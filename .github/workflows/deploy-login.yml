@@ -46,6 +46,12 @@ jobs:
       - name: Remover Husky para la nube
         run: npm pkg delete scripts.prepare
 
+      - name: Instalar y Compilar a la fuerza
+        run: |
+          npm install
+          cd apps/login
+          npm run build
+
       - name: Build And Deploy a Azure
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -53,3 +59,4 @@ jobs:
           action: "upload"
           app_location: "./apps/login"
           output_location: "dist"
+          skip_app_build: true
