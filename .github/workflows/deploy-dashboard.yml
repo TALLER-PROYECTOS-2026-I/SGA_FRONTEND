@@ -1,0 +1,52 @@
+name: Deploy Dashboard SWA
+
+on:
+  push:
+    branches:
+      - qa
+      - prod
+
+jobs:
+  build_and_deploy_dashboard:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Dashboard
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Inyectar Variables de Entorno (.env)
+        run: |
+          echo "VITE_AZURE_AUTHORITY=https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}" >> .env
+          
+          if [[ "${{ github.ref }}" == "refs/heads/qa" ]]; then
+            echo "--- Configurando entorno QA ---"
+            echo "VITE_API_BASE_URL=${{ secrets.VITE_API_URL_QA }}" >> .env
+            echo "VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID_QA }}" >> .env
+            echo "VITE_AZURE_API_SCOPE=api://${{ secrets.AZURE_CLIENT_ID_QA }}/access" >> .env
+            
+            # REEMPLAZAR con la URL real de tu SWA Dashboard QA
+            echo "VITE_REDIRECT_URI=https://zealous-mud-07e3bd10f.6.azurestaticapps.net" >> .env
+            echo "VITE_REDIRECT_LOGIN=https://jolly-tree-0b3e2140f.4.azurestaticapps.net" >> .env
+            
+            echo "SWA_TOKEN=${{ secrets.AZURE_SWA_DASH_TOKEN_QA }}" >> $GITHUB_ENV
+
+          elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+            echo "--- Configurando entorno PRODUCCIÓN ---"
+            echo "VITE_API_BASE_URL=${{ secrets.VITE_API_URL_PROD }}" >> .env
+            echo "VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID_PROD }}" >> .env
+            echo "VITE_AZURE_API_SCOPE=api://${{ secrets.AZURE_CLIENT_ID_PROD }}/access" >> .env
+            
+            # REEMPLAZAR con la URL real de tu SWA Dashboard PROD
+            echo "VITE_REDIRECT_URI=https://kind-cliff-0a90e400f.6.azurestaticapps.net" >> .env
+            echo "VITE_REDIRECT_LOGIN=https://mango-wave-04c2c3a0f.6.azurestaticapps.net" >> .env
+            
+            echo "SWA_TOKEN=${{ secrets.AZURE_SWA_DASH_TOKEN_PROD }}" >> $GITHUB_ENV
+          fi
+        working-directory: ./apps/dashboard
+
+      - name: Build And Deploy a Azure
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ env.SWA_TOKEN }}
+          action: "upload"
+          app_location: "./apps/dashboard"
+          output_location: "dist"
