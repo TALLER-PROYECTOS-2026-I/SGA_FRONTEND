@@ -43,6 +43,10 @@ jobs:
           fi
         working-directory: ./apps/dashboard
 
+      - name: Remover Husky para la nube
+        run: npm pkg delete scripts.prepare
+        working-directory: ./apps/dashboard
+
       - name: Build And Deploy a Azure
         uses: Azure/static-web-apps-deploy@v1
         with:
