@@ -23,10 +23,13 @@ jobs:
             echo "VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID_QA }}" >> .env
             echo "VITE_AZURE_API_SCOPE=api://${{ secrets.AZURE_CLIENT_ID_QA }}/access" >> .env
             
-            # REEMPLAZAR con la URL real de tu SWA Login QA
+            # URL real de tu SWA Login QA
             echo "VITE_REDIRECT_URI=https://jolly-tree-0b3e2140f.4.azurestaticapps.net" >> .env
             
-            # Guardamos el token de SWA de QA en una variable temporal del sistema
+            # ---> NUEVA LÍNEA: Redirección hacia el Dashboard de QA <---
+            echo "VITE_REDIRECT_DASHBOARD=https://zealous-mud-07e3bd10f.6.azurestaticapps.net" >> .env
+            
+            # Guardamos el token de SWA de QA
             echo "SWA_TOKEN=${{ secrets.AZURE_SWA_LOGIN_TOKEN_QA }}" >> $GITHUB_ENV
 
           elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
@@ -35,10 +38,13 @@ jobs:
             echo "VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID_PROD }}" >> .env
             echo "VITE_AZURE_API_SCOPE=api://${{ secrets.AZURE_CLIENT_ID_PROD }}/access" >> .env
             
-            # REEMPLAZAR con la URL real de tu SWA Login PROD
+            # URL real de tu SWA Login PROD
             echo "VITE_REDIRECT_URI=https://mango-wave-04c2c3a0f.6.azurestaticapps.net" >> .env
             
-            # Guardamos el token de SWA de PROD en una variable temporal del sistema
+            # ---> NUEVA LÍNEA: Redirección hacia el Dashboard de PROD <---
+            echo "VITE_REDIRECT_DASHBOARD=https://kind-cliff-0a90e400f.6.azurestaticapps.net" >> .env
+            
+            # Guardamos el token de SWA de PROD
             echo "SWA_TOKEN=${{ secrets.AZURE_SWA_LOGIN_TOKEN_PROD }}" >> $GITHUB_ENV
           fi
         working-directory: ./apps/login
