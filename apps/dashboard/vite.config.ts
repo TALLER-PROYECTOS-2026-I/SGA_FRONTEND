@@ -5,10 +5,7 @@ import path from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -21,9 +18,10 @@ export default defineConfig({
     cssCodeSplit: false,
   },
   server: {
+    port: 5002,
     proxy: {
-      '/api': {
-        target: 'http://localhost:7071',
+      "/api": {
+        target: "http://localhost:7071",
         changeOrigin: true,
         secure: false,
       },

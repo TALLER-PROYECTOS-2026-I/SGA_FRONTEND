@@ -14,6 +14,7 @@ async function sendTokenToBackend({
   const res = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ microsoftToken, mailToken }),
   });
   const data = await res.json();

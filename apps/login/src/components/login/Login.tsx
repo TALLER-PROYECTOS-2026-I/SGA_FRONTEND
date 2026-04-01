@@ -1,7 +1,7 @@
 import { useMsal } from "@azure/msal-react";
 import { useSendTokenToBackend } from "../../hooks/api/login";
 
-const BACKEND_URL = import.meta.env.VITE_API_BASE_URL as string;
+const BACKEND_URL = import.meta.env.VITE_AZURE_API_BASE_URL as string;
 
 function Login() {
   const { instance } = useMsal();

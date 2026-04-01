@@ -4,11 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   server: {
+    port: 5001,
     proxy: {
       "/api": {
         target: "http://localhost:7071", //modificar en produccion con el link de azure nube
