@@ -1,206 +1,212 @@
-import { useState, useEffect } from "react";
-import { useSaveSumilla, useSumilla } from "../hooks/second-step-query";
+import { useState, useMemo } from "react";
+import { Step } from "./step";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
-import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
-import { Step } from "./step";
-import { toast } from "sonner";
-import type { SumillaResponse } from "../../coordinator/hooks/syllabus-section-data-query";
+import {
+  useGetConceptos,
+  useCrearConcepto,
+  useEliminarConcepto,
+  useActualizarConcepto, // <-- Importamos el nuevo Hook
+} from "../hooks/use-conceptos-query";
 
-/**
- * Paso 2: Formulario de Sumilla con validaciones básicas
- *
- * Lógica de modo:
- * - mode="edit": Consume GET para cargar sumilla existente
- *   - Si GET retorna data: usa PUT para actualizar
- *   - Si GET retorna null (404): usa POST para crear
- * - mode="create": Valida si existe data
- *   - Si GET retorna data: usa PUT para actualizar
- *   - Si GET retorna null: usa POST para crear nuevo registro
- * - mode="review": Carga datos del contexto de revisión (solo lectura con posibilidad de comentarios)
- */
 export default function SecondStep() {
   const { nextStep } = useSteps();
-  const { syllabusId, mode, courseName } = useSyllabusContext();
-  const { isReviewMode, sectionData } = useReviewMode();
-  const [summary, setSummary] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [apiError, setApiError] = useState("");
+  const { syllabusId: contextSyllabusId } = useSyllabusContext();
+  const syllabusId = contextSyllabusId || 2; 
 
-  // Load existing sumilla via query (solo en modo normal, no en revisión)
-  const { data, isLoading, isError, error } = useSumilla(
-    isReviewMode ? null : syllabusId,
-  );
-  const saveSumilla = useSaveSumilla();
+  const [semana, setSemana] = useState<number>(1);
+  const [descripcion, setDescripcion] = useState("");
 
-  // Determina si debe crear (POST) o actualizar (PUT)
-  // - En mode="edit": siempre consumir GET primero
-  //   - Si GET retorna data: usar PUT
-  //   - Si GET retorna null (404): usar POST
-  // - En mode="create":
-  //   - Si GET retorna data (ya existe): usar PUT
-  //   - Si GET retorna null: usar POST
-  const isCreating = mode === "edit" ? !data : !data;
+  // ESTADOS PARA LA EDICIÓN INLINE
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
 
-  // Efecto para cargar datos desde el API (modo normal)
-  useEffect(() => {
-    if (isReviewMode) return; // No cargar desde API en modo revisión
+  const unidadId = useMemo(() => {
+    if (semana >= 1 && semana <= 4) return 1;
+    if (semana >= 5 && semana <= 8) return 2;
+    if (semana >= 9 && semana <= 12) return 3;
+    return 4;
+  }, [semana]);
 
-    if (isError) {
-      const errorMsg = error?.message ?? "Error cargando sumilla";
-      // 404 es esperado cuando no existe sumilla aún, no mostrar error
-      if (!errorMsg.includes("404")) {
-        toast.error("Error al cargar sumilla", {
-          description: errorMsg,
-        });
-      }
-      return;
+  const { data: conceptos = [], isLoading } = useGetConceptos(syllabusId, unidadId, semana);
+  const { mutateAsync: crearConcepto, isPending: isCreating } = useCrearConcepto(syllabusId, unidadId, semana);
+  const { mutateAsync: eliminarConcepto, isPending: isDeleting } = useEliminarConcepto(syllabusId, unidadId, semana);
+  const { mutateAsync: actualizarConcepto, isPending: isUpdating } = useActualizarConcepto(syllabusId, unidadId, semana);
+
+  const handleAdd = async () => {
+    if (!descripcion.trim()) return;
+    try {
+      await crearConcepto(descripcion);
+      setDescripcion(""); 
+    } catch (error) {
+      console.error("Error al crear concepto:", error);
     }
-    if (!data) return;
-    if (data?.sumilla) {
-      setSummary(data.sumilla);
-      try {
-        localStorage.setItem("datos_sumilla", data.sumilla);
-      } catch {
-        /* ignore */
-      }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm("¿Seguro que deseas eliminar este contenido conceptual?")) {
+      await eliminarConcepto(id);
     }
-  }, [data, isError, error, isReviewMode]);
+  };
 
-  // Efecto para cargar datos desde el contexto de revisión
-  useEffect(() => {
-    if (!isReviewMode || !sectionData) return;
+  // FUNCIONES DE EDICIÓN
+  const startEditing = (item: any) => {
+    setEditingId(item.id);
+    setEditText(item.descripcion);
+  };
 
-    const reviewData = sectionData as SumillaResponse;
-    if (reviewData.content && reviewData.content.length > 0) {
-      setSummary(reviewData.content[0].sumilla);
-    }
-  }, [isReviewMode, sectionData]);
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditText("");
+  };
 
-  const validateAndNext = async () => {
-    const newErrors: Record<string, string> = {};
-    if (!summary.trim()) newErrors.summary = "Campo obligatorio";
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length === 0) {
-      setApiError("");
-      const id = syllabusId;
-      if (!id) {
-        toast.error("Error", {
-          description:
-            "Id del sílabo no encontrado. Completa el primer paso antes de continuar.",
-        });
-        return;
-      }
-      try {
-        await saveSumilla.mutateAsync({
-          syllabusId: id,
-          data: { sumilla: summary },
-          isCreating,
-        });
-
-        // Mensaje diferenciado según la operación realizada
-        const successMessage = isCreating
-          ? "Sumilla creada exitosamente"
-          : "Sumilla actualizada exitosamente";
-
-        toast.success(successMessage);
-        nextStep();
-      } catch (err: unknown) {
-        // Parsear error estructurado del backend
-        if (err instanceof Error) {
-          try {
-            // Intentar parsear el mensaje como JSON
-            const errorData = JSON.parse(err.message);
-
-            if (errorData.data && Array.isArray(errorData.data)) {
-              // Mostrar cada error de validación
-              errorData.data.forEach(
-                (validationError: { path: string[]; message: string }) => {
-                  toast.error("Error de validación", {
-                    description: validationError.message,
-                  });
-                },
-              );
-            } else {
-              toast.error("Error al guardar", {
-                description: errorData.message || err.message,
-              });
-            }
-          } catch {
-            // Si no es JSON, mostrar el mensaje directamente
-            toast.error("Error al guardar la sumilla", {
-              description: err.message,
-            });
-          }
-        } else {
-          toast.error("Error desconocido", {
-            description: String(err),
-          });
-        }
-      }
-    } else {
-      // enfocar primer campo con error
-      if (newErrors.summary) {
-        const el = document.querySelector(
-          'textarea[name="summary"]',
-        ) as HTMLElement | null;
-        if (el && typeof el.focus === "function") el.focus();
-      }
+  const handleSaveEdit = async (id: number) => {
+    if (!editText.trim()) return;
+    try {
+      await actualizarConcepto({ contenidoId: id, descripcion: editText });
+      setEditingId(null); // Cerramos el modo edición al terminar
+    } catch (error) {
+      console.error("Error al actualizar:", error);
     }
   };
 
   return (
-    <Step step={2} onNextStep={validateAndNext}>
-      <div className="w-full">
-        {isLoading && (
-          <div className="mb-4 text-sm text-gray-700">Cargando sumilla...</div>
-        )}
+    <Step step={2} onNextStep={nextStep}>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#b91c1c] text-white flex items-center justify-center font-bold">
+            2
+          </div>
+          <h2 className="text-xl font-bold text-[#b91c1c]">Contenidos Conceptuales</h2>
+        </div>
 
-        <div className="mb-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="text-lg font-bold text-black">1.</div>
-            <h3 className="text-lg font-medium text-black">Datos Generales</h3>
-            <div className="ml-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-              i
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+          
+          {/* COLUMNA IZQUIERDA */}
+          <div>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Seleccione una semana</label>
+              <select
+                className="w-full border border-gray-300 rounded-md p-2.5 focus:ring-[#b91c1c] focus:border-[#b91c1c] text-sm"
+                value={semana}
+                onChange={(e) => {
+                  setSemana(Number(e.target.value));
+                  setDescripcion("");
+                  setEditingId(null); // Cancelar edición si cambia de semana
+                }}
+              >
+                {Array.from({ length: 16 }, (_, i) => i + 1).map((s) => (
+                  <option key={s} value={s}>Semana {s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Contenidos Conceptuales</label>
+              <div className="relative">
+                <textarea
+                  className="w-full border border-gray-300 rounded-md p-3 h-32 resize-none focus:ring-[#b91c1c] focus:border-[#b91c1c] text-sm"
+                  maxLength={400}
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Escriba el contenido de esta semana..."
+                />
+                <div className="absolute bottom-3 right-4 text-xs text-gray-400 font-medium">
+                  {descripcion.length}/400
+                </div>
+                
+                <button
+                  onClick={handleAdd}
+                  disabled={!descripcion.trim() || isCreating}
+                  className="absolute bottom-[-18px] right-[-15px] w-12 h-12 bg-[#b91c1c] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-800 disabled:opacity-50 text-2xl pb-1 cursor-pointer z-10 transition-transform hover:scale-105"
+                  title="Agregar contenido"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
-          <div className="w-full h-12 rounded-md px-4 flex items-center text-lg bg-blue-50 border border-blue-100">
-            {courseName || "TALLER DE PROYECTOS"}
-          </div>
-        </div>
 
-        <div className="mb-2">
-          <div className="flex items-center gap-3">
-            <div className="text-lg font-bold text-black">2.</div>
-            <h3 className="text-lg font-medium text-black">Sumilla</h3>
-            <div className="ml-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-              i
+          {/* COLUMNA DERECHA */}
+          <div className="bg-gray-50/50 rounded-lg p-4 border border-gray-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-700">Lista de Contenidos conceptuales</h3>
+              <span className="bg-[#2563eb] text-white text-xs px-4 py-1 rounded-full font-medium">
+                Semana {semana}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {isLoading ? (
+                <p className="text-gray-500 text-sm text-center py-4">Cargando contenidos...</p>
+              ) : conceptos.length === 0 ? (
+                <p className="text-gray-400 text-sm italic text-center py-4">No hay contenidos registrados en esta semana.</p>
+              ) : (
+                conceptos.map((item: any, index: number) => {
+                  
+                  // SI ESTAMOS EDITANDO ESTE ITEM, MOSTRAMOS LA CAJA DE EDICIÓN (Diseño Figma)
+                  if (editingId === item.id) {
+                    return (
+                      <div key={item.id} className="flex flex-col border-2 border-blue-500 rounded-lg p-3 bg-white gap-3 shadow-sm transition-all">
+                        <textarea
+                          className="w-full border-none rounded-md p-0 text-sm text-gray-700 resize-none focus:ring-0 leading-relaxed"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          rows={2}
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2 mt-1">
+                          <button 
+                            onClick={cancelEditing} 
+                            className="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            onClick={() => handleSaveEdit(item.id)} 
+                            disabled={isUpdating} 
+                            className="px-4 py-1.5 bg-[#b91c1c] text-white rounded-md text-sm font-semibold hover:bg-red-800 disabled:opacity-50 transition-colors"
+                          >
+                            Guardar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // SI NO LO ESTAMOS EDITANDO, MOSTRAMOS LA VISTA NORMAL
+                  return (
+                    <div key={item.id} className="flex border border-blue-200 rounded-md bg-blue-50/50 p-3 items-start gap-3 group transition-colors hover:bg-blue-50">
+                      <div className="w-6 h-6 rounded-full bg-[#2563eb] text-white flex items-center justify-center text-xs shrink-0 mt-0.5 font-medium shadow-sm">
+                        {index + 1}
+                      </div>
+                      <p className="text-sm text-gray-700 flex-1 leading-relaxed">{item.descripcion}</p>
+                      
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          className="text-blue-600 hover:text-blue-800 p-1" 
+                          onClick={() => startEditing(item)}
+                          title="Editar"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </button>
+                        <button 
+                          className="text-red-600 hover:text-red-800 p-1"
+                          onClick={() => handleDelete(item.id)}
+                          disabled={isDeleting || editingId !== null}
+                          title="Eliminar"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
-
-        <div>
-          <textarea
-            name="summary"
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder="Escribe la sumilla aquí..."
-            rows={8}
-            disabled={isLoading}
-            className={`w-full min-h-[160px] rounded-lg px-4 py-4 bg-white border resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.summary ? "border-red-500" : "border-gray-300"} ${isLoading ? "opacity-50 cursor-not-allowed bg-gray-100" : ""}`}
-          />
-          {errors.summary && (
-            <div className="text-red-600 text-sm mt-1">{errors.summary}</div>
-          )}
-        </div>
-
-        {apiError && (
-          <div className="text-red-600 text-sm mt-3">{apiError}</div>
-        )}
-
-        {saveSumilla.isPending && (
-          <div className="text-sm text-blue-600 mt-3">Guardando sumilla...</div>
-        )}
       </div>
     </Step>
   );
