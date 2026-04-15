@@ -24,6 +24,7 @@ import ReviewSyllabusList from "./features/coordinator/pages/review-syllabus-lis
 import ReviewSyllabusDetail from "./features/coordinator/pages/review-syllabus-detail";
 import ReviewSyllabusSummary from "./features/coordinator/pages/review-syllabus-summary";
 import SyllabusCatalog from "./features/coordinator/pages/syllabus-catalog";
+import ImportSignedSyllabusPage from "./features/director/pages/import-signed-syllabus";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,14 @@ export default function App() {
           <CoordinatorProvider>
             <Toaster position="top-right" richColors closeButton />
             <Routes>
+              <Route
+                path="/director/importar-silabo-firmado"
+                element={
+                  <MainLayout title="Importar Sílabo con firma">
+                    <ImportSignedSyllabusPage />
+                  </MainLayout>
+                }
+              />
               <Route
                 path="/"
                 element={
@@ -91,7 +100,6 @@ export default function App() {
                   </MainLayout>
                 }
               />
-
               {/* Coordinator Routes */}
               <Route
                 path="/coordinator/assignments"
@@ -157,7 +165,6 @@ export default function App() {
                   </MainLayout>
                 }
               />
-
               {/* Fallback route */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
