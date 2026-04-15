@@ -158,7 +158,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
 
   const filteredAssignments = assignments.filter(
     (assignment: Assignment) => {
-      const group = groupMap[assignment.cursoCodigo] || "";
+      const group = groupMap[assignment.cursoCodigo] || "Sin grupo";
       
       const matchesSearch =
         assignment.cursoNombre
@@ -167,10 +167,8 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
         assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         group.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const normalizedStatus = normalizeStatus(assignment.estadoRevision);
-
       const matchesStatus =
-        selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+        selectedStatus === "ALL" || normalizeStatus(assignment.estadoRevision) === selectedStatus;
 
       return matchesSearch && matchesStatus;
     },
@@ -209,7 +207,6 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
     estado: string,
     syllabusId?: number,
   ) => {
-    const normalizedStatus = normalizeStatus(estado);
     const mode = "edit";
 
     const url = syllabusId
@@ -395,8 +392,8 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                   border: "border-slate-200",
                 };
 
-                const group = groupMap[assignment.cursoCodigo] || "";
-                const date = dateMap[assignment.cursoCodigo] || "";
+                const group = groupMap[assignment.cursoCodigo] || "Sin grupo";
+                const date = dateMap[assignment.cursoCodigo] || "Sin fecha";
                 const permissions = getPermissionsByStatus(normalizedStatus);
 
                 return (
@@ -516,7 +513,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                         )}
                       </div>
                     </td>
-                   </tr>
+                  </tr>
                 );
               })}
             </tbody>
