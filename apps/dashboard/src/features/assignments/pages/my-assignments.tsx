@@ -30,8 +30,6 @@ export default function MyAssignments() {
     | "APROBADO"
     | "ANALIZANDO"
     | "DESAPROBADO"
-    | "ASIGNADO"
-    | "NUEVO";
 
   type FilterStatus = "ALL" | AssignmentStatus;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
@@ -46,8 +44,7 @@ export default function MyAssignments() {
     if (value === "APROBADO") return "APROBADO";
     if (value === "ANALIZANDO" || value === "PENDIENTE") return "ANALIZANDO";
     if (value === "DESAPROBADO" || value === "RECHAZADO") return "DESAPROBADO";
-    if (value === "ASIGNADO") return "ASIGNADO";
-    if (value === "NUEVO") return "NUEVO";
+  
 
     return null;
   };
@@ -78,22 +75,6 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
         canDelete: false,
       };
 
-    case "NUEVO":
-      return {
-        canView: true,
-        canEdit: true,
-        canImport: true,
-        canDelete: true,
-      };
-
-    case "ASIGNADO":
-      return {
-        canView: true,
-        canEdit: true,
-        canImport: true,
-        canDelete: true,
-      };
-
     default:
       return {
         canView: false,
@@ -105,86 +86,95 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
 };
 
   const statusConfig: Record<
-    AssignmentStatus,
-    {
-      label: string;
-      dot: string;
-      textColor: string;
-      bgColor: string;
-      border: string;
-    }
-  > = {
-    APROBADO: {
-      label: "Aprobado",
-      dot: "bg-green-500",
-      textColor: "text-green-700",
-      bgColor: "bg-green-50",
-      border: "border-green-200",
-    },
-    ANALIZANDO: {
-      label: "Pendiente",
-      dot: "bg-yellow-500",
-      textColor: "text-yellow-700",
-      bgColor: "bg-yellow-50",
-      border: "border-yellow-200",
-    },
-    DESAPROBADO: {
-      label: "Rechazado",
-      dot: "bg-red-500",
-      textColor: "text-red-700",
-      bgColor: "bg-red-50",
-      border: "border-red-200",
-    },
-    ASIGNADO: {
-      label: "Asignado",
-      dot: "bg-blue-500",
-      textColor: "text-blue-700",
-      bgColor: "bg-blue-50",
-      border: "border-blue-200",
-    },
-    NUEVO: {
-      label: "Nuevo",
-      dot: "bg-purple-500",
-      textColor: "text-purple-700",
-      bgColor: "bg-purple-50",
-      border: "border-purple-200",
-    },
+  AssignmentStatus,
+  {
+    label: string;
+    dot: string;
+    textColor: string;
+    bgColor: string;
+    border: string;
+  }
+> = {
+  APROBADO: {
+    label: "Aprobado",
+    dot: "bg-green-500",
+    textColor: "text-green-700",
+    bgColor: "bg-green-50",
+    border: "border-green-200",
+  },
+  ANALIZANDO: {
+    label: "Pendiente",
+    dot: "bg-yellow-500",
+    textColor: "text-yellow-700",
+    bgColor: "bg-yellow-50",
+    border: "border-yellow-200",
+  },
+  DESAPROBADO: {
+    label: "Rechazado",
+    dot: "bg-red-500",
+    textColor: "text-red-700",
+    bgColor: "bg-red-50",
+    border: "border-red-200",
+  },
+};
+
+  const getGroupByIndex = (index: number) => {
+    const groups = ["A1", "A2", "B1", "B2", "C1", "C2"];
+    return groups[index % groups.length];
   };
 
-  const getFakeGroup = (index: number) => {
-    return ["A1", "B2", "C1", "A2", "B1", "C2"][index % 6];
-  };
-
-  const getFakeDate = (index: number) => {
-    return [
+  const getDateByIndex = (index: number) => {
+    const dates = [
       "15/05/2026",
       "20/05/2026",
       "18/05/2026",
       "22/05/2026",
       "17/05/2026",
       "25/05/2026",
-    ][index % 6];
+    ];
+    return dates[index % dates.length];
   };
 
+  // Crear un mapa de grupos por curso para mantener consistencia
+  const [groupMap, setGroupMap] = useState<Record<string, string>>({});
+  const [dateMap, setDateMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (assignments.length > 0) {
+      const newGroupMap: Record<string, string> = {};
+      const newDateMap: Record<string, string> = {};
+      
+      assignments.forEach((assignment, index) => {
+        if (!newGroupMap[assignment.cursoCodigo]) {
+          newGroupMap[assignment.cursoCodigo] = getGroupByIndex(index);
+          newDateMap[assignment.cursoCodigo] = getDateByIndex(index);
+        }
+      });
+      
+      setGroupMap(newGroupMap);
+      setDateMap(newDateMap);
+    }
+  }, [assignments]);
+
   const filteredAssignments = assignments.filter(
-  (assignment: Assignment, index: number) => {
-    const fakeGroup = getFakeGroup(index);
+    (assignment: Assignment) => {
+      const group = groupMap[assignment.cursoCodigo] || "";
+      
+      const matchesSearch =
+        assignment.cursoNombre
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        group.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesSearch =
-      assignment.cursoNombre
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      fakeGroup.toLowerCase().includes(searchTerm.toLowerCase());
+      const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
-    const normalizedStatus = normalizeStatus(assignment.estadoRevision);
+      const matchesStatus =
+        selectedStatus === "ALL" || normalizedStatus === selectedStatus;
 
-    const matchesStatus =
-      selectedStatus === "ALL" || normalizedStatus === selectedStatus;
-
-    return matchesSearch && matchesStatus;
-  },
-);
+      return matchesSearch && matchesStatus;
+    },
+  );
 
   const handleViewAssignment = async (assignment: Assignment) => {
     setSelectedAssignment(assignment);
@@ -220,7 +210,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
     syllabusId?: number,
   ) => {
     const normalizedStatus = normalizeStatus(estado);
-    const mode = normalizedStatus === "NUEVO" ? "create" : "edit";
+    const mode = "edit";
 
     const url = syllabusId
       ? `/syllabus?codigo=${codigo}&id=${syllabusId}&mode=${mode}`
@@ -387,11 +377,11 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                 <th className="px-6 py-5">Fecha de entrega</th>
                 <th className="px-6 py-5">Estado</th>
                 <th className="px-6 py-5">Acciones</th>
-              </tr>
+               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filteredAssignments.map((assignment: Assignment, index) => {
+              {filteredAssignments.map((assignment: Assignment) => {
                 const normalizedStatus = normalizeStatus(
                   assignment.estadoRevision,
                 );
@@ -405,13 +395,13 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                   border: "border-slate-200",
                 };
 
-                const fakeGroup = getFakeGroup(index);
-                const fakeDate = getFakeDate(index);
+                const group = groupMap[assignment.cursoCodigo] || "";
+                const date = dateMap[assignment.cursoCodigo] || "";
                 const permissions = getPermissionsByStatus(normalizedStatus);
 
                 return (
                   <tr
-                    key={`${assignment.cursoCodigo}-${index}`}
+                    key={`${assignment.cursoCodigo}`}
                     className="hover:bg-slate-50/70"
                   >
                     <td className="px-6 py-5 text-base font-semibold text-slate-800">
@@ -425,11 +415,11 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                     </td>
 
                     <td className="px-6 py-5 text-base text-slate-800">
-                      {fakeGroup}
+                      {group}
                     </td>
 
                     <td className="px-6 py-5 text-base text-slate-500">
-                      {fakeDate}
+                      {date}
                     </td>
 
                     <td className="px-6 py-5">
@@ -526,7 +516,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                         )}
                       </div>
                     </td>
-                  </tr>
+                   </tr>
                 );
               })}
             </tbody>
