@@ -16,6 +16,7 @@ export default function MyAssignments() {
     isLoading,
     isError,
     error,
+    refetch,
   } = useAssignments(docenteId);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,6 +29,18 @@ export default function MyAssignments() {
     useState<Assignment | null>(null);
 
   type AssignmentStatus = "APROBADO" | "ANALIZANDO" | "DESAPROBADO";
+
+
+  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  type AssignmentStatus =
+    | "APROBADO"
+    | "ANALIZANDO"
+    | "DESAPROBADO"
+
 
   type FilterStatus = "ALL" | AssignmentStatus;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
@@ -114,6 +127,48 @@ export default function MyAssignments() {
       border: "border-red-200",
     },
   };
+    const isApproved = status === "APROBADO";
+    
+    return {
+      canView: isApproved,
+      canEdit: isApproved,
+      canImport: isApproved,
+      canDelete: isApproved,
+    };
+  };
+
+  const statusConfig: Record<
+  AssignmentStatus,
+  {
+    label: string;
+    dot: string;
+    textColor: string;
+    bgColor: string;
+    border: string;
+  }
+> = {
+  APROBADO: {
+    label: "Aprobado",
+    dot: "bg-green-500",
+    textColor: "text-green-700",
+    bgColor: "bg-green-50",
+    border: "border-green-200",
+  },
+  ANALIZANDO: {
+    label: "Pendiente",
+    dot: "bg-yellow-500",
+    textColor: "text-yellow-700",
+    bgColor: "bg-yellow-50",
+    border: "border-yellow-200",
+  },
+  DESAPROBADO: {
+    label: "Rechazado",
+    dot: "bg-red-500",
+    textColor: "text-red-700",
+    bgColor: "bg-red-50",
+    border: "border-red-200",
+  },
+};
 
   const getGroupByIndex = (index: number) => {
     const groups = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -161,13 +216,56 @@ export default function MyAssignments() {
       assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
-    const matchesStatus =
-      selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+  const getDateByIndex = (index: number) => {
+    const dates = [
+      "15/05/2026",
+      "20/05/2026",
+      "18/05/2026",
+      "22/05/2026",
+      "17/05/2026",
+      "25/05/2026",
+    ];
+    return dates[index % dates.length];
+  };
 
-    return matchesSearch && matchesStatus;
-  });
+  const [groupMap, setGroupMap] = useState<Record<string, string>>({});
+  const [dateMap, setDateMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (assignments.length > 0) {
+      const newGroupMap: Record<string, string> = {};
+      const newDateMap: Record<string, string> = {};
+      
+      assignments.forEach((assignment, index) => {
+        if (!newGroupMap[assignment.cursoCodigo]) {
+          newGroupMap[assignment.cursoCodigo] = getGroupByIndex(index);
+          newDateMap[assignment.cursoCodigo] = getDateByIndex(index);
+        }
+      });
+      
+      setGroupMap(newGroupMap);
+      setDateMap(newDateMap);
+    }
+  }, [assignments]);
+
+  const filteredAssignments = assignments.filter(
+    (assignment: Assignment) => {
+      const group = groupMap[assignment.cursoCodigo] || "Sin grupo";
+      
+      const matchesSearch =
+        assignment.cursoNombre
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        group.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus =
+        selectedStatus === "ALL" || normalizeStatus(assignment.estadoRevision) === selectedStatus;
+
+      return matchesSearch && matchesStatus;
+    },
+  );
 
   const handleViewAssignment = async (assignment: Assignment) => {
     setSelectedAssignment(assignment);
@@ -212,10 +310,18 @@ export default function MyAssignments() {
   };
 
   const handleDeleteAssignment = async (assignment: Assignment) => {
+
     if (!assignment.syllabusId) {
       alert("No se encontró el ID del sílabo");
       return;
     }
+
+    if (!assignment.syllabusId) return;
+
+    setIsDeleting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
 
     try {
       const API = import.meta.env.VITE_API_BASE_URL;
@@ -243,6 +349,24 @@ export default function MyAssignments() {
     } catch (error) {
       console.error(error);
       alert("Error al eliminar el sílabo");
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message ?? "Error al eliminar el sílabo");
+      }
+
+      setSuccessMessage("Sílabo eliminado correctamente");
+      await refetch();
+      setAssignmentToDelete(null);
+      
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "Error al eliminar el sílabo");
+      setTimeout(() => setErrorMessage(null), 3000);
+    } finally {
+      setIsDeleting(false);
+
     }
   };
 
@@ -281,6 +405,17 @@ export default function MyAssignments() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
+      {errorMessage && (
+        <div className="mb-4 rounded-xl bg-red-50 p-4 text-red-700 border border-red-200">
+          {errorMessage}
+        </div>
+      )}
+      {successMessage && (
+        <div className="mb-4 rounded-xl bg-green-50 p-4 text-green-700 border border-green-200">
+          {successMessage}
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="mb-2 text-5xl font-bold tracking-tight text-slate-900">
           Mis Asignaciones
@@ -371,12 +506,14 @@ export default function MyAssignments() {
                 <th className="px-6 py-5">Acciones</th>
               </tr>
             </thead>
-
             <tbody className="divide-y divide-slate-100">
+
               {filteredAssignments.map((assignment: Assignment) => {
                 const normalizedStatus = normalizeStatus(
                   assignment.estadoRevision,
                 );
+              {filteredAssignments.map((assignment: Assignment, index: number) => {
+                const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
                 const cfg = (normalizedStatus &&
                   statusConfig[normalizedStatus]) ?? {
@@ -396,37 +533,40 @@ export default function MyAssignments() {
                     key={`${assignment.cursoCodigo}`}
                     className="hover:bg-slate-50/70"
                   >
+
+                const group = groupMap[assignment.cursoCodigo] || "Sin grupo";
+                const date = dateMap[assignment.cursoCodigo] || "Sin fecha";
+                const permissions = getPermissionsByStatus(normalizedStatus);
+
+                const uniqueKey = assignment.syllabusId 
+                  ? `${assignment.cursoCodigo}-${assignment.syllabusId}`
+                  : `${assignment.cursoCodigo}-${index}`;
+
+                return (
+                  <tr key={uniqueKey} className="hover:bg-slate-50/70">
+
                     <td className="px-6 py-5 text-base font-semibold text-slate-800">
                       {assignment.cursoCodigo}
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="max-w-[320px] text-base font-semibold text-slate-900">
                         {assignment.cursoNombre}
                       </div>
                     </td>
-
                     <td className="px-6 py-5 text-base text-slate-800">
                       {group}
                     </td>
-
                     <td className="px-6 py-5 text-base text-slate-500">
                       {date}
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="inline-flex items-center gap-3">
-                        <span
-                          className={`h-3.5 w-3.5 rounded-full ${cfg.dot}`}
-                        />
-                        <span
-                          className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold ${cfg.bgColor} ${cfg.textColor} ${cfg.border}`}
-                        >
+                        <span className={`h-3.5 w-3.5 rounded-full ${cfg.dot}`} />
+                        <span className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold ${cfg.bgColor} ${cfg.textColor} ${cfg.border}`}>
                           {cfg.label}
                         </span>
                       </div>
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         {permissions.canView ? (
@@ -478,6 +618,11 @@ export default function MyAssignments() {
                             title="Eliminar"
                           >
                             <Trash2 size={18} />
+
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+
                           </button>
                         ) : (
                           <button
@@ -567,7 +712,7 @@ export default function MyAssignments() {
       </div>
 
       {selectedAssignment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
           <div className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
             <button
               onClick={closeModal}
@@ -706,6 +851,45 @@ export default function MyAssignments() {
           </div>
         </div>
       )}
+
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+              <h3 className="mb-3 text-2xl font-bold text-slate-900">
+                Confirmar eliminación
+              </h3>
+
+              <p className="mb-6 text-slate-600">
+                ¿Deseas eliminar el sílabo de{" "}
+                <span className="font-semibold text-slate-900">
+                  {assignmentToDelete.cursoNombre}
+                </span>
+                ?
+              </p>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setAssignmentToDelete(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (assignmentToDelete) {
+                      handleDeleteAssignment(assignmentToDelete);
+                    }
+                  }}
+                  disabled={isDeleting}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isDeleting ? "Eliminando..." : "Eliminar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
     </div>
   );
 }
