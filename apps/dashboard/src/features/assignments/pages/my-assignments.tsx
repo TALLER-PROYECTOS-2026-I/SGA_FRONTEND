@@ -16,6 +16,7 @@ export default function MyAssignments() {
     isLoading,
     isError,
     error,
+    refetch,
   } = useAssignments(docenteId);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,6 +26,9 @@ export default function MyAssignments() {
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   type AssignmentStatus =
     | "APROBADO"
@@ -44,46 +48,20 @@ export default function MyAssignments() {
     if (value === "APROBADO") return "APROBADO";
     if (value === "ANALIZANDO" || value === "PENDIENTE") return "ANALIZANDO";
     if (value === "DESAPROBADO" || value === "RECHAZADO") return "DESAPROBADO";
-  
 
     return null;
   };
 
-const getPermissionsByStatus = (status: AssignmentStatus | null) => {
-  switch (status) {
-    case "APROBADO":
-      return {
-        canView: true,
-        canEdit: true,
-        canImport: true,
-        canDelete: true,
-      };
-
-    case "ANALIZANDO":
-      return {
-        canView: false,
-        canEdit: false,
-        canImport: false,
-        canDelete: false,
-      };
-
-    case "DESAPROBADO":
-      return {
-        canView: false,
-        canEdit: false,
-        canImport: false,
-        canDelete: false,
-      };
-
-    default:
-      return {
-        canView: false,
-        canEdit: false,
-        canImport: false,
-        canDelete: false,
-      };
-  }
-};
+  const getPermissionsByStatus = (status: AssignmentStatus | null) => {
+    const isApproved = status === "APROBADO";
+    
+    return {
+      canView: isApproved,
+      canEdit: isApproved,
+      canImport: isApproved,
+      canDelete: isApproved,
+    };
+  };
 
   const statusConfig: Record<
   AssignmentStatus,
@@ -135,7 +113,6 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
     return dates[index % dates.length];
   };
 
-  // Crear un mapa de grupos por curso para mantener consistencia
   const [groupMap, setGroupMap] = useState<Record<string, string>>({});
   const [dateMap, setDateMap] = useState<Record<string, string>>({});
 
@@ -216,40 +193,38 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
     navigate(url);
   };
 
-    const handleDeleteAssignment = async (assignment: Assignment) => {
-      if (!assignment.syllabusId) {
-        alert("No se encontró el ID del sílabo");
-        return;
+  const handleDeleteAssignment = async (assignment: Assignment) => {
+    if (!assignment.syllabusId) return;
+
+    setIsDeleting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const API = import.meta.env.VITE_API_BASE_URL;
+
+      const res = await fetch(`${API}/syllabus/${assignment.syllabusId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message ?? "Error al eliminar el sílabo");
       }
 
-      try {
-        const API = import.meta.env.VITE_API_BASE_URL;
-
-        const res = await fetch(`${API}/syllabus/${assignment.syllabusId}`, {
-          method: "DELETE",
-        });
-
-        let data: { message?: string } | null = null;
-
-        try {
-          data = (await res.json()) as { message?: string };
-        } catch {
-          data = null;
-        }
-
-        if (!res.ok) {
-          alert(data?.message ?? "Error al eliminar el sílabo");
-          return;
-        }
-
-        alert("Sílabo eliminado correctamente");
-        setAssignmentToDelete(null);
-        window.location.reload();
-      } catch (error) {
-        console.error(error);
-        alert("Error al eliminar el sílabo");
-      }
-    };
+      setSuccessMessage("Sílabo eliminado correctamente");
+      await refetch();
+      setAssignmentToDelete(null);
+      
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "Error al eliminar el sílabo");
+      setTimeout(() => setErrorMessage(null), 3000);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const closeModal = () => {
     if (pdfUrl) {
@@ -286,6 +261,17 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
+      {errorMessage && (
+        <div className="mb-4 rounded-xl bg-red-50 p-4 text-red-700 border border-red-200">
+          {errorMessage}
+        </div>
+      )}
+      {successMessage && (
+        <div className="mb-4 rounded-xl bg-green-50 p-4 text-green-700 border border-green-200">
+          {successMessage}
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="mb-2 text-5xl font-bold tracking-tight text-slate-900">
           Mis Asignaciones
@@ -374,14 +360,11 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                 <th className="px-6 py-5">Fecha de entrega</th>
                 <th className="px-6 py-5">Estado</th>
                 <th className="px-6 py-5">Acciones</th>
-               </tr>
+              </tr>
             </thead>
-
             <tbody className="divide-y divide-slate-100">
-              {filteredAssignments.map((assignment: Assignment) => {
-                const normalizedStatus = normalizeStatus(
-                  assignment.estadoRevision,
-                );
+              {filteredAssignments.map((assignment: Assignment, index: number) => {
+                const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
                 const cfg = (normalizedStatus &&
                   statusConfig[normalizedStatus]) ?? {
@@ -396,42 +379,34 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                 const date = dateMap[assignment.cursoCodigo] || "Sin fecha";
                 const permissions = getPermissionsByStatus(normalizedStatus);
 
+                const uniqueKey = assignment.syllabusId 
+                  ? `${assignment.cursoCodigo}-${assignment.syllabusId}`
+                  : `${assignment.cursoCodigo}-${index}`;
+
                 return (
-                  <tr
-                    key={`${assignment.cursoCodigo}`}
-                    className="hover:bg-slate-50/70"
-                  >
+                  <tr key={uniqueKey} className="hover:bg-slate-50/70">
                     <td className="px-6 py-5 text-base font-semibold text-slate-800">
                       {assignment.cursoCodigo}
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="max-w-[320px] text-base font-semibold text-slate-900">
                         {assignment.cursoNombre}
                       </div>
                     </td>
-
                     <td className="px-6 py-5 text-base text-slate-800">
                       {group}
                     </td>
-
                     <td className="px-6 py-5 text-base text-slate-500">
                       {date}
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="inline-flex items-center gap-3">
-                        <span
-                          className={`h-3.5 w-3.5 rounded-full ${cfg.dot}`}
-                        />
-                        <span
-                          className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold ${cfg.bgColor} ${cfg.textColor} ${cfg.border}`}
-                        >
+                        <span className={`h-3.5 w-3.5 rounded-full ${cfg.dot}`} />
+                        <span className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold ${cfg.bgColor} ${cfg.textColor} ${cfg.border}`}>
                           {cfg.label}
                         </span>
                       </div>
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         {permissions.canView ? (
@@ -481,8 +456,9 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                             onClick={() => setAssignmentToDelete(assignment)}
                             className="rounded-xl bg-red-50 p-3 text-red-500 transition hover:bg-red-100"
                             title="Eliminar"
+                            disabled={isDeleting}
                           >
-                            <Trash2 size={18} />
+                            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                           </button>
                         ) : (
                           <button
@@ -572,7 +548,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
       </div>
 
       {selectedAssignment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
           <div className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
             <button
               onClick={closeModal}
@@ -675,7 +651,7 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
         </div>
       )}
       {assignmentToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
               <h3 className="mb-3 text-2xl font-bold text-slate-900">
                 Confirmar eliminación
@@ -703,9 +679,10 @@ const getPermissionsByStatus = (status: AssignmentStatus | null) => {
                       handleDeleteAssignment(assignmentToDelete);
                     }
                   }}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                  disabled={isDeleting}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
                 >
-                  Eliminar
+                  {isDeleting ? "Eliminando..." : "Eliminar"}
                 </button>
               </div>
             </div>
