@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, X, Loader2, Upload } from "lucide-react";
+import { Search, Eye, Edit, X, Loader2, Upload, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "../../auth/hooks/use-session";
 import { useAssignments, type Assignment } from "../hooks/assignments-query";
@@ -10,6 +10,7 @@ import { SyllabusPDFDocument } from "../../syllabus/components/SyllabusPDFDocume
 export default function MyAssignments() {
   const { user, isLoading: sessionLoading } = useSession();
   const docenteId = user?.id as number | string | undefined;
+
   const {
     data: assignments = [],
     isLoading,
@@ -23,15 +24,14 @@ export default function MyAssignments() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] =
+    useState<Assignment | null>(null);
 
-  type AssignmentStatus =
-    | "APROBADO"
-    | "ANALIZANDO"
-    | "DESAPROBADO"
-    | "ASIGNADO"
-    | "NUEVO";
+  type AssignmentStatus = "APROBADO" | "ANALIZANDO" | "DESAPROBADO";
+
   type FilterStatus = "ALL" | AssignmentStatus;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
+
   const navigate = useNavigate();
 
   const normalizeStatus = (status?: string): AssignmentStatus | null => {
@@ -42,10 +42,44 @@ export default function MyAssignments() {
     if (value === "APROBADO") return "APROBADO";
     if (value === "ANALIZANDO" || value === "PENDIENTE") return "ANALIZANDO";
     if (value === "DESAPROBADO" || value === "RECHAZADO") return "DESAPROBADO";
-    if (value === "ASIGNADO") return "ASIGNADO";
-    if (value === "NUEVO") return "NUEVO";
 
     return null;
+  };
+
+  const getPermissionsByStatus = (status: AssignmentStatus | null) => {
+    switch (status) {
+      case "APROBADO":
+        return {
+          canView: true,
+          canEdit: true,
+          canImport: true,
+          canDelete: true,
+        };
+
+      case "ANALIZANDO":
+        return {
+          canView: false,
+          canEdit: false,
+          canImport: false,
+          canDelete: false,
+        };
+
+      case "DESAPROBADO":
+        return {
+          canView: false,
+          canEdit: false,
+          canImport: false,
+          canDelete: false,
+        };
+
+      default:
+        return {
+          canView: false,
+          canEdit: false,
+          canImport: false,
+          canDelete: false,
+        };
+    }
   };
 
   const statusConfig: Record<
@@ -79,26 +113,53 @@ export default function MyAssignments() {
       bgColor: "bg-red-50",
       border: "border-red-200",
     },
-    ASIGNADO: {
-      label: "Asignado",
-      dot: "bg-blue-500",
-      textColor: "text-blue-700",
-      bgColor: "bg-blue-50",
-      border: "border-blue-200",
-    },
-    NUEVO: {
-      label: "Nuevo",
-      dot: "bg-purple-500",
-      textColor: "text-purple-700",
-      bgColor: "bg-purple-50",
-      border: "border-purple-200",
-    },
   };
 
+  const getGroupByIndex = (index: number) => {
+    const groups = ["A1", "A2", "B1", "B2", "C1", "C2"];
+    return groups[index % groups.length];
+  };
+
+  const getDateByIndex = (index: number) => {
+    const dates = [
+      "15/05/2026",
+      "20/05/2026",
+      "18/05/2026",
+      "22/05/2026",
+      "17/05/2026",
+      "25/05/2026",
+    ];
+    return dates[index % dates.length];
+  };
+
+  // Crear un mapa de grupos por curso para mantener consistencia
+  const [groupMap, setGroupMap] = useState<Record<string, string>>({});
+  const [dateMap, setDateMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (assignments.length > 0) {
+      const newGroupMap: Record<string, string> = {};
+      const newDateMap: Record<string, string> = {};
+
+      assignments.forEach((assignment, index) => {
+        if (!newGroupMap[assignment.cursoCodigo]) {
+          newGroupMap[assignment.cursoCodigo] = getGroupByIndex(index);
+          newDateMap[assignment.cursoCodigo] = getDateByIndex(index);
+        }
+      });
+
+      setGroupMap(newGroupMap);
+      setDateMap(newDateMap);
+    }
+  }, [assignments]);
+
   const filteredAssignments = assignments.filter((assignment: Assignment) => {
+    const group = groupMap[assignment.cursoCodigo] || "";
+
     const matchesSearch =
       assignment.cursoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase());
+      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      group.toLowerCase().includes(searchTerm.toLowerCase());
 
     const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
@@ -138,17 +199,51 @@ export default function MyAssignments() {
 
   const handleEditAssignment = (
     codigo: string,
-    estado: string,
+    _estado: string,
     syllabusId?: number,
   ) => {
-    const normalizedStatus = normalizeStatus(estado);
-    const mode = normalizedStatus === "NUEVO" ? "create" : "edit";
+    const mode = "edit";
 
     const url = syllabusId
       ? `/syllabus?codigo=${codigo}&id=${syllabusId}&mode=${mode}`
       : `/syllabus?codigo=${codigo}&mode=${mode}`;
 
     navigate(url);
+  };
+
+  const handleDeleteAssignment = async (assignment: Assignment) => {
+    if (!assignment.syllabusId) {
+      alert("No se encontró el ID del sílabo");
+      return;
+    }
+
+    try {
+      const API = import.meta.env.VITE_API_BASE_URL;
+
+      const res = await fetch(`${API}/syllabus/${assignment.syllabusId}`, {
+        method: "DELETE",
+      });
+
+      let data: { message?: string } | null = null;
+
+      try {
+        data = (await res.json()) as { message?: string };
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        alert(data?.message ?? "Error al eliminar el sílabo");
+        return;
+      }
+
+      alert("Sílabo eliminado correctamente");
+      setAssignmentToDelete(null);
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      alert("Error al eliminar el sílabo");
+    }
   };
 
   const closeModal = () => {
@@ -278,7 +373,7 @@ export default function MyAssignments() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filteredAssignments.map((assignment: Assignment, index) => {
+              {filteredAssignments.map((assignment: Assignment) => {
                 const normalizedStatus = normalizeStatus(
                   assignment.estadoRevision,
                 );
@@ -292,21 +387,13 @@ export default function MyAssignments() {
                   border: "border-slate-200",
                 };
 
-                const fakeGroup = ["A1", "B2", "C1", "A2", "B1", "C2"][
-                  index % 6
-                ];
-                const fakeDate = [
-                  "15/05/2026",
-                  "20/05/2026",
-                  "18/05/2026",
-                  "22/05/2026",
-                  "17/05/2026",
-                  "25/05/2026",
-                ][index % 6];
+                const group = groupMap[assignment.cursoCodigo] || "";
+                const date = dateMap[assignment.cursoCodigo] || "";
+                const permissions = getPermissionsByStatus(normalizedStatus);
 
                 return (
                   <tr
-                    key={assignment.cursoCodigo}
+                    key={`${assignment.cursoCodigo}`}
                     className="hover:bg-slate-50/70"
                   >
                     <td className="px-6 py-5 text-base font-semibold text-slate-800">
@@ -320,11 +407,11 @@ export default function MyAssignments() {
                     </td>
 
                     <td className="px-6 py-5 text-base text-slate-800">
-                      {fakeGroup}
+                      {group}
                     </td>
 
                     <td className="px-6 py-5 text-base text-slate-500">
-                      {fakeDate}
+                      {date}
                     </td>
 
                     <td className="px-6 py-5">
@@ -342,17 +429,25 @@ export default function MyAssignments() {
 
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleViewAssignment(assignment)}
-                          className="rounded-xl bg-blue-50 p-3 text-blue-500 transition hover:bg-blue-100"
-                          title="Ver"
-                        >
-                          <Eye size={18} />
-                        </button>
+                        {permissions.canView ? (
+                          <button
+                            onClick={() => handleViewAssignment(assignment)}
+                            className="rounded-xl bg-blue-50 p-3 text-blue-500 transition hover:bg-blue-100"
+                            title="Ver"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="cursor-not-allowed rounded-xl bg-slate-100 p-3 text-slate-300"
+                            title="Ver bloqueado"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
 
-                        {(normalizedStatus === "DESAPROBADO" ||
-                          normalizedStatus === "ASIGNADO" ||
-                          normalizedStatus === "NUEVO") && (
+                        {permissions.canEdit ? (
                           <button
                             onClick={() =>
                               handleEditAssignment(
@@ -366,15 +461,51 @@ export default function MyAssignments() {
                           >
                             <Edit size={18} />
                           </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="cursor-not-allowed rounded-xl bg-slate-100 p-3 text-slate-300"
+                            title="Editar bloqueado"
+                          >
+                            <Edit size={18} />
+                          </button>
                         )}
 
-                        <a
-                          href={`/director/importar-silabo-firmado?silaboId=${assignment.syllabusId}&cursoCodigo=${encodeURIComponent(assignment.cursoCodigo)}&cursoNombre=${encodeURIComponent(assignment.cursoNombre)}`}
-                          className="rounded-xl bg-purple-50 p-3 text-purple-600 transition hover:bg-purple-100"
-                          title="Importar sílabo firmado"
-                        >
-                          <Upload size={18} />
-                        </a>
+                        {permissions.canDelete ? (
+                          <button
+                            onClick={() => setAssignmentToDelete(assignment)}
+                            className="rounded-xl bg-red-50 p-3 text-red-500 transition hover:bg-red-100"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="cursor-not-allowed rounded-xl bg-slate-100 p-3 text-slate-300"
+                            title="Eliminar bloqueado"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+
+                        {permissions.canImport ? (
+                          <a
+                            href={`/director/importar-silabo-firmado?silaboId=${assignment.syllabusId}&cursoCodigo=${encodeURIComponent(assignment.cursoCodigo)}&cursoNombre=${encodeURIComponent(assignment.cursoNombre)}`}
+                            className="rounded-xl bg-purple-50 p-3 text-purple-600 transition hover:bg-purple-100"
+                            title="Importar sílabo firmado"
+                          >
+                            <Upload size={18} />
+                          </a>
+                        ) : (
+                          <button
+                            disabled
+                            className="cursor-not-allowed rounded-xl bg-slate-100 p-3 text-slate-300"
+                            title="Importar bloqueado"
+                          >
+                            <Upload size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -455,26 +586,26 @@ export default function MyAssignments() {
                 <span>•</span>
                 <span>
                   Estado:{" "}
-                  <span
-                    className={`font-semibold ${
-                      (normalizeStatus(selectedAssignment.estadoRevision) &&
-                        statusConfig[
-                          normalizeStatus(
-                            selectedAssignment.estadoRevision,
-                          ) as AssignmentStatus
-                        ]?.textColor) ||
-                      "text-slate-700"
-                    }`}
-                  >
-                    {(normalizeStatus(selectedAssignment.estadoRevision) &&
-                      statusConfig[
-                        normalizeStatus(
-                          selectedAssignment.estadoRevision,
-                        ) as AssignmentStatus
-                      ]?.label) ||
-                      selectedAssignment.estadoRevision}
-                  </span>
+                  {(() => {
+                    const modalStatus = normalizeStatus(
+                      selectedAssignment.estadoRevision,
+                    );
+                    const modalCfg = modalStatus
+                      ? statusConfig[modalStatus]
+                      : null;
+
+                    return (
+                      <span
+                        className={`font-semibold ${
+                          modalCfg?.textColor || "text-slate-700"
+                        }`}
+                      >
+                        {modalCfg?.label || selectedAssignment.estadoRevision}
+                      </span>
+                    );
+                  })()}
                 </span>
+
                 {selectedAssignment.syllabusId && (
                   <>
                     <span>•</span>
@@ -534,6 +665,43 @@ export default function MyAssignments() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {assignmentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-3 text-2xl font-bold text-slate-900">
+              Confirmar eliminación
+            </h3>
+
+            <p className="mb-6 text-slate-600">
+              ¿Deseas eliminar el sílabo de{" "}
+              <span className="font-semibold text-slate-900">
+                {assignmentToDelete.cursoNombre}
+              </span>
+              ?
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setAssignmentToDelete(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={() => {
+                  if (assignmentToDelete) {
+                    handleDeleteAssignment(assignmentToDelete);
+                  }
+                }}
+                className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              >
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
