@@ -2,13 +2,11 @@ export const sidebarMenusByRole = {
   docente: [
     { to: "/", label: "Inicio" },
     { to: "/mis-asignaciones", label: "Mis Asignaciones" },
-    { to: "/management", label: "Asignar Docente" },
   ],
   coordinadora_academica: [
     { to: "/", label: "Inicio" },
     { to: "/coordinator/permissions", label: "Activar Permisos" },
     { to: "/coordinator/send-email", label: "Enviar Correo" },
-    { to: "/management", label: "Asignar Docente" },
   ],
   director_escuela: [
     { to: "/", label: "Inicio" },
