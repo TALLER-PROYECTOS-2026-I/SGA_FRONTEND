@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, X, Loader2 } from "lucide-react";
+import { Search, Eye, Edit, X, Loader2, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "../../auth/hooks/use-session";
 import { useAssignments, type Assignment } from "../hooks/assignments-query";
@@ -34,49 +34,77 @@ export default function MyAssignments() {
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
   const navigate = useNavigate();
 
-  // Config visual por estado
+  const normalizeStatus = (status?: string): AssignmentStatus | null => {
+    if (!status) return null;
+
+    const value = status.toUpperCase().trim();
+
+    if (value === "APROBADO") return "APROBADO";
+    if (value === "ANALIZANDO" || value === "PENDIENTE") return "ANALIZANDO";
+    if (value === "DESAPROBADO" || value === "RECHAZADO") return "DESAPROBADO";
+    if (value === "ASIGNADO") return "ASIGNADO";
+    if (value === "NUEVO") return "NUEVO";
+
+    return null;
+  };
+
   const statusConfig: Record<
     AssignmentStatus,
-    { label: string; color: string; textColor: string; bgColor: string }
+    {
+      label: string;
+      dot: string;
+      textColor: string;
+      bgColor: string;
+      border: string;
+    }
   > = {
     APROBADO: {
       label: "Aprobado",
-      color: "bg-green-500",
+      dot: "bg-green-500",
       textColor: "text-green-700",
       bgColor: "bg-green-50",
+      border: "border-green-200",
     },
     ANALIZANDO: {
-      label: "Analizando",
-      color: "bg-yellow-500",
+      label: "Pendiente",
+      dot: "bg-yellow-500",
       textColor: "text-yellow-700",
       bgColor: "bg-yellow-50",
+      border: "border-yellow-200",
     },
     DESAPROBADO: {
-      label: "Desaprobado",
-      color: "bg-red-500",
+      label: "Rechazado",
+      dot: "bg-red-500",
       textColor: "text-red-700",
       bgColor: "bg-red-50",
+      border: "border-red-200",
     },
     ASIGNADO: {
       label: "Asignado",
-      color: "bg-blue-500",
+      dot: "bg-blue-500",
       textColor: "text-blue-700",
       bgColor: "bg-blue-50",
+      border: "border-blue-200",
     },
     NUEVO: {
       label: "Nuevo",
-      color: "bg-purple-500",
+      dot: "bg-purple-500",
       textColor: "text-purple-700",
       bgColor: "bg-purple-50",
+      border: "border-purple-200",
     },
   };
 
   const filteredAssignments = assignments.filter((assignment: Assignment) => {
-    const matchesSearch = assignment.cursoNombre
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      assignment.cursoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const normalizedStatus = normalizeStatus(assignment.estadoRevision);
+
     const matchesStatus =
-      selectedStatus === "ALL" || assignment.estadoRevision === selectedStatus;
+      selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+
     return matchesSearch && matchesStatus;
   });
 
@@ -85,7 +113,6 @@ export default function MyAssignments() {
     setPdfUrl(null);
     setPdfError(null);
 
-    // Solo generar preview si tiene syllabusId
     if (!assignment.syllabusId) {
       setPdfError("No hay sílabo disponible para previsualizar");
       return;
@@ -94,19 +121,13 @@ export default function MyAssignments() {
     setIsLoadingPdf(true);
 
     try {
-      console.log(`📥 Cargando sílabo ID: ${assignment.syllabusId}...`);
       const data = await syllabusPDFService.fetchCompleteSyllabus(
         assignment.syllabusId,
       );
-
-      console.log(`📄 Generando PDF blob...`);
       const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
       const url = URL.createObjectURL(blob);
-
       setPdfUrl(url);
-      console.log("✅ PDF generado exitosamente");
     } catch (err) {
-      console.error("❌ Error al generar PDF:", err);
       setPdfError(
         err instanceof Error ? err.message : "Error al cargar el sílabo",
       );
@@ -120,9 +141,8 @@ export default function MyAssignments() {
     estado: string,
     syllabusId?: number,
   ) => {
-    // Si es NUEVO, usar mode=create
-    // Si es DESAPROBADO o ASIGNADO, usar mode=edit
-    const mode = estado === "NUEVO" ? "create" : "edit";
+    const normalizedStatus = normalizeStatus(estado);
+    const mode = normalizedStatus === "NUEVO" ? "create" : "edit";
 
     const url = syllabusId
       ? `/syllabus?codigo=${codigo}&id=${syllabusId}&mode=${mode}`
@@ -132,7 +152,6 @@ export default function MyAssignments() {
   };
 
   const closeModal = () => {
-    // Limpiar URL del PDF para liberar memoria
     if (pdfUrl) {
       URL.revokeObjectURL(pdfUrl);
     }
@@ -141,7 +160,6 @@ export default function MyAssignments() {
     setPdfError(null);
   };
 
-  // Limpiar URL del PDF cuando el componente se desmonte
   useEffect(() => {
     return () => {
       if (pdfUrl) {
@@ -167,41 +185,52 @@ export default function MyAssignments() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
+    <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
+        <h1 className="mb-2 text-5xl font-bold tracking-tight text-slate-900">
           Mis Asignaciones
         </h1>
+        <p className="text-2xl text-slate-500">
+          Gestiona y revisa tus sílabos asignados
+        </p>
+      </div>
 
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md mb-6">
-          <Search
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            size={20}
-          />
-          <input
-            type="text"
-            placeholder="Buscar curso..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+      <div className="relative mb-5">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          size={22}
+        />
+        <input
+          type="text"
+          placeholder="Buscar por código, asignatura o grupo..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-base shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
 
-        {/* Filtros por estado */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {/* Todos */}
+      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-base font-semibold text-slate-700">
+            Filtrar por estado:
+          </span>
+
           <button
             onClick={() => setSelectedStatus("ALL")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
               selectedStatus === "ALL"
-                ? "bg-blue-500 text-white shadow-md"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             }`}
           >
-            <span className="text-sm">Todos</span>
-            <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full text-black">
+            Todos
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                selectedStatus === "ALL"
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-slate-700"
+              }`}
+            >
               {assignments.length}
             </span>
           </button>
@@ -209,27 +238,24 @@ export default function MyAssignments() {
           {(Object.keys(statusConfig) as AssignmentStatus[]).map((key) => {
             const cfg = statusConfig[key];
             const count = assignments.filter(
-              (a) => a.estadoRevision === key,
+              (a) => normalizeStatus(a.estadoRevision) === key,
             ).length;
             const isSelected = selectedStatus === key;
+
             return (
               <button
                 key={key}
                 onClick={() => setSelectedStatus(key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
                   isSelected
-                    ? `${cfg.color} text-white shadow-md`
-                    : `${cfg.bgColor} ${cfg.textColor} hover:shadow-sm`
+                    ? `${cfg.bgColor} ${cfg.textColor} ${cfg.border}`
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                <div
-                  className={`w-3 h-3 rounded-full ${isSelected ? "bg-white bg-opacity-30" : cfg.color}`}
-                ></div>
-                <span className="text-sm">{cfg.label}</span>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${isSelected ? "bg-white bg-opacity-20" : "bg-white bg-opacity-60"}`}
-                >
-                  <span className="text-black">{count}</span>
+                <span className={`h-3 w-3 rounded-full ${cfg.dot}`} />
+                {cfg.label}
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-700">
+                  {count}
                 </span>
               </button>
             );
@@ -237,110 +263,216 @@ export default function MyAssignments() {
         </div>
       </div>
 
-      {/* Assignments List */}
-      <div className="space-y-4">
-        {filteredAssignments.map((assignment: Assignment) => (
-          <div
-            key={assignment.cursoCodigo}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                <h3 className="text-lg font-medium text-gray-800">
-                  {assignment.cursoNombre}
-                </h3>
-              </div>
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="border-b border-slate-200 bg-white">
+              <tr className="text-left text-sm font-extrabold uppercase tracking-wide text-slate-700">
+                <th className="px-6 py-5">Código</th>
+                <th className="px-6 py-5">Asignatura</th>
+                <th className="px-6 py-5">Grupo</th>
+                <th className="px-6 py-5">Fecha de entrega</th>
+                <th className="px-6 py-5">Estado</th>
+                <th className="px-6 py-5">Acciones</th>
+              </tr>
+            </thead>
 
-              <div className="flex items-center gap-3">
-                {/* Estado con badge coloreado */}
-                {(() => {
-                  const cfg = statusConfig[
-                    assignment.estadoRevision as AssignmentStatus
-                  ] ?? {
-                    label: assignment.estadoRevision,
-                    color: "bg-gray-400",
-                    textColor: "text-gray-700",
-                    bgColor: "bg-gray-100",
-                  };
-                  return (
-                    <div
-                      className={`flex items-center gap-2 px-2 py-1 rounded ${cfg.bgColor} ${cfg.textColor}`}
-                    >
-                      <div
-                        className={`w-3 h-3 rounded-full ${cfg.color}`}
-                      ></div>
-                      <span className="text-xs font-semibold">{cfg.label}</span>
-                    </div>
-                  );
-                })()}
+            <tbody className="divide-y divide-slate-100">
+              {filteredAssignments.map((assignment: Assignment, index) => {
+                const normalizedStatus = normalizeStatus(
+                  assignment.estadoRevision,
+                );
 
-                {/* Editar solo si está desaprobado, asignado o nuevo */}
-                {(assignment.estadoRevision === "DESAPROBADO" ||
-                  assignment.estadoRevision === "ASIGNADO" ||
-                  assignment.estadoRevision === "NUEVO") && (
-                  <button
-                    onClick={() =>
-                      handleEditAssignment(
-                        assignment.cursoCodigo,
-                        assignment.estadoRevision,
-                        assignment.syllabusId,
-                      )
-                    }
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                const cfg = (normalizedStatus &&
+                  statusConfig[normalizedStatus]) ?? {
+                  label: assignment.estadoRevision,
+                  dot: "bg-slate-400",
+                  textColor: "text-slate-700",
+                  bgColor: "bg-slate-50",
+                  border: "border-slate-200",
+                };
+
+                const fakeGroup = ["A1", "B2", "C1", "A2", "B1", "C2"][
+                  index % 6
+                ];
+                const fakeDate = [
+                  "15/05/2026",
+                  "20/05/2026",
+                  "18/05/2026",
+                  "22/05/2026",
+                  "17/05/2026",
+                  "25/05/2026",
+                ][index % 6];
+
+                return (
+                  <tr
+                    key={assignment.cursoCodigo}
+                    className="hover:bg-slate-50/70"
                   >
-                    <Edit size={18} />
-                  </button>
-                )}
+                    <td className="px-6 py-5 text-base font-semibold text-slate-800">
+                      {assignment.cursoCodigo}
+                    </td>
 
-                {/* Ver */}
-                <button
-                  onClick={() => handleViewAssignment(assignment)}
-                  className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <Eye size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+                    <td className="px-6 py-5">
+                      <div className="max-w-[320px] text-base font-semibold text-slate-900">
+                        {assignment.cursoNombre}
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-5 text-base text-slate-800">
+                      {fakeGroup}
+                    </td>
+
+                    <td className="px-6 py-5 text-base text-slate-500">
+                      {fakeDate}
+                    </td>
+
+                    <td className="px-6 py-5">
+                      <div className="inline-flex items-center gap-3">
+                        <span
+                          className={`h-3.5 w-3.5 rounded-full ${cfg.dot}`}
+                        />
+                        <span
+                          className={`inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold ${cfg.bgColor} ${cfg.textColor} ${cfg.border}`}
+                        >
+                          {cfg.label}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleViewAssignment(assignment)}
+                          className="rounded-xl bg-blue-50 p-3 text-blue-500 transition hover:bg-blue-100"
+                          title="Ver"
+                        >
+                          <Eye size={18} />
+                        </button>
+
+                        {(normalizedStatus === "DESAPROBADO" ||
+                          normalizedStatus === "ASIGNADO" ||
+                          normalizedStatus === "NUEVO") && (
+                          <button
+                            onClick={() =>
+                              handleEditAssignment(
+                                assignment.cursoCodigo,
+                                assignment.estadoRevision,
+                                assignment.syllabusId,
+                              )
+                            }
+                            className="rounded-xl bg-green-50 p-3 text-green-600 transition hover:bg-green-100"
+                            title="Editar"
+                          >
+                            <Edit size={18} />
+                          </button>
+                        )}
+
+                        <a
+                          href={`/director/importar-silabo-firmado?silaboId=${assignment.syllabusId}&cursoCodigo=${encodeURIComponent(assignment.cursoCodigo)}&cursoNombre=${encodeURIComponent(assignment.cursoNombre)}`}
+                          className="rounded-xl bg-purple-50 p-3 text-purple-600 transition hover:bg-purple-100"
+                          title="Importar sílabo firmado"
+                        >
+                          <Upload size={18} />
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {filteredAssignments.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="py-12 text-center text-slate-500">
           No se encontraron asignaciones que coincidan con tu búsqueda.
         </div>
       )}
 
-      {/* Modal */}
+      <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h3 className="mb-6 text-3xl font-bold text-slate-900">
+          Leyenda de Estados
+        </h3>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="flex items-start gap-4">
+            <span className="mt-1 h-5 w-5 rounded-full bg-green-500" />
+            <div>
+              <p className="text-xl font-bold text-slate-900">
+                Verde - Aprobado
+              </p>
+              <p className="mt-2 text-lg text-slate-600">
+                El sílabo está aprobado por el director
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <span className="mt-1 h-5 w-5 rounded-full bg-yellow-500" />
+            <div>
+              <p className="text-xl font-bold text-slate-900">
+                Amarillo - Pendiente
+              </p>
+              <p className="mt-2 text-lg text-slate-600">
+                El sílabo está pendiente de aprobación por el director
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <span className="mt-1 h-5 w-5 rounded-full bg-red-500" />
+            <div>
+              <p className="text-xl font-bold text-slate-900">
+                Rojo - Rechazado
+              </p>
+              <p className="mt-2 text-lg text-slate-600">
+                El sílabo fue rechazado por el director y requiere correcciones
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {selectedAssignment && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[90vh] flex flex-col relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
             <button
               onClick={closeModal}
-              className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 transition-colors bg-white rounded-full p-2 shadow-md"
+              className="absolute right-5 top-5 z-10 rounded-full bg-white p-2 text-slate-500 shadow-md transition hover:text-slate-700"
             >
               <X size={24} />
             </button>
 
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
+            <div className="border-b border-slate-200 px-8 py-6">
+              <h2 className="mb-2 text-3xl font-bold text-slate-900">
                 {selectedAssignment.cursoNombre}
               </h2>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
+
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                 <span>Código: {selectedAssignment.cursoCodigo}</span>
                 <span>•</span>
                 <span>
                   Estado:{" "}
                   <span
-                    className={`font-medium ${statusConfig[selectedAssignment.estadoRevision as AssignmentStatus]?.textColor || "text-gray-700"}`}
+                    className={`font-semibold ${
+                      (normalizeStatus(selectedAssignment.estadoRevision) &&
+                        statusConfig[
+                          normalizeStatus(
+                            selectedAssignment.estadoRevision,
+                          ) as AssignmentStatus
+                        ]?.textColor) ||
+                      "text-slate-700"
+                    }`}
                   >
-                    {
+                    {(normalizeStatus(selectedAssignment.estadoRevision) &&
                       statusConfig[
-                        selectedAssignment.estadoRevision as AssignmentStatus
-                      ]?.label
-                    }
+                        normalizeStatus(
+                          selectedAssignment.estadoRevision,
+                        ) as AssignmentStatus
+                      ]?.label) ||
+                      selectedAssignment.estadoRevision}
                   </span>
                 </span>
                 {selectedAssignment.syllabusId && (
@@ -352,50 +484,49 @@ export default function MyAssignments() {
               </div>
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-hidden">
               {isLoadingPdf ? (
-                <div className="h-full flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                    <p className="text-lg font-medium text-gray-700">
+                    <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-600" />
+                    <p className="text-lg font-medium text-slate-700">
                       Generando vista previa del PDF...
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="mt-2 text-sm text-slate-500">
                       Esto puede tomar unos segundos
                     </p>
                   </div>
                 </div>
               ) : pdfError ? (
-                <div className="h-full flex items-center justify-center p-6">
-                  <div className="text-center max-w-md">
-                    <div className="w-16 h-16 bg-red-100 rounded-lg mx-auto flex items-center justify-center mb-4">
+                <div className="flex h-full items-center justify-center p-6">
+                  <div className="max-w-md text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100">
                       <X size={32} className="text-red-600" />
                     </div>
-                    <p className="text-lg font-medium text-red-700 mb-2">
+                    <p className="mb-2 text-lg font-medium text-red-700">
                       Error al cargar el sílabo
                     </p>
-                    <p className="text-sm text-gray-600">{pdfError}</p>
+                    <p className="text-sm text-slate-600">{pdfError}</p>
                   </div>
                 </div>
               ) : pdfUrl ? (
                 <iframe
                   src={pdfUrl}
-                  className="w-full h-full"
+                  className="h-full w-full"
                   title="Vista previa del PDF"
                 />
               ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center text-gray-500">
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-center text-slate-500">
                     <div className="mb-4">
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto flex items-center justify-center">
-                        <Eye size={32} className="text-gray-400" />
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-200">
+                        <Eye size={32} className="text-slate-400" />
                       </div>
                     </div>
                     <p className="text-lg font-medium">
                       Vista previa del sílabo
                     </p>
-                    <p className="text-sm mt-2">
+                    <p className="mt-2 text-sm">
                       {selectedAssignment.syllabusId
                         ? "Cargando..."
                         : "No hay sílabo disponible para este curso"}
