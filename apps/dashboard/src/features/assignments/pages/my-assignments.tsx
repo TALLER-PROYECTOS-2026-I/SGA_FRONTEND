@@ -312,7 +312,6 @@ export default function MyAssignments() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       {errorMessage && (
-
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           {errorMessage}
         </div>
@@ -320,14 +319,6 @@ export default function MyAssignments() {
 
       {successMessage && (
         <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-green-700">
-
-        <div className="mb-4 rounded-xl bg-red-50 p-4 text-red-700 border border-red-200">
-          {errorMessage}
-        </div>
-      )}
-      {successMessage && (
-        <div className="mb-4 rounded-xl bg-green-50 p-4 text-green-700 border border-green-200">
-
           {successMessage}
         </div>
       )}
