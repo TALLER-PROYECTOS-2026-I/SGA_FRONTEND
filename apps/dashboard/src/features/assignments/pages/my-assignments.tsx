@@ -748,7 +748,6 @@ export default function MyAssignments() {
       )}
 
       {assignmentToDelete && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <h3 className="mb-3 text-2xl font-bold text-slate-900">
@@ -783,45 +782,10 @@ export default function MyAssignments() {
               >
                 {isDeleting ? "Eliminando..." : "Eliminar"}
               </button>
-
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-              <h3 className="mb-3 text-2xl font-bold text-slate-900">
-                Confirmar eliminación
-              </h3>
-
-              <p className="mb-6 text-slate-600">
-                ¿Deseas eliminar el sílabo de{" "}
-                <span className="font-semibold text-slate-900">
-                  {assignmentToDelete.cursoNombre}
-                </span>
-                ?
-              </p>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setAssignmentToDelete(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (assignmentToDelete) {
-                      handleDeleteAssignment(assignmentToDelete);
-                    }
-                  }}
-                  disabled={isDeleting}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isDeleting ? "Eliminando..." : "Eliminar"}
-                </button>
-              </div>
-
             </div>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }
