@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { Toaster } from "sonner";
 import MyAssignmentsPage from "./features/assignments/pages/my-assignments";
+import ManagementPage from "./features/assignments/pages/management";
 import ApprovedSyllabiPage from "./features/assignments/pages/approved-syllabus";
 import SyllabusProcessPage from "./features/syllabus/pages/syllabus-process";
 import { SessionProvider } from "./features/auth/contexts/session-provider";
@@ -24,7 +25,6 @@ import ReviewSyllabusDetail from "./features/coordinator/pages/review-syllabus-d
 import ReviewSyllabusSummary from "./features/coordinator/pages/review-syllabus-summary";
 import SyllabusCatalog from "./features/coordinator/pages/syllabus-catalog";
 import ImportSignedSyllabusPage from "./features/director/pages/import-signed-syllabus";
-import AssignTeacherPage from "./features/director/pages/assign-teacher";
 
 const queryClient = new QueryClient();
 
@@ -80,7 +80,7 @@ export default function App() {
                 path="/management"
                 element={
                   <MainLayout title="Asignar Docente">
-                    <AssignTeacherPage />
+                    <ManagementPage />
                   </MainLayout>
                 }
               />
