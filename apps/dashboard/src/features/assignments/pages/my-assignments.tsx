@@ -3,9 +3,9 @@ import { Search, Eye, Edit, X, Loader2, Upload, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "../../auth/hooks/use-session";
 import { useAssignments, type Assignment } from "../hooks/assignments-query";
-import { pdf } from "@react-pdf/renderer";
-import { syllabusPDFService } from "../../syllabus/services/syllabus-pdf-service";
-import { SyllabusPDFDocument } from "../../syllabus/components/SyllabusPDFDocument";
+
+type AssignmentStatus = "APROBADO" | "ANALIZANDO" | "DESAPROBADO";
+type FilterStatus = "ALL" | AssignmentStatus;
 
 export default function MyAssignments() {
   const { user, isLoading: sessionLoading } = useSession();
@@ -25,6 +25,13 @@ export default function MyAssignments() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const [assignmentToDelete, setAssignmentToDelete] =
+    useState<Assignment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,10 +42,13 @@ export default function MyAssignments() {
     | "ANALIZANDO"
     | "DESAPROBADO"
 
-  type FilterStatus = "ALL" | AssignmentStatus;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
+  const [groupMap, setGroupMap] = useState<Record<string, string>>({});
+  const [dateMap, setDateMap] = useState<Record<string, string>>({});
 
   const navigate = useNavigate();
+
+  const API = import.meta.env.VITE_API_BASE_URL;
 
   const normalizeStatus = (status?: string): AssignmentStatus | null => {
     if (!status) return null;
@@ -54,7 +64,7 @@ export default function MyAssignments() {
 
   const getPermissionsByStatus = (status: AssignmentStatus | null) => {
     const isApproved = status === "APROBADO";
-    
+
     return {
       canView: isApproved,
       canEdit: isApproved,
@@ -113,6 +123,7 @@ export default function MyAssignments() {
     return dates[index % dates.length];
   };
 
+
   const [groupMap, setGroupMap] = useState<Record<string, string>>({});
   const [dateMap, setDateMap] = useState<Record<string, string>>({});
 
@@ -133,6 +144,30 @@ export default function MyAssignments() {
     }
   }, [assignments]);
 
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
+
+  const filteredAssignments = assignments.filter((assignment: Assignment) => {
+    const group = groupMap[assignment.cursoCodigo] || "";
+
+    const matchesSearch =
+      assignment.cursoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      group.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const normalizedStatus = normalizeStatus(assignment.estadoRevision);
+
+    const matchesStatus =
+      selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+
+    return matchesSearch && matchesStatus;
+  });
+
   const filteredAssignments = assignments.filter(
     (assignment: Assignment) => {
       const group = groupMap[assignment.cursoCodigo] || "Sin grupo";
@@ -151,28 +186,25 @@ export default function MyAssignments() {
     },
   );
 
+
   const handleViewAssignment = async (assignment: Assignment) => {
     setSelectedAssignment(assignment);
     setPdfUrl(null);
     setPdfError(null);
 
     if (!assignment.syllabusId) {
-      setPdfError("No hay sílabo disponible para previsualizar");
+      setPdfError("No hay sílabo importado disponible para este curso");
       return;
     }
 
     setIsLoadingPdf(true);
 
     try {
-      const data = await syllabusPDFService.fetchCompleteSyllabus(
-        assignment.syllabusId,
-      );
-      const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
-      const url = URL.createObjectURL(blob);
+      const url = `${API}/director/syllabi/${assignment.syllabusId}/signed/latest`;
       setPdfUrl(url);
     } catch (err) {
       setPdfError(
-        err instanceof Error ? err.message : "Error al cargar el sílabo",
+        err instanceof Error ? err.message : "Error al cargar el PDF importado",
       );
     } finally {
       setIsLoadingPdf(false);
@@ -194,13 +226,25 @@ export default function MyAssignments() {
   };
 
   const handleDeleteAssignment = async (assignment: Assignment) => {
+
+    if (!assignment.syllabusId) {
+      setErrorMessage("No se encontró el ID del sílabo");
+      setTimeout(() => setErrorMessage(null), 3000);
+      return;
+    }
+
     if (!assignment.syllabusId) return;
 
     setIsDeleting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
+
     try {
+      setIsDeleting(true);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+
       const API = import.meta.env.VITE_API_BASE_URL;
 
       const res = await fetch(`${API}/syllabus/${assignment.syllabusId}`, {
@@ -208,11 +252,24 @@ export default function MyAssignments() {
       });
 
       if (!res.ok) {
+
         const data = await res.json().catch(() => null);
+
         throw new Error(data?.message ?? "Error al eliminar el sílabo");
       }
 
       setSuccessMessage("Sílabo eliminado correctamente");
+
+      setAssignmentToDelete(null);
+      await refetch();
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Error al eliminar el sílabo",
+      );
+
       await refetch();
       setAssignmentToDelete(null);
       
@@ -220,6 +277,7 @@ export default function MyAssignments() {
     } catch (error) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "Error al eliminar el sílabo");
+
       setTimeout(() => setErrorMessage(null), 3000);
     } finally {
       setIsDeleting(false);
@@ -234,14 +292,6 @@ export default function MyAssignments() {
     setPdfUrl(null);
     setPdfError(null);
   };
-
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
 
   if (sessionLoading || isLoading) {
     return (
@@ -262,15 +312,34 @@ export default function MyAssignments() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       {errorMessage && (
-        <div className="mb-4 rounded-xl bg-red-50 p-4 text-red-700 border border-red-200">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           {errorMessage}
         </div>
       )}
+
       {successMessage && (
-        <div className="mb-4 rounded-xl bg-green-50 p-4 text-green-700 border border-green-200">
+        <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-green-700">
           {successMessage}
         </div>
       )}
+
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="mb-2 text-5xl font-bold tracking-tight text-slate-900">
+            Mis Asignaciones
+          </h1>
+          <p className="text-2xl text-slate-500">
+            Gestiona y revisa tus sílabos asignados
+          </p>
+        </div>
+
+        {/* 🔥 BOTÓN CREAR */}
+        <button
+          onClick={() => navigate("/syllabus")}
+          className="flex items-center gap-2 rounded-2xl bg-[#b91c1c] px-6 py-3 font-semibold text-white shadow-md transition hover:scale-105 hover:bg-red-800"
+        >
+          + Crear nuevo sílabo
+        </button>
 
       <div className="mb-8">
         <h1 className="mb-2 text-5xl font-bold tracking-tight text-slate-900">
@@ -279,6 +348,7 @@ export default function MyAssignments() {
         <p className="text-2xl text-slate-500">
           Gestiona y revisa tus sílabos asignados
         </p>
+
       </div>
 
       <div className="relative mb-5">
@@ -363,12 +433,18 @@ export default function MyAssignments() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {filteredAssignments.map((assignment: Assignment, index) => {
+                const normalizedStatus = normalizeStatus(
+                  assignment.estadoRevision,
+                );
+
               {filteredAssignments.map((assignment: Assignment, index: number) => {
                 const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
+
                 const cfg = (normalizedStatus &&
                   statusConfig[normalizedStatus]) ?? {
-                  label: assignment.estadoRevision,
+                  label: assignment.estadoRevision || "Sin estado",
                   dot: "bg-slate-400",
                   textColor: "text-slate-700",
                   bgColor: "bg-slate-50",
@@ -379,7 +455,10 @@ export default function MyAssignments() {
                 const date = dateMap[assignment.cursoCodigo] || "Sin fecha";
                 const permissions = getPermissionsByStatus(normalizedStatus);
 
+                const uniqueKey = assignment.syllabusId
+
                 const uniqueKey = assignment.syllabusId 
+
                   ? `${assignment.cursoCodigo}-${assignment.syllabusId}`
                   : `${assignment.cursoCodigo}-${index}`;
 
@@ -454,11 +533,19 @@ export default function MyAssignments() {
                         {permissions.canDelete ? (
                           <button
                             onClick={() => setAssignmentToDelete(assignment)}
-                            className="rounded-xl bg-red-50 p-3 text-red-500 transition hover:bg-red-100"
+                            className="rounded-xl bg-red-50 p-3 text-red-500 transition hover:bg-red-100 disabled:opacity-60"
                             title="Eliminar"
                             disabled={isDeleting}
                           >
+
+                            {isDeleting ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
+
                             {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+
                           </button>
                         ) : (
                           <button
@@ -650,44 +737,46 @@ export default function MyAssignments() {
           </div>
         </div>
       )}
+
       {assignmentToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-45 p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-              <h3 className="mb-3 text-2xl font-bold text-slate-900">
-                Confirmar eliminación
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-3 text-2xl font-bold text-slate-900">
+              Confirmar eliminación
+            </h3>
 
-              <p className="mb-6 text-slate-600">
-                ¿Deseas eliminar el sílabo de{" "}
-                <span className="font-semibold text-slate-900">
-                  {assignmentToDelete.cursoNombre}
-                </span>
-                ?
-              </p>
+            <p className="mb-6 text-slate-600">
+              ¿Deseas eliminar el sílabo de{" "}
+              <span className="font-semibold text-slate-900">
+                {assignmentToDelete.cursoNombre}
+              </span>
+              ?
+            </p>
 
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setAssignmentToDelete(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setAssignmentToDelete(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50"
+                disabled={isDeleting}
+              >
+                Cancelar
+              </button>
 
-                <button
-                  onClick={() => {
-                    if (assignmentToDelete) {
-                      handleDeleteAssignment(assignmentToDelete);
-                    }
-                  }}
-                  disabled={isDeleting}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isDeleting ? "Eliminando..." : "Eliminar"}
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  if (assignmentToDelete) {
+                    handleDeleteAssignment(assignmentToDelete);
+                  }
+                }}
+                disabled={isDeleting}
+                className="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? "Eliminando..." : "Eliminar"}
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }

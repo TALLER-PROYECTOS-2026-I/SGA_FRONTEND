@@ -3,6 +3,20 @@ import { useSearchParams } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
+const isRealPDF = async (file: File): Promise<boolean> => {
+  const fileReader = new FileReader();
+
+  return new Promise((resolve) => {
+    fileReader.onload = () => {
+      const arr = new Uint8Array(fileReader.result as ArrayBuffer);
+      const header = String.fromCharCode(...arr.slice(0, 5));
+      resolve(header === "%PDF-");
+    };
+
+    fileReader.readAsArrayBuffer(file.slice(0, 5));
+  });
+};
+
 export default function ImportSignedSyllabusPage() {
   const [searchParams] = useSearchParams();
 
@@ -113,10 +127,27 @@ export default function ImportSignedSyllabusPage() {
           <input
             type="file"
             accept="application/pdf"
-            onChange={(e) => {
-              if (e.target.files?.[0]) {
-                setFile(e.target.files[0]);
+            onChange={async (e) => {
+              const selectedFile = e.target.files?.[0];
+              if (!selectedFile) return;
+
+              if (selectedFile.type !== "application/pdf") {
+                alert("Solo se permiten archivos PDF");
+                e.target.value = "";
+                setFile(null);
+                return;
               }
+
+              const validPdf = await isRealPDF(selectedFile);
+
+              if (!validPdf) {
+                alert("El archivo no es un PDF válido");
+                e.target.value = "";
+                setFile(null);
+                return;
+              }
+
+              setFile(selectedFile);
             }}
             className="w-full border rounded px-3 py-2"
           />
