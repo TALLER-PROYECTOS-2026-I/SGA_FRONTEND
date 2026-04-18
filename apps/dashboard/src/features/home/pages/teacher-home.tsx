@@ -1,4 +1,4 @@
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface ModuleCardProps {
@@ -29,6 +29,12 @@ export default function TeacherHome() {
       icon: <ClipboardList size={32} />,
       title: "Modificar Sílabo",
       onClick: () => navigate("/mis-asignaciones"),
+    },
+    // 🔥 NUEVO MÓDULO
+    {
+      icon: <UserPlus size={32} />,
+      title: "Asignar Docente",
+      onClick: () => navigate("/management"),
     },
   ];
 

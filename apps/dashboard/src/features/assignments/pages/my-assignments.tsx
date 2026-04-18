@@ -725,6 +725,3 @@ export default function MyAssignments() {
     </div>
   );
 }
-/*
-preuba
-*/
