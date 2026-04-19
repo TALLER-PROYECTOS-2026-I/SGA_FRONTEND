@@ -22,6 +22,13 @@ type Syllabus = {
   semestreAcademico?: string;
 };
 
+type NormalizedSyllabus = {
+  id: number;
+  cursoNombre: string;
+  cursoCodigo: string;
+  semestreAcademico: string;
+};
+
 export default function AssignTeacherPage() {
   const navigate = useNavigate();
 
@@ -44,8 +51,6 @@ export default function AssignTeacherPage() {
         }
         const teachersData = await teachersRes.json();
 
-        // ⚠️ CAMBIA ESTA RUTA POR LA QUE SÍ EXISTA EN TU BACKEND
-        // Ejemplo temporal: syllabus/revision
         const syllabiRes = await fetch(`${API}/syllabus/revision`);
         if (!syllabiRes.ok) {
           throw new Error(`Error cargando sílabos: ${syllabiRes.status}`);
@@ -79,28 +84,75 @@ export default function AssignTeacherPage() {
     loadData();
   }, []);
 
-  const normalizedSyllabi = useMemo(() => {
-    return syllabi.map((s) => ({
-      id: s.id,
-      cursoNombre: s.cursoNombre || s.curso_nombre || s.name || "",
-      cursoCodigo: s.cursoCodigo || s.curso_codigo || "",
-      semestreAcademico: s.semestreAcademico || s.semestre_academico || "",
-    }));
+  const normalizedSyllabi: NormalizedSyllabus[] = useMemo(() => {
+    return syllabi
+      .map((s) => ({
+        id: s.id,
+        cursoNombre: (s.cursoNombre || s.curso_nombre || s.name || "").trim(),
+        cursoCodigo: (s.cursoCodigo || s.curso_codigo || "").trim(),
+        semestreAcademico: (
+          s.semestreAcademico ||
+          s.semestre_academico ||
+          ""
+        ).trim(),
+      }))
+      .filter(
+        (s) =>
+          Number.isFinite(s.id) &&
+          s.id > 0 &&
+          s.cursoNombre.length > 0 &&
+          s.cursoCodigo.length > 0,
+      );
   }, [syllabi]);
 
-  const filteredSyllabi = useMemo(() => {
-    if (!searchCourse.trim()) return normalizedSyllabi;
+  const query = searchCourse.trim().toLowerCase();
 
-    return normalizedSyllabi.filter((s) =>
-      s.cursoNombre.toLowerCase().includes(searchCourse.toLowerCase()),
+  const filteredSyllabi = useMemo(() => {
+    if (!query) return normalizedSyllabi;
+
+    if (query.length < 5) return [];
+
+    return normalizedSyllabi.filter(
+      (s) =>
+        s.cursoNombre.toLowerCase().includes(query) ||
+        s.cursoCodigo.toLowerCase().includes(query),
     );
-  }, [searchCourse, normalizedSyllabi]);
+  }, [query, normalizedSyllabi]);
+
+  useEffect(() => {
+    if (query.length > 0 && query.length < 5) {
+      setSelectedSyllabusId("");
+      return;
+    }
+
+    if (
+      selectedSyllabusId &&
+      !filteredSyllabi.some((s) => String(s.id) === String(selectedSyllabusId))
+    ) {
+      setSelectedSyllabusId("");
+    }
+  }, [query, filteredSyllabi, selectedSyllabusId]);
 
   const selectedSyllabus = useMemo(() => {
-    return normalizedSyllabi.find(
+    return filteredSyllabi.find(
       (s) => String(s.id) === String(selectedSyllabusId),
     );
-  }, [selectedSyllabusId, normalizedSyllabi]);
+  }, [selectedSyllabusId, filteredSyllabi]);
+
+  const resetForm = () => {
+    setDocenteId("");
+    setSearchCourse("");
+    setSelectedSyllabusId("");
+    setPeriodoAcademico("2026-I");
+    setMensaje("");
+  };
+
+  const clearTeacher = () => setDocenteId("");
+  const clearCourseSearch = () => {
+    setSearchCourse("");
+    setSelectedSyllabusId("");
+  };
+  const clearMessage = () => setMensaje("");
 
   const handleSubmit = async () => {
     if (!docenteId) {
@@ -143,29 +195,12 @@ export default function AssignTeacherPage() {
 
       if (!res.ok) {
         const message = data?.message ?? "Error al asignar docente";
-
         alert(message);
-
-        if (message.toLowerCase().includes("ya está asignado")) {
-          setDocenteId("");
-          setSearchCourse("");
-          setSelectedSyllabusId("");
-          setPeriodoAcademico("2026-I");
-          setMensaje("");
-          navigate("/");
-        }
-
         return;
       }
 
       alert("Docente asignado correctamente");
-
-      setDocenteId("");
-      setSearchCourse("");
-      setSelectedSyllabusId("");
-      setPeriodoAcademico("2026-I");
-      setMensaje("");
-
+      resetForm();
       navigate("/");
     } catch (error) {
       console.error(error);
@@ -174,6 +209,7 @@ export default function AssignTeacherPage() {
       setLoading(false);
     }
   };
+
   return (
     <div className="mx-auto max-w-4xl p-6">
       <h1 className="mb-2 text-3xl font-bold text-slate-900">
@@ -185,9 +221,19 @@ export default function AssignTeacherPage() {
 
       <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Seleccionar docente
-          </label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-semibold text-slate-700">
+              Seleccionar docente
+            </label>
+            <button
+              type="button"
+              onClick={clearTeacher}
+              className="text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Borrar
+            </button>
+          </div>
+
           <select
             value={docenteId}
             onChange={(e) => setDocenteId(e.target.value)}
@@ -206,21 +252,32 @@ export default function AssignTeacherPage() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Nombre de la asignatura
-          </label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-semibold text-slate-700">
+              Nombre de la asignatura
+            </label>
+            <button
+              type="button"
+              onClick={clearCourseSearch}
+              className="text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Borrar
+            </button>
+          </div>
+
           <input
             type="text"
             value={searchCourse}
             onChange={(e) => setSearchCourse(e.target.value)}
-            placeholder="Ingrese las primeras letras"
+            placeholder="Ingrese las primeras letras o código"
             className="mb-3 w-full rounded-xl border border-slate-300 px-4 py-3"
           />
 
           <select
             value={selectedSyllabusId}
             onChange={(e) => setSelectedSyllabusId(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            disabled={query.length > 0 && query.length < 5}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400"
           >
             <option value="">Seleccione una asignatura</option>
             {filteredSyllabi.map((syllabus) => (
@@ -229,6 +286,18 @@ export default function AssignTeacherPage() {
               </option>
             ))}
           </select>
+
+          {searchCourse.trim().length > 0 && searchCourse.trim().length < 5 && (
+            <p className="mt-2 text-sm text-amber-600">
+              Ingrese al menos 5 caracteres para realizar la búsqueda.
+            </p>
+          )}
+
+          {searchCourse.trim().length >= 5 && filteredSyllabi.length === 0 && (
+            <p className="mt-2 text-sm text-slate-500">
+              No se encontraron asignaturas con ese criterio.
+            </p>
+          )}
         </div>
 
         <div>
@@ -258,9 +327,19 @@ export default function AssignTeacherPage() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Mensaje al Docente
-          </label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-semibold text-slate-700">
+              Mensaje al Docente
+            </label>
+            <button
+              type="button"
+              onClick={clearMessage}
+              className="text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Borrar
+            </button>
+          </div>
+
           <textarea
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
@@ -275,6 +354,14 @@ export default function AssignTeacherPage() {
         </div>
 
         <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={resetForm}
+            className="rounded-xl border border-red-300 px-5 py-3 text-red-600 hover:bg-red-50"
+          >
+            Borrar datos
+          </button>
+
           <button
             onClick={() => navigate(-1)}
             className="rounded-xl border border-slate-300 px-5 py-3 text-slate-700 hover:bg-slate-50"

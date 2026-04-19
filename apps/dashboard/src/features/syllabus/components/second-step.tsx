@@ -6,10 +6,10 @@ import {
   useGetConceptos,
   useCrearConcepto,
   useEliminarConcepto,
-  useActualizarConcepto,
+  useActualizarConcepto, // <-- Importamos el nuevo Hook
 } from "../hooks/use-conceptos-query";
 
-type ConceptoItem = {
+type Concepto = {
   id: number;
   descripcion: string;
 };
@@ -17,11 +17,12 @@ type ConceptoItem = {
 export default function SecondStep() {
   const { nextStep } = useSteps();
   const { syllabusId: contextSyllabusId } = useSyllabusContext();
-  const syllabusId = contextSyllabusId || 2;
+  const syllabusId = contextSyllabusId || 4;
 
   const [semana, setSemana] = useState<number>(1);
   const [descripcion, setDescripcion] = useState("");
 
+  // ESTADOS PARA LA EDICIÓN INLINE
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
 
@@ -32,12 +33,11 @@ export default function SecondStep() {
     return 4;
   }, [semana]);
 
-  const { data, isLoading } = useGetConceptos(syllabusId, unidadId, semana);
-
-  const conceptos: ConceptoItem[] = Array.isArray(data)
-    ? data
-    : (data?.items ?? []);
-
+  const { data: conceptos = [], isLoading } = useGetConceptos(
+    syllabusId,
+    unidadId,
+    semana,
+  );
   const { mutateAsync: crearConcepto, isPending: isCreating } =
     useCrearConcepto(syllabusId, unidadId, semana);
   const { mutateAsync: eliminarConcepto, isPending: isDeleting } =
@@ -47,7 +47,6 @@ export default function SecondStep() {
 
   const handleAdd = async () => {
     if (!descripcion.trim()) return;
-
     try {
       await crearConcepto(descripcion);
       setDescripcion("");
@@ -64,7 +63,8 @@ export default function SecondStep() {
     }
   };
 
-  const startEditing = (item: ConceptoItem) => {
+  // FUNCIONES DE EDICIÓN
+  const startEditing = (item: Concepto) => {
     setEditingId(item.id);
     setEditText(item.descripcion);
   };
@@ -76,11 +76,9 @@ export default function SecondStep() {
 
   const handleSaveEdit = async (id: number) => {
     if (!editText.trim()) return;
-
     try {
       await actualizarConcepto({ contenidoId: id, descripcion: editText });
-      setEditingId(null);
-      setEditText("");
+      setEditingId(null); // Cerramos el modo edición al terminar
     } catch (error) {
       console.error("Error al actualizar:", error);
     }
@@ -88,9 +86,9 @@ export default function SecondStep() {
 
   return (
     <Step step={2} onNextStep={nextStep}>
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#b91c1c] font-bold text-white">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#b91c1c] text-white flex items-center justify-center font-bold">
             2
           </div>
           <h2 className="text-xl font-bold text-[#b91c1c]">
@@ -98,19 +96,20 @@ export default function SecondStep() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-10 p-8 md:grid-cols-2">
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+          {/* COLUMNA IZQUIERDA */}
           <div>
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Seleccione una semana
               </label>
               <select
-                className="w-full rounded-md border border-gray-300 p-2.5 text-sm focus:border-[#b91c1c] focus:ring-[#b91c1c]"
+                className="w-full border border-gray-300 rounded-md p-2.5 focus:ring-[#b91c1c] focus:border-[#b91c1c] text-sm"
                 value={semana}
                 onChange={(e) => {
                   setSemana(Number(e.target.value));
                   setDescripcion("");
-                  setEditingId(null);
+                  setEditingId(null); // Cancelar edición si cambia de semana
                 }}
               >
                 {Array.from({ length: 16 }, (_, i) => i + 1).map((s) => (
@@ -122,25 +121,25 @@ export default function SecondStep() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Contenidos Conceptuales
               </label>
               <div className="relative">
                 <textarea
-                  className="h-32 w-full resize-none rounded-md border border-gray-300 p-3 text-sm focus:border-[#b91c1c] focus:ring-[#b91c1c]"
+                  className="w-full border border-gray-300 rounded-md p-3 h-32 resize-none focus:ring-[#b91c1c] focus:border-[#b91c1c] text-sm"
                   maxLength={400}
                   value={descripcion}
                   onChange={(e) => setDescripcion(e.target.value)}
                   placeholder="Escriba el contenido de esta semana..."
                 />
-                <div className="absolute bottom-3 right-4 text-xs font-medium text-gray-400">
+                <div className="absolute bottom-3 right-4 text-xs text-gray-400 font-medium">
                   {descripcion.length}/400
                 </div>
 
                 <button
                   onClick={handleAdd}
                   disabled={!descripcion.trim() || isCreating}
-                  className="absolute bottom-[-18px] right-[-15px] z-10 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#b91c1c] pb-1 text-2xl text-white shadow-lg transition-transform hover:scale-105 hover:bg-red-800 disabled:opacity-50"
+                  className="absolute bottom-[-18px] right-[-15px] w-12 h-12 bg-[#b91c1c] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-800 disabled:opacity-50 text-2xl pb-1 cursor-pointer z-10 transition-transform hover:scale-105"
                   title="Agregar contenido"
                 >
                   +
@@ -149,51 +148,53 @@ export default function SecondStep() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-4">
-            <div className="mb-4 flex items-center justify-between">
+          {/* COLUMNA DERECHA */}
+          <div className="bg-gray-50/50 rounded-lg p-4 border border-gray-100">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-semibold text-gray-700">
                 Lista de Contenidos conceptuales
               </h3>
-              <span className="rounded-full bg-[#2563eb] px-4 py-1 text-xs font-medium text-white">
+              <span className="bg-[#2563eb] text-white text-xs px-4 py-1 rounded-full font-medium">
                 Semana {semana}
               </span>
             </div>
 
             <div className="space-y-3">
               {isLoading ? (
-                <p className="py-4 text-center text-sm text-gray-500">
+                <p className="text-gray-500 text-sm text-center py-4">
                   Cargando contenidos...
                 </p>
               ) : conceptos.length === 0 ? (
-                <p className="py-4 text-center text-sm italic text-gray-400">
+                <p className="text-gray-400 text-sm italic text-center py-4">
                   No hay contenidos registrados en esta semana.
                 </p>
               ) : (
-                conceptos.map((item: ConceptoItem, index: number) => {
+                conceptos.map((item: Concepto, index: number) => {
+                  // SI ESTAMOS EDITANDO ESTE ITEM, MOSTRAMOS LA CAJA DE EDICIÓN (Diseño Figma)
                   if (editingId === item.id) {
                     return (
                       <div
                         key={item.id}
-                        className="flex flex-col gap-3 rounded-lg border-2 border-blue-500 bg-white p-3 shadow-sm transition-all"
+                        className="flex flex-col border-2 border-blue-500 rounded-lg p-3 bg-white gap-3 shadow-sm transition-all"
                       >
                         <textarea
-                          className="w-full resize-none rounded-md border-none p-0 text-sm leading-relaxed text-gray-700 focus:ring-0"
+                          className="w-full border-none rounded-md p-0 text-sm text-gray-700 resize-none focus:ring-0 leading-relaxed"
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           rows={2}
                           autoFocus
                         />
-                        <div className="mt-1 flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 mt-1">
                           <button
                             onClick={cancelEditing}
-                            className="rounded-md bg-gray-200 px-4 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-300"
+                            className="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-300 transition-colors"
                           >
                             Cancelar
                           </button>
                           <button
                             onClick={() => handleSaveEdit(item.id)}
                             disabled={isUpdating}
-                            className="rounded-md bg-[#b91c1c] px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:opacity-50"
+                            className="px-4 py-1.5 bg-[#b91c1c] text-white rounded-md text-sm font-semibold hover:bg-red-800 disabled:opacity-50 transition-colors"
                           >
                             Guardar
                           </button>
@@ -202,22 +203,22 @@ export default function SecondStep() {
                     );
                   }
 
+                  // SI NO LO ESTAMOS EDITANDO, MOSTRAMOS LA VISTA NORMAL
                   return (
                     <div
                       key={item.id}
-                      className="group flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-3 transition-colors hover:bg-blue-50"
+                      className="flex border border-blue-200 rounded-md bg-blue-50/50 p-3 items-start gap-3 group transition-colors hover:bg-blue-50"
                     >
-                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-medium text-white shadow-sm">
+                      <div className="w-6 h-6 rounded-full bg-[#2563eb] text-white flex items-center justify-center text-xs shrink-0 mt-0.5 font-medium shadow-sm">
                         {index + 1}
                       </div>
-
-                      <p className="flex-1 text-sm leading-relaxed text-gray-700">
+                      <p className="text-sm text-gray-700 flex-1 leading-relaxed">
                         {item.descripcion}
                       </p>
 
-                      <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          className="p-1 text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800 p-1"
                           onClick={() => startEditing(item)}
                           title="Editar"
                         >
@@ -235,9 +236,8 @@ export default function SecondStep() {
                             <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                           </svg>
                         </button>
-
                         <button
-                          className="p-1 text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 p-1"
                           onClick={() => handleDelete(item.id)}
                           disabled={isDeleting || editingId !== null}
                           title="Eliminar"

@@ -46,9 +46,17 @@ export default function MyAssignments() {
 
     const value = status.toUpperCase().trim();
 
-    if (value === "APROBADO") return "APROBADO";
-    if (value === "ANALIZANDO" || value === "PENDIENTE") return "ANALIZANDO";
-    if (value === "DESAPROBADO" || value === "RECHAZADO") return "DESAPROBADO";
+    if (value === "APROBADO" || value === "HABILITADO_EDICION") {
+      return "APROBADO";
+    }
+
+    if (value === "ANALIZANDO" || value === "PENDIENTE") {
+      return "ANALIZANDO";
+    }
+
+    if (value === "DESAPROBADO" || value === "RECHAZADO") {
+      return "DESAPROBADO";
+    }
 
     return null;
   };
@@ -139,21 +147,35 @@ export default function MyAssignments() {
     };
   }, [pdfUrl]);
 
-  const filteredAssignments = assignments.filter((assignment: Assignment) => {
-    const group = groupMap[assignment.cursoCodigo] || "";
+  const validAssignments = assignments.filter(
+    (assignment) =>
+      assignment.cursoCodigo &&
+      assignment.cursoCodigo.trim() !== "" &&
+      assignment.cursoNombre &&
+      assignment.cursoNombre.trim() !== "",
+  );
 
-    const matchesSearch =
-      assignment.cursoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assignment.cursoCodigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      group.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredAssignments = validAssignments.filter(
+    (assignment: Assignment) => {
+      const group = groupMap[assignment.cursoCodigo] || "";
 
-    const normalizedStatus = normalizeStatus(assignment.estadoRevision);
+      const matchesSearch =
+        assignment.cursoNombre
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        assignment.cursoCodigo
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        group.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+      const normalizedStatus = normalizeStatus(assignment.estadoRevision);
 
-    return matchesSearch && matchesStatus;
-  });
+      const matchesStatus =
+        selectedStatus === "ALL" || normalizedStatus === selectedStatus;
+
+      return matchesSearch && matchesStatus;
+    },
+  );
 
   const handleViewAssignment = async (assignment: Assignment) => {
     setSelectedAssignment(assignment);
@@ -725,3 +747,6 @@ export default function MyAssignments() {
     </div>
   );
 }
+/*
+preuba
+*/
