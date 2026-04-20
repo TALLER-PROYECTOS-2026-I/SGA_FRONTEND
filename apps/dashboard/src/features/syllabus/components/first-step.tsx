@@ -1,50 +1,55 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Step } from "./step";
 import { useSteps } from "../contexts/steps-context-provider";
-import { useSyllabusContext } from "../contexts/syllabus-context";
-import { useSaveDatosGenerales } from "../hooks/first-step-query";
 
 export default function FirstStep() {
   const { nextStep } = useSteps();
-  const { setCourseName } = useSyllabusContext();
-  const { mutateAsync: saveDatosGenerales } = useSaveDatosGenerales();
+  const [searchParams] = useSearchParams();
 
-  const [nombreAsignatura, setNombreAsignatura] = useState(
-    "INGENIERIA DE SOFTWARE II COD: 09013707052",
-  );
+  const mode = searchParams.get("mode") ?? "";
+  const codigoFromUrl = (searchParams.get("codigo") ?? "").trim();
+  const idFromUrl = (searchParams.get("id") ?? "").trim();
 
-  type SaveDatosGeneralesInput = Parameters<typeof saveDatosGenerales>[0];
-  type DatosGeneralesData = SaveDatosGeneralesInput["data"];
+  const isEditMode = mode === "edit";
 
-  const handleNext = async () => {
-    try {
-      const data: DatosGeneralesData = {
-        nombreAsignatura,
-        codigoAsignatura: "09013707052",
-        ciclo: "7",
-        requisitos: "Ingeniería de Requisitos",
-        horasTeoria: 2,
-        horasPractica: 2,
-        creditosTotales: 2,
-        modalidad: "Presencial",
-      };
+  const [nombreAsignatura, setNombreAsignatura] = useState("");
+  const [codigoAsignatura, setCodigoAsignatura] = useState("");
 
-      const payload: SaveDatosGeneralesInput = {
-        syllabusId: null,
-        data,
-        isCreating: true,
-      };
+  useEffect(() => {
+    if (!isEditMode) return;
 
-      setCourseName(nombreAsignatura);
-      await saveDatosGenerales(payload);
-      nextStep();
-    } catch (error) {
-      console.error(
-        "El backend rechazó los datos, pero forzaremos el paso 2:",
-        error,
-      );
-      nextStep();
+    // Nombre inferido desde el código que venga por URL.
+    // Si luego quieres traer el nombre real desde backend, esto se puede reemplazar.
+    const nombreInferido =
+      codigoFromUrl === "INF-202"
+        ? "Base de Datos"
+        : codigoFromUrl === "INF-101"
+          ? "Ingeniería de Software"
+          : codigoFromUrl === "INF-303"
+            ? "Arquitectura de Software"
+            : codigoFromUrl === "INF-404"
+              ? "Pruebas de Software"
+              : codigoFromUrl === "INF-901"
+                ? "Arquitectura de Software II"
+                : "";
+
+    setCodigoAsignatura(codigoFromUrl);
+    setNombreAsignatura(nombreInferido);
+  }, [isEditMode, codigoFromUrl]);
+
+  const handleNext = () => {
+    if (!nombreAsignatura.trim()) {
+      alert("Ingrese el nombre de la asignatura");
+      return;
     }
+
+    if (!codigoAsignatura.trim()) {
+      alert("Ingrese el código de la asignatura");
+      return;
+    }
+
+    nextStep();
   };
 
   return (
@@ -57,33 +62,61 @@ export default function FirstStep() {
           <h2 className="text-xl font-bold text-[#111827]">Datos Generales</h2>
         </div>
 
-        <div className="px-8 pb-8">
-          <div className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-4">
+        <div className="space-y-6 px-8 pb-8">
+          {isEditMode && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Editando sílabo existente
+              {idFromUrl ? ` (ID: ${idFromUrl})` : ""}
+            </div>
+          )}
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Nombre de la asignatura
+            </label>
+            <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-4">
+              <input
+                type="text"
+                className="w-full bg-transparent font-medium text-gray-800 outline-none"
+                value={nombreAsignatura}
+                onChange={(e) => setNombreAsignatura(e.target.value)}
+                placeholder="Escriba el nombre de la asignatura"
+                readOnly={isEditMode}
+              />
+              <svg
+                className="h-5 w-5 cursor-pointer text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Código de la asignatura
+            </label>
             <input
               type="text"
-              className="w-full bg-transparent font-medium text-gray-800 outline-none"
-              value={nombreAsignatura}
-              onChange={(e) => setNombreAsignatura(e.target.value)}
+              value={codigoAsignatura}
+              onChange={(e) => setCodigoAsignatura(e.target.value)}
+              placeholder="Escriba el código de la asignatura"
+              readOnly={isEditMode}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-3 text-gray-800 outline-none focus:border-red-400 read-only:bg-gray-50"
             />
-            <svg
-              className="h-5 w-5 cursor-pointer text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
-            </svg>
           </div>
         </div>
       </div>

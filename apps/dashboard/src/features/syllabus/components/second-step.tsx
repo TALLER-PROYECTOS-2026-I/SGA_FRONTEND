@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Step } from "./step";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
@@ -9,62 +10,187 @@ import {
   useActualizarConcepto,
 } from "../hooks/use-conceptos-query";
 
-type ConceptoItem = {
+const API = import.meta.env.VITE_API_BASE_URL;
+
+type Concepto = {
   id: number;
   descripcion: string;
+};
+
+type ConceptosPorSemana = Record<number, Concepto[]>;
+
+type Unidad = {
+  id: number;
+  numero: number;
+  titulo?: string;
 };
 
 export default function SecondStep() {
   const { nextStep } = useSteps();
   const { syllabusId: contextSyllabusId } = useSyllabusContext();
-  const syllabusId = contextSyllabusId || 2;
+  const [searchParams] = useSearchParams();
+
+  const mode = searchParams.get("mode") ?? "";
+  const syllabusIdFromUrl = Number(searchParams.get("id") ?? "");
+
+  const isEditMode =
+    mode === "edit" &&
+    Number.isFinite(syllabusIdFromUrl) &&
+    syllabusIdFromUrl > 0;
+
+  const syllabusId = isEditMode
+    ? syllabusIdFromUrl
+    : typeof contextSyllabusId === "number" && contextSyllabusId > 0
+      ? contextSyllabusId
+      : 0;
 
   const [semana, setSemana] = useState<number>(1);
   const [descripcion, setDescripcion] = useState("");
 
+  const [conceptosLocales, setConceptosLocales] = useState<ConceptosPorSemana>(
+    {},
+  );
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
 
-  const unidadId = useMemo(() => {
+  const [unidades, setUnidades] = useState<Unidad[]>([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
+
+  useEffect(() => {
+    if (!isEditMode || syllabusId <= 0) return;
+
+    const loadUnidades = async () => {
+      try {
+        setLoadingUnidades(true);
+
+        const res = await fetch(`${API}/syllabus/${syllabusId}/unidades`);
+        const data = await res.json();
+
+        const items = Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+            ? data
+            : [];
+
+        const parsed: Unidad[] = items
+          .map((item: Record<string, unknown>) => ({
+            id: Number(item.id),
+            numero: Number(item.numero),
+            titulo: String(item.titulo ?? ""),
+          }))
+          .filter((item: Unidad) => item.id > 0 && item.numero > 0)
+          .sort((a: Unidad, b: Unidad) => a.numero - b.numero);
+
+        setUnidades(parsed);
+      } catch (error) {
+        console.error("Error cargando unidades:", error);
+        setUnidades([]);
+      } finally {
+        setLoadingUnidades(false);
+      }
+    };
+
+    loadUnidades();
+  }, [isEditMode, syllabusId]);
+
+  const unidadNumero = useMemo(() => {
     if (semana >= 1 && semana <= 4) return 1;
     if (semana >= 5 && semana <= 8) return 2;
     if (semana >= 9 && semana <= 12) return 3;
     return 4;
   }, [semana]);
 
-  const { data, isLoading } = useGetConceptos(syllabusId, unidadId, semana);
+  const unidadId = useMemo(() => {
+    if (!isEditMode) {
+      return unidadNumero;
+    }
 
-  const conceptos: ConceptoItem[] = Array.isArray(data)
-    ? data
-    : (data?.items ?? []);
+    const unidadReal = unidades.find((u) => u.numero === unidadNumero);
+    return unidadReal?.id ?? 0;
+  }, [isEditMode, unidadNumero, unidades]);
+
+  const {
+    data: conceptosBackend = [],
+    isLoading,
+  } = useGetConceptos(syllabusId, unidadId, semana);
 
   const { mutateAsync: crearConcepto, isPending: isCreating } =
     useCrearConcepto(syllabusId, unidadId, semana);
+
   const { mutateAsync: eliminarConcepto, isPending: isDeleting } =
     useEliminarConcepto(syllabusId, unidadId, semana);
+
   const { mutateAsync: actualizarConcepto, isPending: isUpdating } =
     useActualizarConcepto(syllabusId, unidadId, semana);
+
+  const conceptos = isEditMode
+    ? conceptosBackend
+    : (conceptosLocales[semana] ?? []);
 
   const handleAdd = async () => {
     if (!descripcion.trim()) return;
 
-    try {
-      await crearConcepto(descripcion);
-      setDescripcion("");
-    } catch (error) {
-      console.error("Error al crear concepto:", error);
+    if (isEditMode) {
+      if (loadingUnidades) {
+        alert("Cargando unidades del sílabo...");
+        return;
+      }
+
+      if (!unidadId) {
+        alert("No se encontró una unidad válida para este sílabo en la semana seleccionada.");
+        return;
+      }
+
+      try {
+        await crearConcepto(descripcion.trim());
+        setDescripcion("");
+      } catch (error) {
+        console.error("Error al crear concepto:", error);
+        alert("No se pudo crear el contenido conceptual.");
+      }
+      return;
     }
+
+    const nuevoConcepto: Concepto = {
+      id: Date.now(),
+      descripcion: descripcion.trim(),
+    };
+
+    setConceptosLocales((prev) => ({
+      ...prev,
+      [semana]: [...(prev[semana] ?? []), nuevoConcepto],
+    }));
+
+    setDescripcion("");
   };
 
   const handleDelete = async (id: number) => {
-    if (
-      window.confirm("¿Seguro que deseas eliminar este contenido conceptual?")
-    ) {
-      await eliminarConcepto(id);
+    if (!window.confirm("¿Seguro que deseas eliminar este contenido conceptual?")) {
+      return;
+    }
+
+    if (isEditMode) {
+      try {
+        await eliminarConcepto(id);
+      } catch (error) {
+        console.error("Error al eliminar concepto:", error);
+      }
+      return;
+    }
+
+    setConceptosLocales((prev) => ({
+      ...prev,
+      [semana]: (prev[semana] ?? []).filter((item) => item.id !== id),
+    }));
+
+    if (editingId === id) {
+      setEditingId(null);
+      setEditText("");
     }
   };
 
-  const startEditing = (item: ConceptoItem) => {
+  const startEditing = (item: Concepto) => {
     setEditingId(item.id);
     setEditText(item.descripcion);
   };
@@ -77,13 +203,36 @@ export default function SecondStep() {
   const handleSaveEdit = async (id: number) => {
     if (!editText.trim()) return;
 
-    try {
-      await actualizarConcepto({ contenidoId: id, descripcion: editText });
-      setEditingId(null);
-      setEditText("");
-    } catch (error) {
-      console.error("Error al actualizar:", error);
+    if (isEditMode) {
+      try {
+        await actualizarConcepto({
+          contenidoId: id,
+          descripcion: editText.trim(),
+        });
+        setEditingId(null);
+        setEditText("");
+      } catch (error) {
+        console.error("Error al actualizar:", error);
+      }
+      return;
     }
+
+    setConceptosLocales((prev) => ({
+      ...prev,
+      [semana]: (prev[semana] ?? []).map((item) =>
+        item.id === id ? { ...item, descripcion: editText.trim() } : item,
+      ),
+    }));
+
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const handleWeekChange = (newWeek: number) => {
+    setSemana(newWeek);
+    setDescripcion("");
+    setEditingId(null);
+    setEditText("");
   };
 
   return (
@@ -107,11 +256,7 @@ export default function SecondStep() {
               <select
                 className="w-full rounded-md border border-gray-300 p-2.5 text-sm focus:border-[#b91c1c] focus:ring-[#b91c1c]"
                 value={semana}
-                onChange={(e) => {
-                  setSemana(Number(e.target.value));
-                  setDescripcion("");
-                  setEditingId(null);
-                }}
+                onChange={(e) => handleWeekChange(Number(e.target.value))}
               >
                 {Array.from({ length: 16 }, (_, i) => i + 1).map((s) => (
                   <option key={s} value={s}>
@@ -160,7 +305,7 @@ export default function SecondStep() {
             </div>
 
             <div className="space-y-3">
-              {isLoading ? (
+              {isEditMode && (isLoading || loadingUnidades) ? (
                 <p className="py-4 text-center text-sm text-gray-500">
                   Cargando contenidos...
                 </p>
@@ -169,7 +314,7 @@ export default function SecondStep() {
                   No hay contenidos registrados en esta semana.
                 </p>
               ) : (
-                conceptos.map((item: ConceptoItem, index: number) => {
+                conceptos.map((item: Concepto, index: number) => {
                   if (editingId === item.id) {
                     return (
                       <div
