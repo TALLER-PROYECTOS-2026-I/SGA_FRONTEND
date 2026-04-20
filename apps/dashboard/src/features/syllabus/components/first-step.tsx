@@ -3,40 +3,114 @@ import { useSearchParams } from "react-router-dom";
 import { Step } from "./step";
 import { useSteps } from "../contexts/steps-context-provider";
 
+const API = import.meta.env.VITE_API_BASE_URL;
+
+type SyllabusItem = {
+  id?: number;
+  syllabusId?: number;
+  cursoNombre?: string;
+  curso_nombre?: string;
+  nombreAsignatura?: string;
+  cursoCodigo?: string;
+  curso_codigo?: string;
+  codigoAsignatura?: string;
+};
+
 export default function FirstStep() {
   const { nextStep } = useSteps();
   const [searchParams] = useSearchParams();
 
   const mode = searchParams.get("mode") ?? "";
+  const idFromUrl = Number(searchParams.get("id") ?? "");
   const codigoFromUrl = (searchParams.get("codigo") ?? "").trim();
-  const idFromUrl = (searchParams.get("id") ?? "").trim();
 
-  const isEditMode = mode === "edit";
+  const isEditMode =
+    mode === "edit" &&
+    Number.isFinite(idFromUrl) &&
+    idFromUrl > 0;
 
   const [nombreAsignatura, setNombreAsignatura] = useState("");
   const [codigoAsignatura, setCodigoAsignatura] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isEditMode) return;
 
-    // Nombre inferido desde el código que venga por URL.
-    // Si luego quieres traer el nombre real desde backend, esto se puede reemplazar.
-    const nombreInferido =
-      codigoFromUrl === "INF-202"
-        ? "Base de Datos"
-        : codigoFromUrl === "INF-101"
-          ? "Ingeniería de Software"
-          : codigoFromUrl === "INF-303"
-            ? "Arquitectura de Software"
-            : codigoFromUrl === "INF-404"
-              ? "Pruebas de Software"
-              : codigoFromUrl === "INF-901"
-                ? "Arquitectura de Software II"
-                : "";
+    let isMounted = true;
 
-    setCodigoAsignatura(codigoFromUrl);
-    setNombreAsignatura(nombreInferido);
-  }, [isEditMode, codigoFromUrl]);
+    const loadSyllabusData = async () => {
+      try {
+        setLoading(true);
+
+        // Usamos una ruta que sí existe en tu backend
+        const res = await fetch(`${API}/syllabus/revision`);
+
+        if (!res.ok) {
+          throw new Error(`No se pudo cargar la lista de sílabos: ${res.status}`);
+        }
+
+        const raw = (await res.json()) as
+          | { data?: SyllabusItem[] }
+          | SyllabusItem[];
+
+        const items = Array.isArray((raw as { data?: SyllabusItem[] })?.data)
+          ? ((raw as { data?: SyllabusItem[] }).data ?? [])
+          : Array.isArray(raw)
+            ? raw
+            : [];
+
+        const found = items.find((item) => {
+          const itemId = Number(item.id ?? item.syllabusId ?? 0);
+          const itemCodigo = String(
+            item.cursoCodigo ||
+              item.curso_codigo ||
+              item.codigoAsignatura ||
+              "",
+          ).trim();
+
+          return itemId === idFromUrl || itemCodigo === codigoFromUrl;
+        });
+
+        const nombre = String(
+          found?.cursoNombre ||
+            found?.curso_nombre ||
+            found?.nombreAsignatura ||
+            "",
+        ).trim();
+
+        const codigo = String(
+          found?.cursoCodigo ||
+            found?.curso_codigo ||
+            found?.codigoAsignatura ||
+            codigoFromUrl ||
+            "",
+        ).trim();
+
+        if (isMounted) {
+          setNombreAsignatura(nombre);
+          setCodigoAsignatura(codigo);
+        }
+      } catch (error) {
+        console.error("Error cargando datos del sílabo:", error);
+
+        if (isMounted) {
+          // Al menos conservamos el código de la URL si viene
+          setNombreAsignatura("");
+          setCodigoAsignatura(codigoFromUrl);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadSyllabusData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [API, codigoFromUrl, idFromUrl, isEditMode]);
 
   const handleNext = () => {
     if (!nombreAsignatura.trim()) {
@@ -65,8 +139,9 @@ export default function FirstStep() {
         <div className="space-y-6 px-8 pb-8">
           {isEditMode && (
             <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              Editando sílabo existente
-              {idFromUrl ? ` (ID: ${idFromUrl})` : ""}
+              {loading
+                ? "Cargando datos del sílabo..."
+                : `Editando sílabo existente (ID: ${idFromUrl})`}
             </div>
           )}
 
