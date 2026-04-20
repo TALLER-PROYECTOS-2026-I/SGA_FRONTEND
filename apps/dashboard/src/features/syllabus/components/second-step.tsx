@@ -68,6 +68,23 @@ export default function SecondStep() {
     } catch (error) {
       console.error("Error al actualizar:", error);
     }
+
+    setConceptosLocales((prev) => ({
+      ...prev,
+      [semana]: (prev[semana] ?? []).map((item) =>
+        item.id === id ? { ...item, descripcion: editText.trim() } : item,
+      ),
+    }));
+
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const handleWeekChange = (newWeek: number) => {
+    setSemana(newWeek);
+    setDescripcion("");
+    setEditingId(null);
+    setEditText("");
   };
 
   return (
