@@ -2,4 +2,4 @@
 
 # Adding CODEOWNERS file
 
-Pruebas DevSecOps.
+Pruebas DevSecOps - Commit 1.
