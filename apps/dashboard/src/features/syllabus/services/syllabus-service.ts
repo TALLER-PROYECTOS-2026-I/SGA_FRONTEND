@@ -5,16 +5,20 @@ export interface SyllabusData {
   [key: string]: unknown;
 }
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    sessionStorage.getItem("token") ?? localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const syllabusService = {
   async fetchSyllabus(syllabusId: number): Promise<SyllabusData> {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/syllabus/${syllabusId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
-    );
+    const response = await fetch(`${API_BASE}/syllabus/${syllabusId}`, {
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
       throw new Error("Error al cargar sílabo");
@@ -26,11 +30,9 @@ export const syllabusService = {
 
   async checkDraftByCodigo(codigo: string): Promise<SyllabusData | null> {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/syllabus/draft?codigo=${codigo}`,
+      `${API_BASE}/syllabus/draft?codigo=${encodeURIComponent(codigo)}`,
       {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        headers: getAuthHeaders(),
       },
     );
 

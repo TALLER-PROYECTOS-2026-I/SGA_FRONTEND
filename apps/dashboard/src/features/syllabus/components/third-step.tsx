@@ -434,7 +434,7 @@ export default function ThirdStep() {
             </div>
           </div>
           <div className="w-full h-12 rounded-md px-4 flex items-center text-lg bg-blue-50 border border-blue-100">
-            {courseName || "TALLER DE PROYECTOS"}
+            {courseName || ""}
           </div>
         </div>
 
