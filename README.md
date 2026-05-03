@@ -10,4 +10,4 @@ Pruebas DevSecOps - Commit 1.
 
 3er cambio: Se agrega el archivo sonar-project.properties para visualizarlo en en el SonarQube. (Verificar)
 
-4to cambio: Se modificó la Key del sonar-project.properties.
+4to cambio: Se modificó la Key del sonar-project.properties. (Nuevos cambios)
