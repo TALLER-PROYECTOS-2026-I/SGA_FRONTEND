@@ -13,3 +13,5 @@ Pruebas DevSecOps - Commit 1.
 4to cambio: Se modificó la Key del sonar-project.properties. (Nuevos cambios)
 
 5to cambio: Implementación del SonarQube. (Cambio de nombres)
+
+6to cambio: Se realizaron cambios en el properties security-dev.yml (args)
