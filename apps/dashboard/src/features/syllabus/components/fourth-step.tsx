@@ -9,7 +9,6 @@ import {
 } from "../hooks/fourth-step-query";
 import type {
   CreateProgramacionBody,
-  ProgramacionResponse,
   UpdateProgramacionBody,
 } from "../hooks/fourth-step-query";
 import { WeekSelector } from "../../../common/week-selector";
@@ -99,9 +98,6 @@ export default function FourthStep() {
 
   const [selectedUnidad, setSelectedUnidad] = useState<number>(1);
   const [selectedSemana, setSelectedSemana] = useState<string>("1");
-  const [programacionForm, setProgramacionForm] = useState<
-    Partial<ProgramacionResponse>
-  >({});
 
   const [contenidoInput, setContenidoInput] = useState("");
   const [listasPorSemana, setListasPorSemana] = useState<
@@ -120,27 +116,12 @@ export default function FourthStep() {
       first.semanaInicio ?? unitWeekRanges[unidadNumero]?.[0] ?? 1,
     );
 
-    setProgramacionForm(first);
     setSelectedUnidad(unidadNumero);
     setSelectedSemana(semanaInicio);
     setListasPorSemana(
       parseConceptualesPorSemana(first.contenidosConceptuales),
     );
   }, [data]);
-
-  const weeksForSelectedUnit = (() => {
-    const range = unitWeekRanges[selectedUnidad];
-
-    if (!range) return DEFAULT_WEEKS;
-
-    const weeks = [];
-
-    for (let week = range[0]; week <= range[1]; week++) {
-      weeks.push({ numeroSemana: week });
-    }
-
-    return weeks;
-  })();
 
   const handleSemanaChange = (nuevaSemana: string) => {
     setSelectedSemana(nuevaSemana);
