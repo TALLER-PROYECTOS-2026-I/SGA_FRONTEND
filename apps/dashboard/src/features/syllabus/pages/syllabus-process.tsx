@@ -1,11 +1,7 @@
 import StepsProvider from "../contexts/steps-context";
-import {
-  SyllabusProvider,
-  useSyllabusContext,
-} from "../contexts/syllabus-context";
+import { SyllabusProvider, useSyllabusContext } from "../contexts/syllabus-context";
 import { PermissionsProvider } from "../contexts/permissions-context";
 import { usePermissions } from "../hooks/use-permissions";
-import { useSession } from "../../auth";
 
 import FirstStep from "../components/first-step";
 import SecondStep from "../components/second-step";
@@ -20,9 +16,10 @@ const TOTAL_STEPS = 8;
 const FULL_STEPS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 function SyllabusProcessContent() {
-  const { user } = useSession();
+  // TODO: Obtener userId del contexto de autenticación
+  const userId = 5;
+
   const { mode } = useSyllabusContext();
-  const userId = user?.id ? Number(user.id) : null;
 
   const { allowedSteps, isLoading, error, hasEditPermissionForSection } =
     usePermissions(userId);

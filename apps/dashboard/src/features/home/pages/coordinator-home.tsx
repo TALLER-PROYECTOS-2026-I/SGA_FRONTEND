@@ -71,7 +71,7 @@ export default function CoordinatorHome() {
     {
       icon: <Plus size={32} />,
       title: "Registrar nuevo Silabo",
-      onClick: () => navigate("/syllabus?mode=create"),
+      onClick: () => navigate("/syllabus?mode=create")
     },
     {
       icon: <Edit size={32} />,

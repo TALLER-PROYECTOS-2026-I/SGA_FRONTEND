@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  FileText,
-  Upload,
-  CheckCircle2,
-  ArrowLeft,
-  Loader2,
-} from "lucide-react";
+import { FileText, Upload, CheckCircle2, ArrowLeft, Loader2 } from "lucide-react";
 
-const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+const API = import.meta.env.VITE_API_BASE_URL;
 
 const isRealPDF = async (file: File): Promise<boolean> => {
   const fileReader = new FileReader();
@@ -99,8 +93,7 @@ export default function ImportSignedSyllabusPage() {
           Importar Sílabo Firmado
         </h1>
         <p className="text-2xl text-slate-500">
-          Carga el archivo PDF firmado correspondiente a la asignatura
-          seleccionada
+          Carga el archivo PDF firmado correspondiente a la asignatura seleccionada
         </p>
       </div>
 
@@ -275,16 +268,9 @@ export default function ImportSignedSyllabusPage() {
                 Recomendaciones
               </p>
               <ul className="space-y-2 text-sm text-amber-700">
-                <li>
-                  • Verifica que el archivo corresponda a la asignatura
-                  seleccionada.
-                </li>
-                <li>
-                  • El documento debe estar firmado y en formato PDF válido.
-                </li>
-                <li>
-                  • Selecciona el ciclo correcto antes de subir el archivo.
-                </li>
+                <li>• Verifica que el archivo corresponda a la asignatura seleccionada.</li>
+                <li>• El documento debe estar firmado y en formato PDF válido.</li>
+                <li>• Selecciona el ciclo correcto antes de subir el archivo.</li>
               </ul>
             </div>
           </div>

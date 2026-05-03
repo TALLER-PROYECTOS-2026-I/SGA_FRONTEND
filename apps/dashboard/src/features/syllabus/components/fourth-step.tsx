@@ -123,20 +123,6 @@ export default function FourthStep() {
     );
   }, [data]);
 
-  const weeksForSelectedUnit = (() => {
-    const range = unitWeekRanges[selectedUnidad];
-
-    if (!range) return DEFAULT_WEEKS;
-
-    const weeks = [];
-
-    for (let week = range[0]; week <= range[1]; week++) {
-      weeks.push({ numeroSemana: week });
-    }
-
-    return weeks;
-  })();
-
   const handleSemanaChange = (nuevaSemana: string) => {
     setSelectedSemana(nuevaSemana);
     setContenidoInput("");
@@ -285,7 +271,9 @@ export default function FourthStep() {
       nextStep();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Error guardando programación",
+        error instanceof Error
+          ? error.message
+          : "Error guardando programación",
       );
     }
   };
@@ -302,9 +290,7 @@ export default function FourthStep() {
             <div>
               <h3 className="font-bold text-lg">1. Datos Generales</h3>
               <p className="text-sm text-gray-700">
-                {generalData?.nombreAsignatura ||
-                  courseName ||
-                  "Sin nombre de asignatura"}
+                {generalData?.nombreAsignatura || courseName || "Sin nombre de asignatura"}
                 {generalData?.codigoAsignatura || cursoCodigo
                   ? ` | COD: ${generalData?.codigoAsignatura || cursoCodigo}`
                   : ""}
@@ -328,7 +314,7 @@ export default function FourthStep() {
             <WeekSelector
               value={selectedSemana}
               onChange={handleSemanaChange}
-              semanas={weeksForSelectedUnit}
+              semanas={DEFAULT_WEEKS}
               className="w-full px-4 py-2 text-sm"
             />
 
@@ -362,7 +348,8 @@ export default function FourthStep() {
 
             {editingIndex !== null && (
               <p className="text-xs text-blue-600 text-right mt-1">
-                Editando contenido #{editingIndex + 1}. Presiona ✓ para guardar.
+                Editando contenido #{editingIndex + 1}. Presiona ✓ para
+                guardar.
               </p>
             )}
           </div>
@@ -390,7 +377,9 @@ export default function FourthStep() {
                       key={`${selectedSemana}-${contenido}-${index}`}
                       className="flex items-center justify-between gap-3 border rounded-lg px-4 py-3 bg-gray-50"
                     >
-                      <span className="text-sm text-gray-800">{contenido}</span>
+                      <span className="text-sm text-gray-800">
+                        {contenido}
+                      </span>
 
                       <div className="flex gap-2 text-gray-500">
                         <button

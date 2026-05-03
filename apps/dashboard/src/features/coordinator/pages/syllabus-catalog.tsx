@@ -1,23 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Eye, Loader2 } from "lucide-react";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
-
 interface SyllabusCatalogItem {
   id: string;
   courseName: string;
   courseCode: string;
   sumilla: string;
   credits: number;
-}
-
-interface SyllabusRevisionItem {
-  id?: string | number;
-  syllabusId?: string | number;
-  silaboId?: string | number;
-  cursoNombre?: string;
-  cursoCodigo?: string;
 }
 
 export default function SyllabusCatalog() {
@@ -34,13 +23,16 @@ export default function SyllabusCatalog() {
         setIsLoading(true);
         setError("");
 
-        const res = await fetch(`${API_BASE}/syllabus/revision`);
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/syllabus/revision`,
+        );
 
         if (!res.ok) {
           throw new Error(await res.text());
         }
 
         const json = await res.json();
+
         const syllabuses = Array.isArray(json)
           ? json
           : Array.isArray(json.data)
@@ -48,12 +40,14 @@ export default function SyllabusCatalog() {
             : [];
 
         const items = await Promise.all(
-          syllabuses.map(async (item: SyllabusRevisionItem) => {
+          syllabuses.map(async (item: any) => {
             const syllabusId = item.syllabusId ?? item.silaboId ?? item.id;
 
             try {
               const completeRes = await fetch(
-                `${API_BASE}/syllabus/${syllabusId}/complete`,
+                `${
+                  import.meta.env.VITE_API_BASE_URL
+                }/syllabus/${syllabusId}/complete`,
               );
 
               if (!completeRes.ok) {
@@ -64,6 +58,7 @@ export default function SyllabusCatalog() {
               const complete = completeJson.data ?? completeJson;
 
               const datos = complete.datosGenerales ?? {};
+
               const creditos =
                 Number(datos.creditosTeoria ?? 0) +
                 Number(datos.creditosPractica ?? 0);
@@ -71,9 +66,13 @@ export default function SyllabusCatalog() {
               return {
                 id: String(syllabusId),
                 courseName:
-                  datos.nombreAsignatura ?? item.cursoNombre ?? "Sin nombre",
+                  datos.nombreAsignatura ??
+                  item.cursoNombre ??
+                  "Sin nombre",
                 courseCode:
-                  datos.codigoAsignatura ?? item.cursoCodigo ?? "Sin código",
+                  datos.codigoAsignatura ??
+                  item.cursoCodigo ??
+                  "Sin código",
                 sumilla:
                   complete.sumilla ??
                   "Este sílabo aún no tiene sumilla registrada.",
@@ -107,10 +106,12 @@ export default function SyllabusCatalog() {
   }, []);
 
   const filteredCatalog = useMemo(() => {
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+
     return catalog.filter(
       (item) =>
-        item.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.courseCode.toLowerCase().includes(searchTerm.toLowerCase()),
+        item.courseName.toLowerCase().includes(normalizedSearch) ||
+        item.courseCode.toLowerCase().includes(normalizedSearch),
     );
   }, [catalog, searchTerm]);
 
@@ -139,11 +140,12 @@ export default function SyllabusCatalog() {
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
             size={20}
           />
+
           <input
             type="text"
             placeholder="Buscar por curso o código..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(event) => setSearchTerm(event.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -171,6 +173,7 @@ export default function SyllabusCatalog() {
               </div>
 
               <button
+                type="button"
                 onClick={() => setSelectedSyllabus(item)}
                 className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors ml-4"
                 title="Ver detalles"
@@ -195,6 +198,7 @@ export default function SyllabusCatalog() {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">
                 {selectedSyllabus.courseName}
               </h2>
+
               <p className="text-sm text-gray-600">
                 Código: {selectedSyllabus.courseCode} | Créditos:{" "}
                 {selectedSyllabus.credits}
@@ -205,6 +209,7 @@ export default function SyllabusCatalog() {
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 Sumilla
               </h3>
+
               <p className="text-gray-700 leading-relaxed">
                 {selectedSyllabus.sumilla}
               </p>
@@ -212,6 +217,7 @@ export default function SyllabusCatalog() {
 
             <div className="flex justify-end">
               <button
+                type="button"
                 onClick={() => setSelectedSyllabus(null)}
                 className="px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >

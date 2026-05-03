@@ -52,37 +52,22 @@ class EighthStepManager {
     return data.items ?? data.resultados ?? data.outcomes ?? [];
   }
 
-  private normalizeResponse(response: unknown): ResultadosResponse {
-    if (
-      typeof response === "object" &&
-      response !== null &&
-      "data" in response
-    ) {
-      const responseWithData = response as { data: unknown };
-      const data = responseWithData.data;
+  private normalizeResponse(response: any): ResultadosResponse {
+    if (response?.data) {
+      const data = response.data;
 
-      if (Array.isArray(data)) return { items: data as StudentOutcome[] };
-      if (typeof data !== "object" || data === null) return { items: [] };
-
-      const normalized = data as ResultadosData;
-      if (normalized.items) return normalized;
-      if (normalized.resultados) return { items: normalized.resultados };
-      if (normalized.outcomes) return { items: normalized.outcomes };
+      if (Array.isArray(data)) return { items: data };
+      if (data.items) return data;
+      if (data.resultados) return { items: data.resultados };
+      if (data.outcomes) return { items: data.outcomes };
 
       return { items: [] };
     }
 
-    if (Array.isArray(response)) {
-      return { items: response as StudentOutcome[] };
-    }
-
-    if (typeof response === "object" && response !== null) {
-      const normalized = response as ResultadosData;
-
-      if (normalized.items) return normalized;
-      if (normalized.resultados) return { items: normalized.resultados };
-      if (normalized.outcomes) return { items: normalized.outcomes };
-    }
+    if (Array.isArray(response)) return { items: response };
+    if (response?.items) return response;
+    if (response?.resultados) return { items: response.resultados };
+    if (response?.outcomes) return { items: response.outcomes };
 
     return { items: [] };
   }
@@ -133,7 +118,10 @@ class EighthStepManager {
       const nivel = rawNivel === "K" || rawNivel === "R" ? rawNivel : "";
 
       const rawCodigo =
-        item.resultadoProgramaCodigo ?? item.codigo ?? item.code ?? "";
+        item.resultadoProgramaCodigo ??
+        item.codigo ??
+        item.code ??
+        "";
 
       const codigo =
         rawCodigo && rawCodigo !== "K" && rawCodigo !== "R"

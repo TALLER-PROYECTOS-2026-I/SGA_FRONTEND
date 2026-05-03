@@ -12,19 +12,17 @@ export const SessionProvider = ({
   children: React.ReactNode;
 }) => {
   const [token, setToken] = React.useState<string | undefined>();
-  const [isSessionInitialized, setIsSessionInitialized] = React.useState(false);
+  const [shouldFetch, setShouldFetch] = React.useState(false);
 
   React.useLayoutEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get("token");
     const mailToken = urlParams.get("mailToken");
 
-    if (tokenFromUrl) {
+    if (tokenFromUrl && mailToken) {
       setToken(tokenFromUrl);
       sessionStorage.setItem("token", tokenFromUrl);
-      if (mailToken) {
-        sessionStorage.setItem("mailToken", mailToken);
-      }
+      sessionStorage.setItem("mailToken", mailToken);
       const clear = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, clear);
     } else {
@@ -33,13 +31,13 @@ export const SessionProvider = ({
         setToken(savedToken);
       }
     }
-    setIsSessionInitialized(true);
+    setShouldFetch(true);
   }, []);
 
   const getSession = useQuery({
     queryKey: ["session", token],
     queryFn: () => authService.fetchSession(token),
-    enabled: isSessionInitialized && !!token,
+    enabled: shouldFetch,
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
@@ -63,12 +61,12 @@ export const SessionProvider = ({
   });
 
   React.useEffect(() => {
-    if (getSession.isError && isSessionInitialized) {
+    if (getSession.isError && shouldFetch) {
       sessionStorage.removeItem("token");
       sessionStorage.removeItem("mailToken");
       console.log("❌ Sesión inválida - tokens eliminados");
     }
-  }, [getSession.isError, isSessionInitialized]);
+  }, [getSession.isError, shouldFetch]);
 
   // Combinar nombre y apellido para obtener el nombre completo
   const getUserWithFullName = () => {
@@ -103,11 +101,8 @@ export const SessionProvider = ({
     <SessionContext.Provider
       value={{
         user: getUserWithFullName(),
-        isLoading:
-          !isSessionInitialized ||
-          getSession.isLoading ||
-          getTeacherProfile.isLoading,
-        isError: isSessionInitialized && (!token || getSession.isError),
+        isLoading: getSession.isLoading || getTeacherProfile.isLoading,
+        isError: getSession.isError,
       }}
     >
       {children}

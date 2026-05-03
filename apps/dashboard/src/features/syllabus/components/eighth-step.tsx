@@ -141,7 +141,7 @@ export default function EighthStep() {
       // 4. Navegar a página de confirmación o lista
       // Esperar un momento para que el usuario vea el mensaje
       setTimeout(() => {
-        navigate("/mis-asignaciones");
+        navigate("/my-syllabus"); // O la ruta que corresponda
       }, 2000);
     } catch (error) {
       console.error("❌ Error:", error);

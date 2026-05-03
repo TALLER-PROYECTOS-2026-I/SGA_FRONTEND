@@ -7,8 +7,7 @@ import { useSyllabusGeneral } from "../hooks/first-step-query";
 import type { SyllabusGeneral } from "../hooks/first-step-query";
 import type { DatosGenerales } from "../../coordinator/hooks/syllabus-section-data-query";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+const API_BASE = "http://localhost:7071/api";
 
 const getCurrentSemester = () => {
   const now = new Date();
@@ -93,9 +92,7 @@ export default function FirstStep() {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return emptyForm;
 
-      const parsed = JSON.parse(raw) as Partial<
-        Record<keyof FormState, string>
-      >;
+      const parsed = JSON.parse(raw) as Partial<Record<keyof FormState, string>>;
 
       return {
         ...emptyForm,
@@ -117,7 +114,7 @@ export default function FirstStep() {
   const { data, isLoading, isError, error } = useSyllabusGeneral(
     isReviewMode || isCreateMode ? null : syllabusId,
   );
-
+  
   useEffect(() => {
     const fetchDocentes = async () => {
       try {
@@ -204,7 +201,14 @@ export default function FirstStep() {
           ? String(json.horasPractica)
           : s.horasPractica,
     }));
-  }, [data, isError, error, setCourseName, isReviewMode, isCreateMode]);
+  }, [
+    data,
+    isError,
+    error,
+    setCourseName,
+    isReviewMode,
+    isCreateMode,
+  ]);
 
   useEffect(() => {
     if (!isReviewMode || !sectionData) return;
@@ -566,7 +570,9 @@ export default function FirstStep() {
                 placeholder="Nombre de la asignatura"
                 disabled={isCreating}
                 className={`w-full h-12 rounded-md px-4 flex items-center text-lg bg-white border ${
-                  errors.nombreAsignatura ? "border-red-500" : "border-blue-100"
+                  errors.nombreAsignatura
+                    ? "border-red-500"
+                    : "border-blue-100"
                 } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             ) : (
@@ -829,7 +835,7 @@ export default function FirstStep() {
                             <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-gray-300 bg-white shadow-lg">
                               {filteredDocentes.length > 0 ? (
                                 filteredDocentes.map((docente) => {
-                                  const nombre =
+                                 const nombre =
                                     docente.nombre_docente ||
                                     docente.nombreDocente ||
                                     docente.correo ||
@@ -896,9 +902,7 @@ export default function FirstStep() {
                                 : "border-gray-300"
                             }`}
                           >
-                            <option value="">
-                              Seleccione tipo de estudios
-                            </option>
+                            <option value="">Seleccione tipo de estudios</option>
                             <option value="general">General</option>
                             <option value="especifica">Específica</option>
                             <option value="especialidad">Especialidad</option>
@@ -932,7 +936,8 @@ export default function FirstStep() {
 
                           <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
                             Especialidad (
-                            {form.tipoEstudios?.toLowerCase() === "especialidad"
+                            {form.tipoEstudios?.toLowerCase() ===
+                            "especialidad"
                               ? "X"
                               : " "}
                             )
@@ -981,7 +986,8 @@ export default function FirstStep() {
 
                           <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
                             Semipresencial (
-                            {form.modalidad?.toLowerCase() === "semipresencial"
+                            {form.modalidad?.toLowerCase() ===
+                            "semipresencial"
                               ? "X"
                               : " "}
                             )

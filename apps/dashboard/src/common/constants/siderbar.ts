@@ -12,7 +12,6 @@ export const sidebarMenusByRole = {
     { to: "/", label: "Inicio" },
     { to: "/silabus", label: "Silabus" },
     { to: "/management", label: "Asignar Docente" },
-    { to: "/director/importar-silabo-firmado", label: "Importar Sílabo" },
   ],
   indeterminado: [],
 } as const;

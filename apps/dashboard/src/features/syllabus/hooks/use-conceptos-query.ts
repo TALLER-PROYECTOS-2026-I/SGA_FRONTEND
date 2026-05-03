@@ -13,14 +13,26 @@ export const useGetConceptos = (
     queryKey: ["conceptos", silaboId, unidadId, semana],
     queryFn: async () => {
       if (!silaboId) return [];
-      const res = await fetch(
-        `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales`,
-      );
-      if (!res.ok) throw new Error("Error al obtener conceptos");
-      const data = await res.json();
-      return data.data || data;
+
+      const url = `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales`;
+      console.log("GET conceptos URL:", url);
+
+      const res = await fetch(url);
+      const data = await res.json().catch(() => null);
+
+      console.log("GET conceptos RESP:", res.status, data);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            `Error al obtener conceptos (${res.status})`,
+        );
+      }
+
+      return data?.data || data || [];
     },
-    enabled: !!silaboId && !!unidadId && !!semana, // Solo busca si tenemos los 3 datos
+    enabled: !!silaboId && !!unidadId && !!semana,
   });
 };
 
@@ -31,21 +43,34 @@ export const useCrearConcepto = (
   semana: number,
 ) => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (descripcion: string) => {
-      const res = await fetch(
-        `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ descripcion, orden: 1 }),
-        },
-      );
-      if (!res.ok) throw new Error("Error al crear");
-      return res.json();
+      const url = `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales`;
+      const payload = { descripcion, orden: 1 };
+
+      console.log("POST concepto URL:", url);
+      console.log("POST concepto BODY:", payload);
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      console.log("POST concepto RESP:", res.status, data);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error || `Error al crear (${res.status})`,
+        );
+      }
+
+      return data;
     },
     onSuccess: () => {
-      // Recarga la lista automáticamente al guardar
       queryClient.invalidateQueries({
         queryKey: ["conceptos", silaboId, unidadId, semana],
       });
@@ -60,16 +85,28 @@ export const useEliminarConcepto = (
   semana: number,
 ) => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (contenidoId: number) => {
-      const res = await fetch(
-        `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales/${contenidoId}`,
-        {
-          method: "DELETE",
-        },
-      );
-      if (!res.ok) throw new Error("Error al eliminar");
-      return res.json();
+      const url = `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales/${contenidoId}`;
+
+      console.log("DELETE concepto URL:", url);
+
+      const res = await fetch(url, {
+        method: "DELETE",
+      });
+
+      const data = await res.json().catch(() => null);
+
+      console.log("DELETE concepto RESP:", res.status, data);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error || `Error al eliminar (${res.status})`,
+        );
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -86,6 +123,7 @@ export const useActualizarConcepto = (
   semana: number,
 ) => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       contenidoId,
@@ -94,16 +132,29 @@ export const useActualizarConcepto = (
       contenidoId: number;
       descripcion: string;
     }) => {
-      const res = await fetch(
-        `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales/${contenidoId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ descripcion, orden: 1 }),
-        },
-      );
-      if (!res.ok) throw new Error("Error al actualizar");
-      return res.json();
+      const url = `${API_BASE}/syllabus/${silaboId}/unidades/${unidadId}/semanas/${semana}/contenidos-conceptuales/${contenidoId}`;
+      const payload = { descripcion, orden: 1 };
+
+      console.log("PUT concepto URL:", url);
+      console.log("PUT concepto BODY:", payload);
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      console.log("PUT concepto RESP:", res.status, data);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error || `Error al actualizar (${res.status})`,
+        );
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

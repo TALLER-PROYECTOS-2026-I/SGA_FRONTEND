@@ -72,7 +72,7 @@ export const useFinalizeSyllabus = ({
               });
 
               setTimeout(() => {
-                navigate("/mis-asignaciones");
+                navigate("/my-syllabus");
               }, 2000);
 
               resolve(true);
