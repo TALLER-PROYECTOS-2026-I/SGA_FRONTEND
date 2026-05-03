@@ -9,3 +9,5 @@ Pruebas DevSecOps - Commit 1.
 2do cambio: Se añadió como Secret el SONAR_TOKEN del repo.
 
 3er cambio: Se agrega el archivo sonar-project.properties para visualizarlo en en el SonarQube. (Verificar)
+
+4to cambio: Se modificó la Key del sonar-project.properties.
