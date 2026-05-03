@@ -4,17 +4,18 @@ export interface PermissionSection {
   numeroSeccion: number;
 }
 
-// Mapeo de numeroSeccion a step number
+export const FULL_STEPS = [1, 2, 3, 4, 5, 6, 7, 8];
+
 export const SECTION_TO_STEP_MAP: Record<number, number> = {
-  1: 1, // Datos generales (siempre visible)
+  1: 1, // Datos generales
   2: 2, // Sumilla
   3: 3, // Competencias
   4: 4, // Programación del contenido
-  5: 5, // Estrategias metodológicas (sección 5 o 6)
-  6: 5, // Recursos didácticos (también step 5)
-  7: 6, // Fórmula de evaluación
+  5: 5, // Estrategias metodológicas
+  6: 5, // Recursos didácticos
+  7: 6, // Evaluación del aprendizaje
   8: 7, // Fuentes de consulta
-  9: 8, // Resultados (outcomes)
+  9: 8, // Aportes / resultados
 };
 
 class PermissionsManager {
@@ -44,26 +45,38 @@ class PermissionsManager {
     }
 
     const data: PermissionSection[] = await res.json();
-    return data;
+    return Array.isArray(data) ? data : [];
   }
 
-  /**
-   * Convierte las secciones permitidas a números de step
-   * @param sections Array de secciones permitidas
-   * @returns Array de steps permitidos (sin duplicados, ordenados)
-   */
   sectionsToSteps(sections: PermissionSection[]): number[] {
-    // Siempre incluir step 1 (datos generales)
-    const steps = new Set<number>([1]);
+    if (!sections || sections.length === 0) {
+      return FULL_STEPS;
+    }
+
+    const steps = new Set<number>();
 
     sections.forEach((section) => {
       const step = SECTION_TO_STEP_MAP[section.numeroSeccion];
+
       if (step) {
         steps.add(step);
       }
     });
 
-    return Array.from(steps).sort((a, b) => a - b);
+    const result = Array.from(steps).sort((a, b) => a - b);
+
+    return result.length > 0 ? result : FULL_STEPS;
+  }
+
+  hasPermissionForSection(
+    sections: PermissionSection[] | undefined,
+    sectionNumber: number,
+  ): boolean {
+    if (!sections || sections.length === 0) {
+      return true;
+    }
+
+    return sections.some((section) => section.numeroSeccion === sectionNumber);
   }
 }
 
@@ -77,20 +90,18 @@ export const usePermissions = (userId: number | null) => {
     queryFn: () => permissionsManager.fetchPermissions(userId!),
     enabled: isValidId,
     retry: false,
-    staleTime: 10 * 60 * 1000, // 10 minutos
-    gcTime: 30 * 60 * 1000, // 30 minutos
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
-  // Convertir secciones a steps
   const allowedSteps = query.data
     ? permissionsManager.sectionsToSteps(query.data)
-    : [1]; // Por defecto, solo step 1
+    : FULL_STEPS;
 
-  // Verificar si tiene permiso de edición para una sección específica
   const hasEditPermissionForSection = (sectionNumber: number): boolean => {
-    if (!query.data) return false;
-    return query.data.some(
-      (section) => section.numeroSeccion === sectionNumber,
+    return permissionsManager.hasPermissionForSection(
+      query.data,
+      sectionNumber,
     );
   };
 

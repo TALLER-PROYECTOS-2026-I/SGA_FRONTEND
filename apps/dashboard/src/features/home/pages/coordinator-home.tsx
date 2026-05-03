@@ -1,7 +1,15 @@
 import { Key, Mail, CheckSquare, List, Plus, Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import React from "react";
 
 interface ModuleCardProps {
+  icon: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+interface Module {
   icon: React.ReactNode;
   title: string;
   onClick: () => void;
@@ -22,7 +30,9 @@ function ModuleCard({ icon, title, onClick, disabled }: ModuleCardProps) {
       `}
     >
       <div
-        className={`p-4 rounded-lg ${disabled ? "bg-gray-400 text-gray-200" : "bg-red-600 text-white"}`}
+        className={`p-4 rounded-lg ${
+          disabled ? "bg-gray-400 text-gray-200" : "bg-red-600 text-white"
+        }`}
       >
         {icon}
       </div>
@@ -36,7 +46,7 @@ function ModuleCard({ icon, title, onClick, disabled }: ModuleCardProps) {
 export default function CoordinatorHome() {
   const navigate = useNavigate();
 
-  const modules = [
+  const modules: Module[] = [
     {
       icon: <Key size={32} />,
       title: "Activar permisos",
@@ -56,13 +66,12 @@ export default function CoordinatorHome() {
       icon: <List size={32} />,
       title: "Catalogo de Sumilla",
       onClick: () => navigate("/coordinator/syllabus-catalog"),
-      disabled: true,
+      disabled: false, // habilitado
     },
     {
       icon: <Plus size={32} />,
       title: "Registrar nuevo Silabo",
-      onClick: () => navigate("/syllabus"),
-      disabled: true,
+      onClick: () => navigate("/syllabus?mode=create")
     },
     {
       icon: <Edit size={32} />,
