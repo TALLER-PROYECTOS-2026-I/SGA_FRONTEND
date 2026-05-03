@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Tipos para Resultados del Estudiante (Paso 8)
 export interface StudentOutcome {
   id?: number;
   code?: string;
@@ -9,6 +8,9 @@ export interface StudentOutcome {
   codigo?: string;
   descripcion?: string;
   nivel?: "K" | "R" | "";
+  aporteValor?: "K" | "R" | "";
+  resultadoProgramaCodigo?: string;
+  resultadoProgramaDescripcion?: string;
   [key: string]: unknown;
 }
 
@@ -41,59 +43,81 @@ class EighthStepManager {
     );
   }
 
-  async fetchResultados(
-    syllabusId: number,
-    baseUrl?: string,
-  ): Promise<ResultadosResponse> {
+  private getContributionUrl(syllabusId: number, baseUrl?: string): string {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/cronograma`;
+    return `${apiBase}/syllabus/${syllabusId}/contribution`;
+  }
 
-    const res = await fetch(url);
-    if (res.status === 404) {
-      return { items: [] };
-    }
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`${res.status} ${t}`);
-    }
+  private getItems(data: ResultadosData): StudentOutcome[] {
+    return data.items ?? data.resultados ?? data.outcomes ?? [];
+  }
 
-    const response = await res.json();
+  private normalizeResponse(response: unknown): ResultadosResponse {
+    if (
+      typeof response === "object" &&
+      response !== null &&
+      "data" in response
+    ) {
+      const responseWithData = response as { data: unknown };
+      const data = responseWithData.data;
 
-    // Manejar diferentes formatos de respuesta
-    if (response.data) {
-      const data = response.data;
-      if (Array.isArray(data)) {
-        return { items: data };
-      }
-      if (data.items) {
-        return data;
-      }
-      if (data.resultados) {
-        return { items: data.resultados };
-      }
-      if (data.outcomes) {
-        return { items: data.outcomes };
-      }
+      if (Array.isArray(data)) return { items: data as StudentOutcome[] };
+      if (typeof data !== "object" || data === null) return { items: [] };
+
+      const normalized = data as ResultadosData;
+      if (normalized.items) return normalized;
+      if (normalized.resultados) return { items: normalized.resultados };
+      if (normalized.outcomes) return { items: normalized.outcomes };
+
       return { items: [] };
     }
 
     if (Array.isArray(response)) {
-      return { items: response };
+      return { items: response as StudentOutcome[] };
     }
 
-    if (response.items) {
-      return response;
-    }
+    if (typeof response === "object" && response !== null) {
+      const normalized = response as ResultadosData;
 
-    if (response.resultados) {
-      return { items: response.resultados };
-    }
-
-    if (response.outcomes) {
-      return { items: response.outcomes };
+      if (normalized.items) return normalized;
+      if (normalized.resultados) return { items: normalized.resultados };
+      if (normalized.outcomes) return { items: normalized.outcomes };
     }
 
     return { items: [] };
+  }
+
+  private async parseError(res: Response): Promise<Error> {
+    const text = await res.text();
+
+    try {
+      const json = JSON.parse(text) as ApiErrorResponse;
+      return new Error(
+        json.message || json.error || text || `Error ${res.status}`,
+      );
+    } catch {
+      return new Error(text || `Error ${res.status}`);
+    }
+  }
+
+  async fetchResultados(
+    syllabusId: number,
+    baseUrl?: string,
+  ): Promise<ResultadosResponse> {
+    const url = this.getContributionUrl(syllabusId, baseUrl);
+
+    const res = await fetch(url);
+
+    if (res.status === 404) {
+      return { items: [] };
+    }
+
+    if (!res.ok) {
+      throw await this.parseError(res);
+    }
+
+    const response = await res.json();
+    return this.normalizeResponse(response);
   }
 
   async createResultados(
@@ -101,28 +125,44 @@ class EighthStepManager {
     data: ResultadosData,
     baseUrl?: string,
   ): Promise<{ message: string }> {
-    const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/cronograma`;
+    const url = this.getContributionUrl(syllabusId, baseUrl);
+    const items = this.getItems(data);
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    for (const [index, item] of items.entries()) {
+      const rawNivel = item.nivel ?? item.level ?? item.aporteValor ?? "";
+      const nivel = rawNivel === "K" || rawNivel === "R" ? rawNivel : "";
 
-    if (!res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text) as ApiErrorResponse;
-        const apiMessage = json?.message || json?.error;
-        if (apiMessage) throw new Error(apiMessage);
-        throw new Error(JSON.stringify(json));
-      } catch (_parseError) {
-        throw new Error(text || `Error ${res.status}` || "error" + _parseError);
+      const rawCodigo =
+        item.resultadoProgramaCodigo ?? item.codigo ?? item.code ?? "";
+
+      const codigo =
+        rawCodigo && rawCodigo !== "K" && rawCodigo !== "R"
+          ? String(rawCodigo)
+          : `RP${index + 1}`;
+
+      const descripcion =
+        item.resultadoProgramaDescripcion ??
+        item.descripcion ??
+        item.description ??
+        "";
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          syllabusId,
+          resultadoProgramaCodigo: codigo,
+          resultadoProgramaDescripcion: descripcion,
+          aporteValor: nivel,
+        }),
+      });
+
+      if (!res.ok) {
+        throw await this.parseError(res);
       }
     }
 
-    return res.json();
+    return { message: "Aportes guardados correctamente" };
   }
 
   async updateResultados(
@@ -130,28 +170,7 @@ class EighthStepManager {
     data: ResultadosData,
     baseUrl?: string,
   ): Promise<{ message: string }> {
-    const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/cronograma`;
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text) as ApiErrorResponse;
-        const apiMessage = json?.message || json?.error;
-        if (apiMessage) throw new Error(apiMessage);
-        throw new Error(JSON.stringify(json));
-      } catch (_parseError) {
-        throw new Error(text || `Error ${res.status}` || "error" + _parseError);
-      }
-    }
-
-    return res.json();
+    return this.createResultados(syllabusId, data, baseUrl);
   }
 }
 
@@ -161,7 +180,7 @@ export const useResultados = (syllabusId: number | null) => {
   const isValidId = syllabusId !== null && syllabusId > 0;
 
   return useQuery<ResultadosResponse, Error>({
-    queryKey: ["syllabus", syllabusId, "cronograma"],
+    queryKey: ["syllabus", syllabusId, "contribution"],
     queryFn: () => eighthStepManager.fetchResultados(syllabusId!),
     enabled: isValidId,
     retry: false,
@@ -182,16 +201,12 @@ export const useSaveResultados = () => {
     Error,
     { syllabusId: number; data: ResultadosData; isCreating: boolean }
   >({
-    mutationFn: ({ syllabusId, data, isCreating }) => {
-      if (isCreating) {
-        return eighthStepManager.createResultados(syllabusId, data);
-      } else {
-        return eighthStepManager.updateResultados(syllabusId, data);
-      }
+    mutationFn: ({ syllabusId, data }) => {
+      return eighthStepManager.createResultados(syllabusId, data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "cronograma"],
+        queryKey: ["syllabus", variables.syllabusId, "contribution"],
       });
     },
   });

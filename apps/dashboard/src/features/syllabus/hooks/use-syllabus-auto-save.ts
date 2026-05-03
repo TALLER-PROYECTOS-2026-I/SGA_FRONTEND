@@ -14,6 +14,12 @@ interface SectionData {
   [key: string]: unknown;
 }
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+
+const getSessionToken = () =>
+  sessionStorage.getItem("token") ?? localStorage.getItem("token");
+
 export const useSyllabusAutoSave = () => {
   const { syllabusId, codigo, updateUrlWithId } = useSyllabusMode();
   const [currentSyllabusId, setCurrentSyllabusId] = useState<number | null>(
@@ -32,12 +38,14 @@ export const useSyllabusAutoSave = () => {
           console.log(`🔄 PUT /api/syllabus/${currentSyllabusId}`, sectionData);
 
           const response = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/syllabus/${currentSyllabusId}`,
+            `${API_BASE}/syllabus/${currentSyllabusId}`,
             {
               method: "PUT",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                ...(getSessionToken()
+                  ? { Authorization: `Bearer ${getSessionToken()}` }
+                  : {}),
               },
               body: JSON.stringify(sectionData),
             },
@@ -53,21 +61,20 @@ export const useSyllabusAutoSave = () => {
         } else {
           console.log("📤 POST /api/syllabus", { codigo, ...sectionData });
 
-          const response = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/syllabus`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-              body: JSON.stringify({
-                codigo,
-                estado: "BORRADOR",
-                ...sectionData,
-              }),
+          const response = await fetch(`${API_BASE}/syllabus`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(getSessionToken()
+                ? { Authorization: `Bearer ${getSessionToken()}` }
+                : {}),
             },
-          );
+            body: JSON.stringify({
+              codigo,
+              estado: "BORRADOR",
+              ...sectionData,
+            }),
+          });
 
           if (!response.ok) {
             throw new Error("Error al crear sílabo");
@@ -107,12 +114,14 @@ export const useSyllabusAutoSave = () => {
       console.log(`🏁 PUT /api/syllabus/${currentSyllabusId}/finalize`);
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/syllabus/${currentSyllabusId}/finalize`,
+        `${API_BASE}/syllabus/${currentSyllabusId}/finalize`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            ...(getSessionToken()
+              ? { Authorization: `Bearer ${getSessionToken()}` }
+              : {}),
           },
           body: JSON.stringify({
             estado: "PENDIENTE_REVISION",

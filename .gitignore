@@ -1,6 +1,7 @@
 /node_modules
 /dist
 .env
+SGA_FRONTEND-Nuevo/
 
 # Adding CODEOWNERS file 
 .github/CODEOWNERS

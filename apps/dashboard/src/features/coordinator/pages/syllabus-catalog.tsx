@@ -1,7 +1,10 @@
-import { useState } from "react";
-import { Search, Eye } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Eye, Loader2 } from "lucide-react";
 
-interface SyllabusCatalog {
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+
+interface SyllabusCatalogItem {
   id: string;
   courseName: string;
   courseCode: string;
@@ -9,53 +12,128 @@ interface SyllabusCatalog {
   credits: number;
 }
 
-const mockCatalog: SyllabusCatalog[] = [
-  {
-    id: "1",
-    courseName: "Taller de Proyectos",
-    courseCode: "09072108042",
-    sumilla:
-      "La asignatura de Taller de Proyectos es de naturaleza teórico-práctica...",
-    credits: 4,
-  },
-  {
-    id: "2",
-    courseName: "Programación Orientada a Objetos",
-    courseCode: "09072108043",
-    sumilla:
-      "Asignatura que desarrolla competencias en programación orientada a objetos...",
-    credits: 4,
-  },
-  {
-    id: "3",
-    courseName: "Base de Datos",
-    courseCode: "09072108044",
-    sumilla:
-      "Curso que aborda los fundamentos de bases de datos relacionales...",
-    credits: 4,
-  },
-];
+interface SyllabusRevisionItem {
+  id?: string | number;
+  syllabusId?: string | number;
+  silaboId?: string | number;
+  cursoNombre?: string;
+  cursoCodigo?: string;
+}
 
 export default function SyllabusCatalog() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [catalog, setCatalog] = useState<SyllabusCatalogItem[]>([]);
   const [selectedSyllabus, setSelectedSyllabus] =
-    useState<SyllabusCatalog | null>(null);
+    useState<SyllabusCatalogItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const filteredCatalog = mockCatalog.filter(
-    (item) =>
-      item.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.courseCode.includes(searchTerm),
-  );
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const res = await fetch(`${API_BASE}/syllabus/revision`);
+
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+
+        const json = await res.json();
+        const syllabuses = Array.isArray(json)
+          ? json
+          : Array.isArray(json.data)
+            ? json.data
+            : [];
+
+        const items = await Promise.all(
+          syllabuses.map(async (item: SyllabusRevisionItem) => {
+            const syllabusId = item.syllabusId ?? item.silaboId ?? item.id;
+
+            try {
+              const completeRes = await fetch(
+                `${API_BASE}/syllabus/${syllabusId}/complete`,
+              );
+
+              if (!completeRes.ok) {
+                throw new Error("No se pudo cargar el sílabo completo");
+              }
+
+              const completeJson = await completeRes.json();
+              const complete = completeJson.data ?? completeJson;
+
+              const datos = complete.datosGenerales ?? {};
+              const creditos =
+                Number(datos.creditosTeoria ?? 0) +
+                Number(datos.creditosPractica ?? 0);
+
+              return {
+                id: String(syllabusId),
+                courseName:
+                  datos.nombreAsignatura ?? item.cursoNombre ?? "Sin nombre",
+                courseCode:
+                  datos.codigoAsignatura ?? item.cursoCodigo ?? "Sin código",
+                sumilla:
+                  complete.sumilla ??
+                  "Este sílabo aún no tiene sumilla registrada.",
+                credits: creditos,
+              };
+            } catch {
+              return {
+                id: String(syllabusId),
+                courseName: item.cursoNombre ?? "Sin nombre",
+                courseCode: item.cursoCodigo ?? "Sin código",
+                sumilla: "Este sílabo aún no tiene sumilla registrada.",
+                credits: 0,
+              };
+            }
+          }),
+        );
+
+        setCatalog(items);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error cargando catálogo de sumillas",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCatalog();
+  }, []);
+
+  const filteredCatalog = useMemo(() => {
+    return catalog.filter(
+      (item) =>
+        item.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.courseCode.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [catalog, searchTerm]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center text-gray-600 flex items-center justify-center gap-2">
+        <Loader2 className="animate-spin" size={20} />
+        Cargando catálogo de sumillas...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-6 text-center text-red-600">Error: {error}</div>;
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">
           Catálogo de Sumilla
         </h1>
 
-        {/* Search Bar */}
         <div className="relative flex-1 max-w-md">
           <Search
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -71,7 +149,6 @@ export default function SyllabusCatalog() {
         </div>
       </div>
 
-      {/* Catalog List */}
       <div className="space-y-4">
         {filteredCatalog.map((item) => (
           <div
@@ -83,13 +160,16 @@ export default function SyllabusCatalog() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-1">
                   {item.courseName}
                 </h3>
+
                 <p className="text-sm text-gray-600 mb-2">
                   Código: {item.courseCode} | Créditos: {item.credits}
                 </p>
+
                 <p className="text-sm text-gray-700 line-clamp-2">
                   {item.sumilla}
                 </p>
               </div>
+
               <button
                 onClick={() => setSelectedSyllabus(item)}
                 className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors ml-4"
@@ -108,7 +188,6 @@ export default function SyllabusCatalog() {
         </div>
       )}
 
-      {/* Modal de detalles */}
       {selectedSyllabus && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
@@ -121,6 +200,7 @@ export default function SyllabusCatalog() {
                 {selectedSyllabus.credits}
               </p>
             </div>
+
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 Sumilla
@@ -129,6 +209,7 @@ export default function SyllabusCatalog() {
                 {selectedSyllabus.sumilla}
               </p>
             </div>
+
             <div className="flex justify-end">
               <button
                 onClick={() => setSelectedSyllabus(null)}

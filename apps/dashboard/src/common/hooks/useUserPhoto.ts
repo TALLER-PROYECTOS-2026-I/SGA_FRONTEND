@@ -18,7 +18,7 @@ export const useUserPhoto = () => {
         },
       );
 
-      if (response.status === 404) {
+      if (response.status === 403 || response.status === 404) {
         return null;
       }
 
