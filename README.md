@@ -14,4 +14,4 @@ Pruebas DevSecOps - Commit 1.
 
 5to cambio: Implementación del SonarQube. (Cambio de nombres)
 
-6to cambio: Se realizaron cambios en el properties security-dev.yml (args)
+6to cambio: Se realizaron cambios en el properties security-dev.yml (args) Nuevo cambio.
