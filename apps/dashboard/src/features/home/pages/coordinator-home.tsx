@@ -1,4 +1,4 @@
-import { Key, Mail, CheckSquare, List, Plus, Edit } from "lucide-react";
+import { Key, Mail, FileSearch, List, Plus, Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import React from "react";
 
@@ -36,6 +36,7 @@ function ModuleCard({ icon, title, onClick, disabled }: ModuleCardProps) {
       >
         {icon}
       </div>
+
       <span className="text-base font-semibold text-black text-center">
         {title}
       </span>
@@ -58,24 +59,24 @@ export default function CoordinatorHome() {
       onClick: () => navigate("/coordinator/send-email"),
     },
     {
-      icon: <CheckSquare size={32} />,
-      title: "Seguimiento de Silabo",
+      icon: <FileSearch size={32} />,
+      title: "Revisión Académica",
       onClick: () => navigate("/coordinator/review-syllabus"),
     },
     {
       icon: <List size={32} />,
-      title: "Catalogo de Sumilla",
+      title: "Catálogo de Sumilla",
       onClick: () => navigate("/coordinator/syllabus-catalog"),
-      disabled: false, // habilitado
+      disabled: false,
     },
     {
       icon: <Plus size={32} />,
-      title: "Registrar nuevo Silabo",
-      onClick: () => navigate("/syllabus?mode=create")
+      title: "Registrar nuevo Sílabo",
+      onClick: () => navigate("/syllabus?mode=create"),
     },
     {
       icon: <Edit size={32} />,
-      title: "Modificar nuevo Silabo",
+      title: "Modificar Sílabo",
       onClick: () => navigate("/mis-asignaciones"),
     },
   ];
