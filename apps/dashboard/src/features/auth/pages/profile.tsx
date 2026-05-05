@@ -54,7 +54,18 @@ export default function Profile() {
   }, [profile, isEditing]);
 
   const handleInputChange = (field: keyof ProfileData, value: string) => {
-    setProfileData((prev) => ({ ...prev, [field]: value }));
+    let sanitizedValue = value;
+
+    // Validación en tiempo real según el campo
+    if (field === "firstName" || field === "lastName") {
+      // Reemplaza cualquier número (0-9) por nada (lo elimina)
+      sanitizedValue = value.replace(/[0-9]/g, "");
+    } else if (field === "phone") {
+      // Reemplaza cualquier cosa que NO sea un dígito por nada (solo deja números)
+      sanitizedValue = value.replace(/\D/g, "");
+    }
+
+    setProfileData((prev) => ({ ...prev, [field]: sanitizedValue }));
   };
 
   const handleSave = () => {
