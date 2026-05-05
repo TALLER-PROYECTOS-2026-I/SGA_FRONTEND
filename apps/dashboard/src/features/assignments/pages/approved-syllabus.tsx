@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Download, X, Printer } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import {
   useApprovedSyllabi,
   type ApprovedSyllabus as ApprovedSyllabusType,
@@ -12,6 +13,12 @@ import { useToast } from "../../../common/hooks/use-toast";
 
 export default function ApprovedSyllabus() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+
+  const syllabusIdParam = searchParams.get("syllabusId");
+  const courseNameParam = searchParams.get("courseName") || "";
+  const courseCodeParam = searchParams.get("courseCode") || "";
+  const teacherNameParam = searchParams.get("teacherName") || "";
 
   const [searchText, setSearchText] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -30,7 +37,6 @@ export default function ApprovedSyllabus() {
     error,
   } = useApprovedSyllabi();
 
-  // Inicializar fecha de aprobación con la fecha actual
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
     setApprovalDate(today);
@@ -50,12 +56,36 @@ export default function ApprovedSyllabus() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!syllabusIdParam) return;
+
+    const syllabusId = Number(syllabusIdParam);
+
+    if (!syllabusId || Number.isNaN(syllabusId)) return;
+
+    const selectedFromTracking: ApprovedSyllabusType = {
+      id: syllabusId,
+      codigo: courseCodeParam || `SIL-${syllabusId}`,
+      asignatura: courseNameParam || "Sílabo aprobado",
+      ciclo: "",
+      escuela: "",
+      estadoRevision: "APROBADO",
+    };
+
+    setSelectedSyllabus(selectedFromTracking);
+    setSearchText(
+      `${selectedFromTracking.codigo} - ${selectedFromTracking.asignatura}`,
+    );
+    setShowDropdown(false);
+  }, [syllabusIdParam, courseCodeParam, courseNameParam, teacherNameParam]);
+
   const filteredSyllabi = syllabi.filter((syllabus) => {
     const searchLower = searchText.toLowerCase();
     const matchesCodigo = syllabus.codigo?.toLowerCase().includes(searchLower);
     const matchesAsignatura = syllabus.asignatura
       ?.toLowerCase()
       .includes(searchLower);
+
     return matchesCodigo || matchesAsignatura;
   });
 
@@ -68,6 +98,7 @@ export default function ApprovedSyllabus() {
   const handleClear = () => {
     setSelectedSyllabus(null);
     setSearchText("");
+    setShowDropdown(false);
   };
 
   const handlePreviewPDF = async () => {
@@ -77,6 +108,7 @@ export default function ApprovedSyllabus() {
     }
 
     setIsPreviewingPDF(true);
+
     try {
       toast.info("Generando impresión previa", "Abriendo PDF...");
 
@@ -86,7 +118,6 @@ export default function ApprovedSyllabus() {
       const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
       const url = URL.createObjectURL(blob);
 
-      // Abrir en nueva pestaña
       window.open(url, "_blank");
 
       toast.success("Éxito", "Vista previa abierta en nueva pestaña");
@@ -108,6 +139,7 @@ export default function ApprovedSyllabus() {
     }
 
     setIsDownloadingPDF(true);
+
     try {
       toast.info("Generando PDF", "Descargando sílabo...");
 
@@ -118,11 +150,14 @@ export default function ApprovedSyllabus() {
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
+
       link.href = url;
       link.download = `silabo-${selectedSyllabus.codigo}.pdf`;
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
       URL.revokeObjectURL(url);
 
       toast.success("Éxito", "PDF descargado correctamente");
@@ -137,7 +172,7 @@ export default function ApprovedSyllabus() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !syllabusIdParam) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-600">Cargando sílabos aprobados...</div>
@@ -145,7 +180,7 @@ export default function ApprovedSyllabus() {
     );
   }
 
-  if (isError) {
+  if (isError && !syllabusIdParam) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-red-600">
@@ -158,32 +193,42 @@ export default function ApprovedSyllabus() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-sm border border-red-600 p-8">
-        {/* Header */}
         <div className="mb-6 border-b-2 border-red-600 pb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Sílabo Aprobados</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Sílabo Aprobados
+          </h1>
         </div>
 
-        {/* Buscador de Sílabos */}
         <div className="mb-6">
           <label className="block text-lg font-semibold text-gray-800 mb-2">
             1. Buscar Sílabo por Código o Asignatura
           </label>
+
           <div className="relative" ref={dropdownRef}>
             <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-4 py-3 bg-white">
               <input
                 type="text"
                 value={searchText}
+                disabled={Boolean(syllabusIdParam)}
                 onChange={(e) => {
                   setSearchText(e.target.value);
+                  setSelectedSyllabus(null);
                   setShowDropdown(true);
                 }}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => {
+                  if (!syllabusIdParam) {
+                    setShowDropdown(true);
+                  }
+                }}
                 placeholder="Buscar por código o nombre de asignatura..."
-                className="flex-1 outline-none text-gray-700"
+                className="flex-1 outline-none text-gray-700 disabled:bg-white disabled:text-gray-700"
               />
+
               <Search className="text-gray-400" size={20} />
-              {searchText && (
+
+              {searchText && !syllabusIdParam && (
                 <button
+                  type="button"
                   onClick={handleClear}
                   className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                 >
@@ -192,12 +237,12 @@ export default function ApprovedSyllabus() {
               )}
             </div>
 
-            {/* Dropdown con resultados */}
             {showDropdown && searchText && filteredSyllabi.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto">
                 {filteredSyllabi.slice(0, 15).map((syllabus) => (
                   <button
                     key={syllabus.id}
+                    type="button"
                     onClick={() => handleSyllabusSelect(syllabus)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                   >
@@ -217,7 +262,6 @@ export default function ApprovedSyllabus() {
               </div>
             )}
 
-            {/* Mensaje cuando no hay resultados */}
             {showDropdown && searchText && filteredSyllabi.length === 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
                 <p className="text-gray-500 text-center">
@@ -228,13 +272,13 @@ export default function ApprovedSyllabus() {
           </div>
         </div>
 
-        {/* Información del sílabo seleccionado */}
         {selectedSyllabus && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">
-              Sílabo Seleccionado:
+          <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-100">
+            <h3 className="font-semibold text-red-800 mb-2">
+              Sílabo seleccionado
             </h3>
-            <div className="space-y-1 text-sm">
+
+            <div className="space-y-1 text-sm text-gray-700">
               <p>
                 <span className="font-medium">Código:</span>{" "}
                 {selectedSyllabus.codigo}
@@ -259,11 +303,11 @@ export default function ApprovedSyllabus() {
           </div>
         )}
 
-        {/* Campo de Fecha de Aprobación */}
         <div className="mb-6">
           <label className="block text-lg font-semibold text-gray-800 mb-2">
             2. Fecha de Aprobación
           </label>
+
           <input
             type="date"
             value={approvalDate}
@@ -272,9 +316,9 @@ export default function ApprovedSyllabus() {
           />
         </div>
 
-        {/* Botones de Imprimir y Descarga */}
         <div className="flex justify-center gap-4 mb-6">
           <button
+            type="button"
             onClick={handleDownloadPDF}
             disabled={!selectedSyllabus || isDownloadingPDF}
             className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
@@ -282,7 +326,9 @@ export default function ApprovedSyllabus() {
             <Download className="w-5 h-5" />
             {isDownloadingPDF ? "Descargando..." : "Descargar"}
           </button>
+
           <button
+            type="button"
             onClick={handlePreviewPDF}
             disabled={!selectedSyllabus || isPreviewingPDF}
             className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-semibold"
@@ -292,7 +338,6 @@ export default function ApprovedSyllabus() {
           </button>
         </div>
 
-        {/* Mensaje informativo */}
         {!selectedSyllabus && (
           <div className="text-center py-8 text-gray-500">
             <p>
