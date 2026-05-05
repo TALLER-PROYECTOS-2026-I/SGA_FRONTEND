@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Download,
   FileText,
-  Info,
   Printer,
   Search,
   X,
