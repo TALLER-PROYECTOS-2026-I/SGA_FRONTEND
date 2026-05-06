@@ -423,13 +423,17 @@ export default function ApprovedSyllabus() {
           </div>
 
           <div className="mb-5">
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
+            <label
+              htmlFor="approved-syllabus-search"
+              className="mb-2 block text-sm font-semibold text-gray-700"
+            >
               Sílabo aprobado *
             </label>
 
             <div className="relative" ref={dropdownRef}>
               <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3">
                 <input
+                  id="approved-syllabus-search"
                   type="text"
                   value={searchText}
                   disabled={Boolean(syllabusIdParam)}
@@ -457,6 +461,7 @@ export default function ApprovedSyllabus() {
                     type="button"
                     onClick={handleClear}
                     className="rounded-full p-1 transition hover:bg-gray-100"
+                    aria-label="Limpiar búsqueda de sílabo aprobado"
                   >
                     <X className="text-gray-500" size={18} />
                   </button>
