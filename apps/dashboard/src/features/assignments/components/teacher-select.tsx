@@ -29,8 +29,8 @@ export default function TeacherSelect({
 }: TeacherSelectProps) {
   return (
     <div className="mb-6">
-      <label className="block text-lg font-semibold text-gray-800 mb-2">
-        1. Asignar Docente (s)
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+        Docente Responsable <span className="text-red-500">*</span>
       </label>
       <SearchableSelect
         value={teacherSearch}

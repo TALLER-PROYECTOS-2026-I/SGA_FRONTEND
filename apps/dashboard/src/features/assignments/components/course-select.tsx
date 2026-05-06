@@ -29,8 +29,8 @@ export default function CourseSelect({
 }: CourseSelectProps) {
   return (
     <div className="mb-6">
-      <label className="block text-lg font-semibold text-gray-800 mb-2">
-        2. Nombre de la Asignatura
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+        Sílabo del Curso <span className="text-red-500">*</span>
       </label>
       <SearchableSelect
         value={courseSearch}
@@ -41,7 +41,7 @@ export default function CourseSelect({
         selectedItem={selectedCourse}
         showDropdown={showCourseDropdown}
         setShowDropdown={setShowCourseDropdown}
-        placeholder="Buscar asignatura..."
+        placeholder="Buscar un Sílabo"
         getItemKey={(course) => course.id}
         renderItem={(course) => (
           <>
