@@ -15,9 +15,9 @@ export interface SendMailOptions {
   files?: File[];
 }
 
-export const MAX_FILE_BYTES = 3 * 1024 * 1024; // ~3MB por archivo
-export const MAX_TOTAL_BYTES = 10 * 1024 * 1024; // ~10MB total
-export const MAX_FILES = 5; // máximo 5 adjuntos
+export const MAX_FILE_BYTES = 3 * 1024 * 1024;
+export const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
+export const MAX_FILES = 5;
 
 const humanSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,16 +25,18 @@ const humanSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
-const fileToBase64 = (f: File): Promise<string> =>
+const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onload = () => {
       const result = reader.result as string;
       const base64 = result.split(",")[1] ?? "";
       resolve(base64);
     };
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(f);
+
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
   });
 
 const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
@@ -45,42 +47,51 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   }
 
   const mailToken = sessionStorage.getItem("mailToken");
+
   if (!mailToken) {
     throw new Error(
-      "No se encontraron los permisos para enviar email, vuelva a iniciar sesión",
+      "No se encontraron los permisos para enviar email. Vuelva a iniciar sesión.",
     );
   }
 
   let attachments: GraphFileAttachment[] | undefined = undefined;
-  if (files.length) {
+
+  if (files.length > 0) {
     if (files.length > MAX_FILES) {
-      throw new Error(`Máximo ${MAX_FILES} archivos`);
+      throw new Error(`Máximo ${MAX_FILES} archivos permitidos`);
     }
-    const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
+
+    const totalBytes = files.reduce((acc, file) => acc + file.size, 0);
+
     if (totalBytes > MAX_TOTAL_BYTES) {
       throw new Error(
         `Límite total excedido (${humanSize(totalBytes)} > ${humanSize(MAX_TOTAL_BYTES)})`,
       );
     }
-    for (const f of files) {
-      if (f.size > MAX_FILE_BYTES) {
-        throw new Error(`Archivo muy grande: ${f.name}`);
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_BYTES) {
+        throw new Error(`Archivo muy grande: ${file.name}`);
       }
     }
+
     const converted: GraphFileAttachment[] = [];
-    for (const f of files) {
-      const contentBytes = await fileToBase64(f);
+
+    for (const file of files) {
+      const contentBytes = await fileToBase64(file);
+
       converted.push({
         "@odata.type": "#microsoft.graph.fileAttachment",
-        name: f.name,
-        contentType: f.type || "application/octet-stream",
+        name: file.name,
+        contentType: file.type || "application/octet-stream",
         contentBytes,
       });
     }
+
     attachments = converted;
   }
 
-  const res = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+  const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -102,13 +113,13 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
         ],
         ...(attachments ? { attachments } : {}),
       },
-      saveToSentItems: "true",
+      saveToSentItems: true,
     }),
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(txt || "Error al enviar el correo");
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || "Error al enviar el correo");
   }
 };
 
@@ -120,14 +131,11 @@ export function useSendMail() {
     },
     onSuccess: () => {
       toast.dismiss("send-mail");
-      toast.success("Mensaje enviado con éxito", {
-        duration: 5000, // 5 segundos visible
-      });
     },
     onError: (error: Error) => {
       toast.dismiss("send-mail");
       toast.error(error.message || "Error al enviar el correo", {
-        duration: 5000, // 5 segundos visible
+        duration: 5000,
       });
     },
   });
