@@ -177,12 +177,8 @@ export default function Management() {
         syllabusId,
         courseCode: courseCode.trim(),
         academicPeriod: academicPeriod.trim(),
+        message: message.trim(), // <-- CORRECCIÓN: Se envía siempre, aunque esté vacío
       };
-
-      // Solo agregar message si tiene contenido
-      if (message.trim()) {
-        assignmentData.message = message.trim();
-      }
 
       await createAssignment.mutateAsync(assignmentData);
 
@@ -201,12 +197,8 @@ export default function Management() {
           courseName: selectedCourse.name,
           courseCode: courseCode.trim(),
           academicPeriod: academicPeriod.trim(),
+          additionalMessage: message.trim(), // <-- CORRECCIÓN: Se envía siempre, aunque esté vacío
         };
-
-        // Solo agregar additionalMessage si tiene contenido
-        if (message.trim()) {
-          emailData.additionalMessage = message.trim();
-        }
 
         await sendEmail(emailData);
 
@@ -347,7 +339,19 @@ export default function Management() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      {/* Nuevo Header / Título Principal */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">
+          Asignar Docente a Sílabo
+        </h1>
+        <p className="text-slate-600">
+          Registre la asignación de un docente responsable a un sílabo de curso
+          para un periodo académico específico
+        </p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        {/* Componentes de Input - Mantenemos sus props originales */}
         <TeacherSelect
           selectedTeacher={selectedTeacher}
           teacherSearch={teacherSearch}
@@ -381,6 +385,45 @@ export default function Management() {
           maxChars={maxChars}
         />
 
+        {/* Nueva Caja Morada de Información Importante */}
+        <div className="my-8 bg-[#F9F5FF] border-l-4 border-purple-600 p-5 rounded-r-xl">
+          <div className="flex gap-3">
+            <svg
+              className="w-6 h-6 text-purple-600 shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div>
+              <h4 className="text-sm font-bold text-[#4B1194] mb-2">
+                Información Importante
+              </h4>
+              <ul className="text-sm text-[#5D2B9F] space-y-1.5 list-disc list-inside">
+                <li>
+                  Solo se muestran docentes activos disponibles para asignación
+                </li>
+                <li>
+                  Un sílabo no puede tener más de un docente responsable en el
+                  mismo periodo
+                </li>
+                <li>
+                  El docente asignado podrá visualizar el sílabo en "Mis
+                  asignaciones"
+                </li>
+                <li>La asignación cambia el estado del sílabo a "ASIGNADO"</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Notar que isUpdating no estaba definido en el original para pasarlo a FormActions, lo dejo como estaba */}
         <FormActions onGoBack={handleGoBack} onSubmit={handleSubmit} />
       </div>
     </div>

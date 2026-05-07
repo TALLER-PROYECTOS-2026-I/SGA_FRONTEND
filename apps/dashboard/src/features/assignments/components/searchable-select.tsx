@@ -31,7 +31,11 @@ export default function SearchableSelect<T>({
 }: SearchableSelectProps<T>) {
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-4 py-3 bg-white">
+      {/* 
+        AQUÍ SE EDITÓ: Se agregó focus-within:ring-2 focus-within:ring-purple-500 
+        focus-within:border-transparent transition-colors para el efecto morado 
+      */}
+      <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-4 py-3 bg-white focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent transition-colors">
         <input
           type="text"
           value={value}
@@ -41,7 +45,7 @@ export default function SearchableSelect<T>({
           }}
           onFocus={() => setShowDropdown(true)}
           placeholder={placeholder}
-          className="flex-1 outline-none text-gray-700"
+          className="flex-1 outline-none text-gray-700 bg-transparent"
         />
         <Search className="text-gray-400" size={20} />
         {selectedItem && (
