@@ -1,4 +1,20 @@
+// permissions-manage.tsx
+// Archivo encargado de configurar el alcance de edición de un sílabo.
+// Permite definir si el docente tendrá solo lectura, edición restringida
+// o edición completa sobre las secciones del sílabo.
+// Después de guardar los permisos, redirige a la pantalla de envío de correo.
+
+// =====================================================
+// IMPORTS
+// =====================================================
+
+// Importa hooks de React.
+// useState permite manejar estados internos.
+// useEffect permite ejecutar acciones cuando cambian datos o al cargar el componente.
 import { useState, useEffect } from "react";
+
+// Importa íconos desde lucide-react.
+// Se usan para botones, tarjetas, estados visuales y opciones de permisos.
 import {
   ArrowLeft,
   BookOpen,
@@ -9,21 +25,58 @@ import {
   Save,
   User,
 } from "lucide-react";
+
+// Importa hooks de React Router.
+// useNavigate permite navegar entre pantallas.
+// useSearchParams permite leer parámetros de la URL.
 import { useNavigate, useSearchParams } from "react-router-dom";
+
+// Importa el contexto del coordinador.
+// Sirve para obtener el docente y sílabo seleccionados previamente.
 import { useCoordinator } from "../contexts/coordinator-context";
+
+// Importa el hook de sesión.
+// Sirve para obtener el usuario actual y validar su rol.
 import { useSession } from "../../auth/hooks/use-session";
+
+// Importa getRoleName.
+// Convierte el id del rol del usuario en el nombre del rol.
 import { getRoleName } from "../../../common/constants/roles";
+
+// Importa hooks de permisos.
+// usePermissions obtiene los permisos actuales.
+// useSavePermissions guarda la nueva configuración de permisos.
 import { usePermissions, useSavePermissions } from "../hooks/permissions-query";
 
+// =====================================================
+// INTERFACES Y TIPOS
+// =====================================================
+
+// Define la estructura de una sección del sílabo.
 interface SyllabusSection {
+  // Número de la sección.
   id: number;
+
+  // Nombre visible de la sección.
   title: string;
+
+  // Indica si la sección está habilitada para edición.
   isEnabled: boolean;
+
+  // Indica si la sección tiene información adicional disponible.
   hasInfo: boolean;
 }
 
+// Define los tipos de acceso posibles para un docente.
 type AccessType = "READ_ONLY" | "RESTRICTED_EDIT" | "FULL_EDIT";
 
+// =====================================================
+// SECCIONES INICIALES DEL SÍLABO
+// =====================================================
+
+// Lista base de secciones configurables del sílabo.
+// Las secciones 1, 2 y 3 son secciones base.
+// En edición restringida permanecen bloqueadas.
 const INITIAL_SECTIONS: SyllabusSection[] = [
   { id: 1, title: "Datos generales", isEnabled: false, hasInfo: true },
   { id: 2, title: "Sumilla", isEnabled: false, hasInfo: true },
@@ -71,10 +124,17 @@ const INITIAL_SECTIONS: SyllabusSection[] = [
   },
 ];
 
+// =====================================================
+// FUNCIONES AUXILIARES
+// =====================================================
+
+// Verifica si una sección pertenece al bloque base del sílabo.
+// Las secciones 1, 2 y 3 no se habilitan en edición restringida.
 function isBaseSection(sectionId: number) {
   return sectionId <= 3;
 }
 
+// Devuelve el texto visible del tipo de acceso.
 function getAccessLabel(accessType: AccessType) {
   switch (accessType) {
     case "READ_ONLY":
@@ -88,6 +148,7 @@ function getAccessLabel(accessType: AccessType) {
   }
 }
 
+// Devuelve la descripción explicativa del tipo de acceso seleccionado.
 function getAccessDescription(accessType: AccessType) {
   switch (accessType) {
     case "READ_ONLY":
@@ -101,6 +162,10 @@ function getAccessDescription(accessType: AccessType) {
   }
 }
 
+// Devuelve el ícono correspondiente al tipo de acceso.
+// Solo lectura muestra candado.
+// Edición restringida muestra edición.
+// Edición completa muestra check.
 function getAccessIcon(accessType: AccessType) {
   if (accessType === "READ_ONLY") {
     return <Lock size={18} />;
@@ -113,28 +178,75 @@ function getAccessIcon(accessType: AccessType) {
   return <CheckCircle2 size={18} />;
 }
 
+// =====================================================
+// COMPONENTE PRINCIPAL
+// =====================================================
+
+// Componente encargado de gestionar los permisos de edición del sílabo.
 export default function PermissionsManage() {
+  // Hook para navegar entre páginas.
   const navigate = useNavigate();
+
+  // Hook para leer parámetros recibidos por URL.
   const [searchParams] = useSearchParams();
 
+  // =====================================================
+  // PARÁMETROS DE URL
+  // =====================================================
+
+  // Nombre del docente recibido por URL.
   const teacherName = searchParams.get("teacherName") || "Docente";
+
+  // Correo del docente recibido por URL.
   const teacherEmail = searchParams.get("teacherEmail") || "";
+
+  // Nombre del curso o sílabo recibido por URL.
   const courseName = searchParams.get("courseName") || "Sílabo asignado";
+
+  // Código del curso recibido por URL.
   const courseCode = searchParams.get("courseCode") || "";
 
+  // =====================================================
+  // SESIÓN Y CONTEXTO DEL COORDINADOR
+  // =====================================================
+
+  // Obtiene el usuario actual y el estado de carga de sesión.
   const { user, isLoading: sessionLoading } = useSession();
+
+  // Obtiene el docente y sílabo seleccionados desde el contexto del coordinador.
   const { selectedDocenteId, selectedSilaboId } = useCoordinator();
 
+  // =====================================================
+  // CONSULTA Y GUARDADO DE PERMISOS
+  // =====================================================
+
+  // Consulta los permisos actuales del docente seleccionado.
+  // permissions contiene las secciones que ya estaban habilitadas.
+  // permissionsLoading indica si la consulta está cargando.
   const { data: permissions = [], isLoading: permissionsLoading } =
     usePermissions(selectedDocenteId);
 
+  // Hook para guardar la nueva configuración de permisos.
   const savePermissionsMutation = useSavePermissions();
 
+  // =====================================================
+  // ESTADOS DEL FORMULARIO
+  // =====================================================
+
+  // Lista de secciones visibles en la pantalla.
   const [sections, setSections] =
     useState<SyllabusSection[]>(INITIAL_SECTIONS);
 
+  // Tipo de acceso seleccionado.
+  // Por defecto inicia como solo lectura.
   const [accessType, setAccessType] = useState<AccessType>("READ_ONLY");
 
+  // =====================================================
+  // VALIDACIÓN DE ROL
+  // =====================================================
+
+  // Valida que el usuario tenga rol de coordinadora académica.
+  // Si no lo tiene, lo redirige al inicio.
   useEffect(() => {
     if (!sessionLoading && user) {
       const roleName = getRoleName(user.role);
@@ -145,26 +257,47 @@ export default function PermissionsManage() {
     }
   }, [user, sessionLoading, navigate]);
 
+  // =====================================================
+  // VALIDACIÓN DE CONTEXTO
+  // =====================================================
+
+  // Advierte en consola si no existe docente o sílabo seleccionado.
+  // Esto ayuda a detectar errores de navegación o contexto.
   useEffect(() => {
     if (!selectedDocenteId || !selectedSilaboId) {
       console.warn("No se encontró información del docente o sílabo.");
     }
   }, [selectedDocenteId, selectedSilaboId]);
 
+  // =====================================================
+  // CARGAR PERMISOS EXISTENTES
+  // =====================================================
+
+  // Cuando terminan de cargar los permisos, actualiza las secciones.
+  // También determina automáticamente el tipo de acceso actual:
+  // - Todo habilitado: edición completa.
+  // - Nada habilitado: solo lectura.
+  // - Algunas secciones habilitadas: edición restringida.
   useEffect(() => {
     if (!permissionsLoading) {
+      // Marca como habilitadas las secciones que ya existen en permisos.
       const updatedSections = INITIAL_SECTIONS.map((section) => ({
         ...section,
         isEnabled: permissions.some((p) => p.numeroSeccion === section.id),
       }));
 
+      // Cuenta cuántas secciones están habilitadas.
       const enabledCount = updatedSections.filter(
         (section) => section.isEnabled,
       ).length;
 
+      // Verifica si todas las secciones están habilitadas.
       const allEnabled = enabledCount === updatedSections.length;
+
+      // Verifica si ninguna sección está habilitada.
       const noneEnabled = enabledCount === 0;
 
+      // Si todas están habilitadas, se interpreta como edición completa.
       if (allEnabled) {
         setAccessType("FULL_EDIT");
         setSections(
@@ -176,6 +309,7 @@ export default function PermissionsManage() {
         return;
       }
 
+      // Si ninguna está habilitada, se interpreta como solo lectura.
       if (noneEnabled) {
         setAccessType("READ_ONLY");
         setSections(
@@ -187,6 +321,8 @@ export default function PermissionsManage() {
         return;
       }
 
+      // Si hay permisos parciales, se interpreta como edición restringida.
+      // En este modo las secciones base 1, 2 y 3 quedan bloqueadas.
       setAccessType("RESTRICTED_EDIT");
       setSections(
         updatedSections.map((section) => ({
@@ -197,9 +333,16 @@ export default function PermissionsManage() {
     }
   }, [permissions, permissionsLoading]);
 
+  // =====================================================
+  // CAMBIO DE TIPO DE ACCESO
+  // =====================================================
+
+  // Cambia el tipo de acceso y actualiza automáticamente las secciones.
   const handleAccessChange = (value: AccessType) => {
+    // Guarda el nuevo tipo de acceso.
     setAccessType(value);
 
+    // Si es solo lectura, deshabilita todas las secciones.
     if (value === "READ_ONLY") {
       setSections((prevSections) =>
         prevSections.map((section) => ({
@@ -210,6 +353,7 @@ export default function PermissionsManage() {
       return;
     }
 
+    // Si es edición completa, habilita todas las secciones.
     if (value === "FULL_EDIT") {
       setSections((prevSections) =>
         prevSections.map((section) => ({
@@ -220,6 +364,8 @@ export default function PermissionsManage() {
       return;
     }
 
+    // Si es edición restringida, mantiene las secciones seleccionadas,
+    // pero bloquea las secciones base 1, 2 y 3.
     setSections((prevSections) =>
       prevSections.map((section) => ({
         ...section,
@@ -228,15 +374,24 @@ export default function PermissionsManage() {
     );
   };
 
+  // =====================================================
+  // ACTIVAR O DESACTIVAR SECCIONES
+  // =====================================================
+
+  // Cambia el estado de una sección específica.
+  // Solo funciona cuando el tipo de acceso es edición restringida.
   const handleToggleSection = (id: number) => {
+    // Si no es edición restringida, no permite cambiar secciones manualmente.
     if (accessType !== "RESTRICTED_EDIT") {
       return;
     }
 
+    // Si la sección es base, no se puede activar ni desactivar.
     if (isBaseSection(id)) {
       return;
     }
 
+    // Invierte el estado de la sección seleccionada.
     setSections((prevSections) =>
       prevSections.map((section) =>
         section.id === id
@@ -246,11 +401,18 @@ export default function PermissionsManage() {
     );
   };
 
+  // =====================================================
+  // SECCIONES FINALES HABILITADAS
+  // =====================================================
+
+  // Obtiene la lista final de secciones que se guardarán.
   const getFinalEnabledSections = () => {
+    // En solo lectura no se guarda ninguna sección habilitada.
     if (accessType === "READ_ONLY") {
       return [];
     }
 
+    // En edición completa se guardan todas las secciones como habilitadas.
     if (accessType === "FULL_EDIT") {
       return sections.map((section) => ({
         ...section,
@@ -258,21 +420,35 @@ export default function PermissionsManage() {
       }));
     }
 
+    // En edición restringida solo se guardan las secciones habilitadas
+    // que no pertenecen al bloque base.
     return sections.filter(
       (section) => section.isEnabled && !isBaseSection(section.id),
     );
   };
 
+  // Secciones finales que se enviarán al backend.
   const finalEnabledSections = getFinalEnabledSections();
+
+  // Texto visible del acceso seleccionado.
   const accessLabel = getAccessLabel(accessType);
+
+  // Descripción visible del acceso seleccionado.
   const accessDescription = getAccessDescription(accessType);
 
+  // =====================================================
+  // GUARDAR CONFIGURACIÓN
+  // =====================================================
+
+  // Guarda los permisos configurados y luego redirige al envío de correo.
   const handleSave = async () => {
+    // Valida que exista información del docente y sílabo.
     if (!selectedDocenteId || !selectedSilaboId) {
       alert("Error: No se encontró información del docente o sílabo");
       return;
     }
 
+    // En edición restringida debe haber al menos una sección editable del 4 al 9.
     if (accessType === "RESTRICTED_EDIT" && finalEnabledSections.length === 0) {
       alert(
         "Para edición restringida debe seleccionar al menos una sección editable del 4 al 9.",
@@ -280,17 +456,22 @@ export default function PermissionsManage() {
       return;
     }
 
+    // Construye el arreglo de permisos que se enviará al backend.
+    // Solo se envía numeroSeccion porque es lo que espera el endpoint.
     const permissionsToSave = finalEnabledSections.map((section) => ({
       numeroSeccion: section.id,
     }));
 
     try {
+      // Guarda los permisos en el backend.
       await savePermissionsMutation.mutateAsync({
         silaboId: selectedSilaboId,
         docenteId: selectedDocenteId,
         permisos: permissionsToSave,
       });
 
+      // Construye los parámetros para redirigir al envío de correo.
+      // La siguiente pantalla usará estos datos para generar el correo de habilitación.
       const queryParams = new URLSearchParams({
         fromPermissions: "1",
         teacherName,
@@ -306,13 +487,20 @@ export default function PermissionsManage() {
           .join("|"),
       });
 
+      // Redirige a la pantalla de envío de correo.
       navigate(`/coordinator/send-email?${queryParams.toString()}`);
     } catch (error) {
+      // Si falla el guardado, muestra error en consola y alerta al usuario.
       console.error("Error al guardar permisos:", error);
       alert("Error al guardar los permisos. Por favor, intente de nuevo.");
     }
   };
 
+  // =====================================================
+  // ESTADO DE CARGA
+  // =====================================================
+
+  // Mientras carga sesión o permisos, muestra un mensaje de espera.
   if (sessionLoading || permissionsLoading) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -321,9 +509,14 @@ export default function PermissionsManage() {
     );
   }
 
+  // =====================================================
+  // RENDER PRINCIPAL
+  // =====================================================
+
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
       <div className="mx-auto max-w-6xl">
+        {/* Encabezado principal de la pantalla. */}
         <div className="mb-7">
           <h1 className="text-3xl font-bold text-gray-900">
             Configurar Alcance de Edición de Sílabos
@@ -336,7 +529,12 @@ export default function PermissionsManage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_0.85fr]">
+          {/* =====================================================
+              PANEL IZQUIERDO: FORMULARIO DE CONFIGURACIÓN
+              ===================================================== */}
+
           <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
+            {/* Cabecera del formulario. */}
             <div className="border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white px-8 py-6">
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-700">
@@ -356,6 +554,7 @@ export default function PermissionsManage() {
             </div>
 
             <div className="space-y-6 p-8">
+              {/* Información del sílabo asignado. */}
               <div>
                 <label className="mb-2 block text-sm font-bold text-gray-900">
                   Sílabo asignado
@@ -386,6 +585,7 @@ export default function PermissionsManage() {
                 </div>
               </div>
 
+              {/* Selector de alcance de edición. */}
               <div>
                 <label className="mb-2 block text-sm font-bold text-gray-900">
                   Alcance de edición
@@ -407,6 +607,7 @@ export default function PermissionsManage() {
                   </option>
                 </select>
 
+                {/* Descripción visual del alcance seleccionado. */}
                 <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
                   <div className="flex items-start gap-3">
                     <div
@@ -432,6 +633,8 @@ export default function PermissionsManage() {
                 </div>
               </div>
 
+              {/* Lista de secciones habilitables.
+                  Solo se muestra cuando el acceso es edición restringida. */}
               {accessType === "RESTRICTED_EDIT" && (
                 <div>
                   <div className="mb-3 flex items-center justify-between">
@@ -446,6 +649,7 @@ export default function PermissionsManage() {
 
                   <div className="space-y-3">
                     {sections.map((section) => {
+                      // Las secciones base no se pueden editar en modo restringido.
                       const disabled = isBaseSection(section.id);
 
                       return (
@@ -460,6 +664,7 @@ export default function PermissionsManage() {
                               {section.id}. {section.title}
                             </span>
 
+                            {/* Badge para indicar que una sección está bloqueada. */}
                             {disabled && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
                                 <Lock size={12} />
@@ -467,6 +672,7 @@ export default function PermissionsManage() {
                               </span>
                             )}
 
+                            {/* Botón informativo para secciones con información adicional. */}
                             {section.hasInfo && (
                               <button
                                 type="button"
@@ -478,6 +684,7 @@ export default function PermissionsManage() {
                             )}
                           </div>
 
+                          {/* Switch para activar o desactivar sección. */}
                           <button
                             type="button"
                             onClick={() => handleToggleSection(section.id)}
@@ -506,6 +713,7 @@ export default function PermissionsManage() {
                 </div>
               )}
 
+              {/* Botones inferiores del formulario. */}
               <div className="flex items-center justify-between border-t border-gray-100 pt-6">
                 <button
                   type="button"
@@ -531,6 +739,10 @@ export default function PermissionsManage() {
             </div>
           </section>
 
+          {/* =====================================================
+              PANEL DERECHO: VISTA PREVIA DE CONFIGURACIÓN
+              ===================================================== */}
+
           <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
             <div className="bg-red-700 px-6 py-5 text-white">
               <h2 className="text-lg font-bold">Configuración activa</h2>
@@ -541,6 +753,7 @@ export default function PermissionsManage() {
             </div>
 
             <div className="space-y-5 p-6">
+              {/* Datos del docente. */}
               <div className="flex gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
                   <User size={20} />
@@ -559,6 +772,7 @@ export default function PermissionsManage() {
                 </div>
               </div>
 
+              {/* Datos del sílabo. */}
               <div className="flex gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
                   <BookOpen size={20} />
@@ -577,6 +791,7 @@ export default function PermissionsManage() {
                 </div>
               </div>
 
+              {/* Resumen del alcance seleccionado. */}
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                 <p className="text-xs font-bold uppercase text-gray-400">
                   Alcance
@@ -603,17 +818,20 @@ export default function PermissionsManage() {
                 </p>
               </div>
 
+              {/* Vista previa de secciones habilitadas. */}
               <div>
                 <p className="mb-2 text-xs font-bold uppercase text-gray-400">
                   Secciones habilitadas
                 </p>
 
+                {/* Caso solo lectura. */}
                 {accessType === "READ_ONLY" && (
                   <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
                     No se habilitarán secciones para edición.
                   </div>
                 )}
 
+                {/* Caso edición restringida. */}
                 {accessType === "RESTRICTED_EDIT" && (
                   <div className="space-y-2">
                     {finalEnabledSections.length > 0 ? (
@@ -633,6 +851,7 @@ export default function PermissionsManage() {
                   </div>
                 )}
 
+                {/* Caso edición completa. */}
                 {accessType === "FULL_EDIT" && (
                   <div className="space-y-2">
                     <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm font-medium text-green-800">

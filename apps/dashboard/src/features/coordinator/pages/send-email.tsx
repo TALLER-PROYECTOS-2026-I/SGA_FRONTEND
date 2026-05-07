@@ -1,5 +1,26 @@
+// send-email.tsx
+// Archivo encargado de enviar correos académicos desde el sistema.
+// Puede funcionar en modo normal para enviar mensajes manuales
+// o en modo de habilitación de permisos cuando viene desde la pantalla de permisos.
+// También registra auditoría cuando se envían correos de habilitación.
+
+// =====================================================
+// IMPORTS
+// =====================================================
+
+// Importa hooks de React.
+// useState permite manejar estados internos.
+// useEffect permite ejecutar acciones cuando cambian datos.
+// useMemo permite memorizar valores calculados para evitar cálculos repetidos.
 import { useState, useEffect, useMemo } from "react";
+
+// Importa hooks de React Router.
+// useNavigate permite navegar a otra pantalla.
+// useSearchParams permite leer parámetros de la URL.
 import { useNavigate, useSearchParams } from "react-router-dom";
+
+// Importa íconos desde lucide-react.
+// Se usan para botones, estados, tarjetas, campos y mensajes visuales.
 import {
   ArrowLeft,
   Upload,
@@ -14,42 +35,101 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
+
+// Importa el hook para enviar correos y las constantes de validación de archivos.
+// useSendMail envía el correo usando Microsoft Graph.
+// MAX_FILES define la cantidad máxima de archivos.
+// MAX_FILE_BYTES define el tamaño máximo permitido por archivo.
 import {
   useSendMail,
   MAX_FILES,
   MAX_FILE_BYTES,
 } from "../../../common/hooks/useSendMail";
+
+// Importa el hook para obtener docentes y el tipo Teacher.
+// useTeachers consulta docentes desde el backend.
+// Teacher define la estructura de un docente.
 import {
   useTeachers,
   type Teacher,
 } from "../../assignments/hooks/use-teachers";
+
+// Importa el hook para obtener cursos y el tipo Course.
+// useCourses consulta cursos desde el backend.
+// Course define la estructura de un curso.
 import { useCourses, type Course } from "../../assignments/hooks/use-courses";
+
+// Importa el hook de sesión.
+// Sirve para obtener el usuario actual y validar permisos.
 import { useSession } from "../../auth/hooks/use-session";
+
+// Importa la función getRoleName.
+// Sirve para convertir el id del rol del usuario en el nombre del rol.
 import { getRoleName } from "../../../common/constants/roles";
+
+// Importa toast desde Sonner.
+// Sirve para mostrar notificaciones de éxito, error o advertencia.
 import { toast } from "sonner";
 
+// =====================================================
+// TIPOS
+// =====================================================
+
+// Define los posibles resultados visuales del envío.
+// idle significa que aún no hay resultado.
+// success significa que el correo se envió correctamente.
+// error significa que el envío falló.
 type SendResult = "idle" | "success" | "error";
 
+// Define la estructura del evento de auditoría que se enviará al backend.
+// Se usa cuando se envía o falla un correo de habilitación.
 type AuditEventPayload = {
+  // Tabla o módulo relacionado con el evento auditado.
   tabla: string;
+
+  // Clave primaria o identificador del registro afectado.
   registroPk: string;
+
+  // Acción realizada dentro del sistema.
   accion: string;
+
+  // Descripción opcional del evento.
   descripcion?: string;
+
+  // Id del docente relacionado, si existe.
   docenteId?: number | null;
+
+  // Id del sílabo relacionado, si existe.
   silaboId?: number | null;
+
+  // Valores anteriores, si aplica.
   oldValues?: unknown;
+
+  // Valores nuevos o datos registrados en auditoría.
   newValues?: unknown;
 };
 
+// =====================================================
+// FUNCIONES AUXILIARES
+// =====================================================
+
+// Convierte el tamaño de un archivo de bytes a KB.
+// Se usa para mostrar el tamaño de archivos adjuntos en pantalla.
 function formatFileSize(size: number) {
   return `${Math.round(size / 1024)} KB`;
 }
 
+// Obtiene el periodo académico de un curso.
+// Como Course puede tener diferentes nombres de propiedad,
+// se convierte a Record para revisar varias opciones posibles.
 function getCoursePeriod(course: Course | null) {
+  // Si no hay curso seleccionado, devuelve "No informado".
   if (!course) return "No informado";
 
+  // Convierte el curso a un objeto genérico para leer campos dinámicos.
   const record = course as unknown as Record<string, unknown>;
 
+  // Devuelve el primer campo de periodo encontrado.
   return String(
     record.periodoAcademico ||
       record.academicPeriod ||
@@ -59,15 +139,21 @@ function getCoursePeriod(course: Course | null) {
   );
 }
 
+// Devuelve el texto del tipo de acceso.
+// Si no llega accessLabel, devuelve un texto por defecto.
 function getAccessText(accessLabel: string) {
   if (!accessLabel) return "Permiso de edición configurado";
   return accessLabel;
 }
 
+// Valida si un correo pertenece al dominio institucional.
+// Solo permite correos terminados en @usmp.pe.
 function isInstitutionalEmail(email: string) {
   return email.trim().toLowerCase().endsWith("@usmp.pe");
 }
 
+// Escapa caracteres especiales para evitar insertar HTML peligroso.
+// Se usa antes de construir mensajes HTML.
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -77,15 +163,21 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+// Convierte texto plano a HTML.
+// Escapa el texto y reemplaza saltos de línea por <br/>.
 function plainTextToHtml(value: string) {
   return `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #111827; line-height: 1.6;">${escapeHtml(
     value,
   ).replaceAll("\n", "<br/>")}</div>`;
 }
 
+// Registra un evento de auditoría en el backend.
+// Se usa para guardar si el correo de habilitación se envió correctamente o falló.
 async function registerAuditEvent(payload: AuditEventPayload) {
+  // Obtiene la URL base de la API desde variables de entorno.
   const apiUrl = import.meta.env.VITE_API_URL || "";
 
+  // Envía el evento de auditoría al endpoint correspondiente.
   const response = await fetch(`${apiUrl}/api/audit-events`, {
     method: "POST",
     headers: {
@@ -94,67 +186,141 @@ async function registerAuditEvent(payload: AuditEventPayload) {
     body: JSON.stringify(payload),
   });
 
+  // Si el backend responde con error, lanza una excepción.
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(text || "No se pudo registrar auditoría");
   }
 }
 
+// =====================================================
+// COMPONENTE PRINCIPAL
+// =====================================================
+
+// Componente encargado de enviar correos.
+// Puede enviar correos normales o correos de habilitación de permisos.
 export default function SendEmail() {
+  // Hook para navegar entre pantallas.
   const navigate = useNavigate();
+
+  // Hook para leer parámetros de la URL.
   const [searchParams] = useSearchParams();
 
+  // =====================================================
+  // PARÁMETROS DE URL
+  // =====================================================
+
+  // Indica si esta pantalla fue abierta desde la configuración de permisos.
   const fromPermissions = searchParams.get("fromPermissions") === "1";
 
+  // Parámetros del docente recibidos por URL.
   const teacherEmailParam = searchParams.get("teacherEmail") || "";
   const teacherNameParam = searchParams.get("teacherName") || "";
+
+  // Parámetros del curso recibidos por URL.
   const courseCodeParam = searchParams.get("courseCode") || "";
   const courseNameParam = searchParams.get("courseName") || "";
+
+  // Parámetros de acceso o permiso recibidos por URL.
   const accessLabelParam = searchParams.get("accessLabel") || "";
   const accessTypeParam = searchParams.get("accessType") || "";
   const enabledSectionsParam = searchParams.get("enabledSections") || "";
 
+  // Parámetros de ids recibidos por URL.
   const docenteIdParam = searchParams.get("docenteId") || "";
   const silaboIdParam = searchParams.get("silaboId") || "";
 
+  // Convierte docenteId a número si existe.
   const docenteId = docenteIdParam ? Number(docenteIdParam) : null;
+
+  // Convierte silaboId a número si existe.
   const silaboId = silaboIdParam ? Number(silaboIdParam) : null;
 
+  // Convierte las secciones habilitadas recibidas por URL en un arreglo.
+  // El separador esperado es "|".
   const enabledSections = useMemo(() => {
+    // Si no hay secciones, devuelve arreglo vacío.
     if (!enabledSectionsParam.trim()) return [];
 
+    // Separa las secciones, limpia espacios y elimina valores vacíos.
     return enabledSectionsParam
       .split("|")
       .map((section) => section.trim())
       .filter(Boolean);
   }, [enabledSectionsParam]);
 
+  // =====================================================
+  // SESIÓN Y PERMISOS
+  // =====================================================
+
+  // Obtiene el usuario actual y el estado de carga de la sesión.
   const { user, isLoading: sessionLoading } = useSession();
 
+  // =====================================================
+  // ESTADOS DE DOCENTE
+  // =====================================================
+
+  // Docente seleccionado.
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+
+  // Texto del buscador de docentes.
   const [teacherSearch, setTeacherSearch] = useState("");
+
+  // Controla si se muestra el dropdown de docentes.
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
 
+  // =====================================================
+  // ESTADOS DE CURSO
+  // =====================================================
+
+  // Curso seleccionado.
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
+  // Texto del buscador de cursos.
   const [courseSearch, setCourseSearch] = useState("");
+
+  // Controla si se muestra el dropdown de cursos.
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
 
+  // =====================================================
+  // ESTADOS DEL MENSAJE, ARCHIVOS Y RESULTADO
+  // =====================================================
+
+  // Mensaje escrito manualmente cuando no viene desde permisos.
   const [message, setMessage] = useState("");
+
+  // Contador de caracteres del mensaje.
   const [charCount, setCharCount] = useState(0);
+
+  // Archivos adjuntos seleccionados.
   const [attachments, setAttachments] = useState<File[]>([]);
+
+  // Resultado del envío para mostrar alerta visual.
   const [sendResult, setSendResult] = useState<SendResult>("idle");
+
+  // Mensaje asociado al resultado del envío.
   const [resultMessage, setResultMessage] = useState("");
 
+  // Máximo de caracteres permitidos en el mensaje manual.
   const maxChars = 400;
 
+  // =====================================================
+  // HOOKS DE ENVÍO Y CONSULTAS
+  // =====================================================
+
+  // Hook para enviar el correo.
+  // sendMail ejecuta el envío.
+  // isSending indica si el correo está en proceso.
   const { sendMail, isSending } = useSendMail();
 
+  // Consulta la lista de docentes desde el backend.
   const {
     data: teachers = [],
     isError: isErrorTeachers,
     error: teachersError,
   } = useTeachers();
 
+  // Consulta la lista de cursos desde el backend.
   const {
     data: courses = [],
     isLoading: isLoadingCourses,
@@ -162,11 +328,20 @@ export default function SendEmail() {
     error: coursesError,
   } = useCourses();
 
+  // Obtiene el nombre del rol del usuario actual.
   const userRoleName = user ? getRoleName(user.role) : "";
+
+  // Valida si el usuario tiene permiso para enviar correos HU06.
+  // Solo coordinadora académica o director de escuela pueden hacerlo.
   const canSendHU06 =
     userRoleName === "coordinadora_academica" ||
     userRoleName === "director_escuela";
 
+  // =====================================================
+  // EFECTOS DE ERRORES Y PERMISOS
+  // =====================================================
+
+  // Muestra error si falla la carga de docentes.
   useEffect(() => {
     if (isErrorTeachers) {
       toast.error(
@@ -175,12 +350,15 @@ export default function SendEmail() {
     }
   }, [isErrorTeachers, teachersError]);
 
+  // Muestra error si falla la carga de cursos.
   useEffect(() => {
     if (isErrorCourses) {
       toast.error(coursesError?.message || "No se pudieron cargar los cursos");
     }
   }, [isErrorCourses, coursesError]);
 
+  // Si viene desde permisos y el usuario no tiene rol permitido,
+  // muestra error y redirige al inicio.
   useEffect(() => {
     if (!sessionLoading && user && fromPermissions && !canSendHU06) {
       toast.error("No tiene permisos para enviar correos de habilitación.");
@@ -188,13 +366,21 @@ export default function SendEmail() {
     }
   }, [sessionLoading, user, fromPermissions, canSendHU06, navigate]);
 
+  // =====================================================
+  // EFECTOS PARA PRECARGAR DOCENTE Y CURSO DESDE URL
+  // =====================================================
+
+  // Precarga el docente cuando el correo o nombre viene por URL.
   useEffect(() => {
+    // Si hay correo por URL y ya cargaron los docentes,
+    // busca el docente por correo.
     if (teacherEmailParam && teachers.length > 0) {
       const teacher = teachers.find(
         (item) =>
           item.email.toLowerCase() === teacherEmailParam.toLowerCase(),
       );
 
+      // Si encuentra docente, lo selecciona y coloca su nombre en el buscador.
       if (teacher) {
         setSelectedTeacher(teacher);
         setTeacherSearch(teacher.name);
@@ -202,18 +388,24 @@ export default function SendEmail() {
       }
     }
 
+    // Si no encuentra por correo pero viene nombre por URL,
+    // coloca ese nombre en el buscador.
     if (teacherNameParam) {
       setTeacherSearch(teacherNameParam);
     }
   }, [teacherEmailParam, teacherNameParam, teachers]);
 
+  // Precarga el curso cuando el código o nombre viene por URL.
   useEffect(() => {
+    // Si hay código por URL y ya cargaron los cursos,
+    // busca el curso por código.
     if (courseCodeParam && courses.length > 0) {
       const course = courses.find(
         (item: Course) =>
           item.code.toLowerCase() === courseCodeParam.toLowerCase(),
       );
 
+      // Si encuentra curso, lo selecciona y muestra código + nombre.
       if (course) {
         setSelectedCourse(course);
         setCourseSearch(`${course.code} - ${course.name}`);
@@ -221,6 +413,8 @@ export default function SendEmail() {
       }
     }
 
+    // Si no encuentra el curso, pero hay datos por URL,
+    // muestra el texto disponible en el buscador.
     if (courseNameParam || courseCodeParam) {
       setCourseSearch(
         courseCodeParam && courseNameParam
@@ -230,6 +424,7 @@ export default function SendEmail() {
     }
   }, [courseCodeParam, courseNameParam, courses]);
 
+  // Cierra los dropdowns cuando se hace clic fuera.
   useEffect(() => {
     const handleClickOutside = () => {
       setShowTeacherDropdown(false);
@@ -241,6 +436,11 @@ export default function SendEmail() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // =====================================================
+  // FILTROS DE DOCENTES Y CURSOS
+  // =====================================================
+
+  // Filtra docentes por nombre o correo.
   const filteredTeachers = teachers.filter((teacher) => {
     const search = teacherSearch.toLowerCase();
 
@@ -250,6 +450,7 @@ export default function SendEmail() {
     );
   });
 
+  // Filtra cursos por nombre o código.
   const filteredCourses = courses.filter((course: Course) => {
     const search = courseSearch.toLowerCase();
 
@@ -259,20 +460,36 @@ export default function SendEmail() {
     );
   });
 
+  // =====================================================
+  // DATOS DERIVADOS DEL FORMULARIO
+  // =====================================================
+
+  // Correo final del destinatario.
+  // Prioriza el docente seleccionado; si no existe, usa el parámetro de URL.
   const recipientEmail = selectedTeacher?.email || teacherEmailParam || "";
+
+  // Nombre final del destinatario.
   const recipientName =
     selectedTeacher?.name || teacherNameParam || "Docente responsable";
 
+  // Indica si existe un curso seleccionado o recibido por URL.
   const hasCourseSelected = Boolean(
     selectedCourse || courseCodeParam || courseNameParam,
   );
 
+  // Código final del curso.
   const courseCode = selectedCourse?.code || courseCodeParam;
+
+  // Nombre final del curso.
   const courseName = selectedCourse?.name || courseNameParam;
+
+  // Periodo académico del curso seleccionado.
   const coursePeriod = getCoursePeriod(selectedCourse);
 
+  // Texto final del tipo de acceso.
   const accessLabel = getAccessText(accessLabelParam);
 
+  // Verifica si hay todo el contexto necesario para enviar HU06.
   const hasHU06Context = Boolean(
     fromPermissions &&
       teacherEmailParam &&
@@ -285,6 +502,12 @@ export default function SendEmail() {
       silaboId,
   );
 
+  // =====================================================
+  // MENSAJE DE HABILITACIÓN EN TEXTO PLANO
+  // =====================================================
+
+  // Construye el mensaje de habilitación en texto plano.
+  // Se muestra en pantalla para que el usuario lo revise.
   const permissionMessage = useMemo(() => {
     const safeCourseName = courseName || "Sílabo asignado";
     const safeCourseCode = courseCode || "N/A";
@@ -323,6 +546,12 @@ Coordinación Académica`;
     enabledSections,
   ]);
 
+  // =====================================================
+  // MENSAJE DE HABILITACIÓN EN HTML
+  // =====================================================
+
+  // Construye el mensaje HTML que se enviará por correo cuando viene desde permisos.
+  // Se escapan los valores para evitar insertar HTML no deseado.
   const permissionHtmlMessage = useMemo(() => {
     const safeCourseName = escapeHtml(courseName || "Sílabo asignado");
     const safeCourseCode = escapeHtml(courseCode || "N/A");
@@ -378,16 +607,31 @@ Coordinación Académica`;
     enabledSections,
   ]);
 
+  // =====================================================
+  // ASUNTO Y CUERPO FINAL DEL CORREO
+  // =====================================================
+
+  // Define el asunto del correo.
+  // Si viene desde permisos, usa asunto de habilitación.
+  // Si es correo normal, usa el curso seleccionado o un asunto genérico.
   const subject = fromPermissions
     ? `Habilitación de edición de sílabo - ${courseCode || "N/A"}`
     : selectedCourse
       ? `Notificación - Curso ${selectedCourse.code}`
       : "Notificación académica";
 
+  // Define el cuerpo final que se enviará.
+  // En modo permisos se envía HTML generado.
+  // En modo normal se convierte el texto escrito a HTML.
   const bodyToSend = fromPermissions
     ? permissionHtmlMessage
     : plainTextToHtml(message);
 
+  // =====================================================
+  // SELECCIÓN Y LIMPIEZA DE DOCENTE / CURSO
+  // =====================================================
+
+  // Selecciona un docente desde el dropdown.
   const handleTeacherSelect = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     setTeacherSearch(teacher.name);
@@ -396,6 +640,7 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // Selecciona un curso desde el dropdown.
   const handleCourseSelect = (course: Course) => {
     setSelectedCourse(course);
     setCourseSearch(`${course.code} - ${course.name}`);
@@ -404,6 +649,8 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // Limpia el docente seleccionado.
+  // En modo permisos no se permite limpiar porque viene preconfigurado.
   const handleClearTeacher = () => {
     if (fromPermissions) return;
 
@@ -413,6 +660,8 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // Limpia el curso seleccionado.
+  // En modo permisos no se permite limpiar porque viene preconfigurado.
   const handleClearCourse = () => {
     if (fromPermissions) return;
 
@@ -422,6 +671,11 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // =====================================================
+  // MENSAJE Y ARCHIVOS
+  // =====================================================
+
+  // Actualiza el mensaje manual siempre que no supere el máximo de caracteres.
   const handleMessageChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
@@ -435,6 +689,8 @@ Coordinación Académica`;
     }
   };
 
+  // Maneja la selección de archivos adjuntos.
+  // Valida cantidad máxima y tamaño máximo por archivo.
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
 
@@ -456,6 +712,7 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // Elimina un archivo adjunto por su índice.
   const removeAttachment = (index: number) => {
     setAttachments((prev) =>
       prev.filter((_, itemIndex) => itemIndex !== index),
@@ -464,12 +721,19 @@ Coordinación Académica`;
     setResultMessage("");
   };
 
+  // =====================================================
+  // VALIDACIÓN DEL FORMULARIO
+  // =====================================================
+
+  // Valida que el formulario tenga todos los datos necesarios antes de enviar.
   const validateForm = () => {
+    // Si viene desde permisos, valida que el usuario tenga rol permitido.
     if (fromPermissions && !canSendHU06) {
       toast.error("No tiene permisos para enviar correos de habilitación.");
       return false;
     }
 
+    // Si viene desde permisos, valida que exista todo el contexto HU06.
     if (fromPermissions && !hasHU06Context) {
       toast.error(
         "No se puede enviar el correo. Falta la configuración de alcance o la asignación del sílabo.",
@@ -477,11 +741,13 @@ Coordinación Académica`;
       return false;
     }
 
+    // Valida que exista destinatario.
     if (!recipientEmail) {
       toast.error("Selecciona un destinatario");
       return false;
     }
 
+    // Valida que el correo sea institucional.
     if (!isInstitutionalEmail(recipientEmail)) {
       toast.error(
         "El destinatario debe tener correo institucional con dominio @usmp.pe.",
@@ -489,20 +755,29 @@ Coordinación Académica`;
       return false;
     }
 
+    // Valida que exista curso seleccionado.
     if (!hasCourseSelected) {
       toast.error("Selecciona un curso");
       return false;
     }
 
+    // Valida que exista cuerpo de correo.
     if (!bodyToSend.trim()) {
       toast.error("Ingresa el mensaje");
       return false;
     }
 
+    // Si todo está correcto, permite continuar.
     return true;
   };
 
+  // =====================================================
+  // AUDITORÍA DEL CORREO DE HABILITACIÓN
+  // =====================================================
+
+  // Registra en auditoría que el correo de habilitación fue enviado correctamente.
   const registerEmailAuditSuccess = async () => {
+    // Solo registra auditoría en modo permisos.
     if (!fromPermissions) return;
 
     await registerAuditEvent({
@@ -524,7 +799,9 @@ Coordinación Académica`;
     });
   };
 
+  // Registra en auditoría que el envío del correo de habilitación falló.
   const registerEmailAuditFailure = async (error: unknown) => {
+    // Solo registra auditoría en modo permisos.
     if (!fromPermissions) return;
 
     await registerAuditEvent({
@@ -548,13 +825,21 @@ Coordinación Académica`;
     });
   };
 
+  // =====================================================
+  // ENVÍO DEL CORREO
+  // =====================================================
+
+  // Valida el formulario, envía el correo y registra auditoría si corresponde.
   const handleSubmit = async () => {
+    // Si la validación falla, detiene el envío.
     if (!validateForm()) return;
 
+    // Limpia resultado anterior.
     setSendResult("idle");
     setResultMessage("");
 
     try {
+      // Envía el correo con destinatario, asunto, cuerpo y archivos adjuntos.
       await sendMail({
         to: recipientEmail,
         subject,
@@ -562,10 +847,13 @@ Coordinación Académica`;
         files: attachments,
       });
 
+      // Registra auditoría de éxito.
+      // Si la auditoría falla, no bloquea el flujo principal.
       await registerEmailAuditSuccess().catch((auditError) => {
         console.error("No se pudo registrar auditoría del envío:", auditError);
       });
 
+      // Actualiza el estado visual de éxito.
       setSendResult("success");
       setResultMessage(
         fromPermissions
@@ -573,8 +861,11 @@ Coordinación Académica`;
           : `Correo enviado correctamente a ${recipientEmail}.`,
       );
 
+      // Muestra notificación de éxito.
       toast.success("Correo enviado correctamente");
 
+      // Si es correo normal, limpia docente, curso y mensaje.
+      // En modo permisos no limpia porque los datos vienen de la configuración.
       if (!fromPermissions) {
         setSelectedTeacher(null);
         setTeacherSearch("");
@@ -584,38 +875,59 @@ Coordinación Académica`;
         setCharCount(0);
       }
 
+      // Limpia archivos adjuntos después del envío.
       setAttachments([]);
     } catch (error) {
+      // Registra el error en consola.
       console.error("Error al enviar correo:", error);
 
+      // Registra auditoría de fallo.
+      // Si la auditoría falla, no bloquea el mensaje de error al usuario.
       await registerEmailAuditFailure(error).catch((auditError) => {
         console.error("No se pudo registrar auditoría del fallo:", auditError);
       });
 
+      // Actualiza el estado visual de error.
       setSendResult("error");
       setResultMessage(
         "No se pudo enviar el correo. Verifica la sesión de Microsoft Graph o vuelve a iniciar sesión.",
       );
 
+      // Muestra notificación de error.
       toast.error(
         "No se pudo enviar el correo. Verifica la sesión de Microsoft Graph.",
       );
     }
   };
 
+  // =====================================================
+  // NAVEGACIÓN
+  // =====================================================
+
+  // Regresa a la pantalla anterior.
   const handleGoBack = () => {
     navigate(-1);
   };
 
+  // =====================================================
+  // ESTADO DE CARGA DE SESIÓN
+  // =====================================================
+
+  // Mientras se carga la sesión, muestra un mensaje simple.
   if (sessionLoading) {
     return (
       <div className="p-6 text-center text-gray-600">Cargando sesión...</div>
     );
   }
 
+  // =====================================================
+  // RENDER PRINCIPAL
+  // =====================================================
+
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
       <div className="mx-auto max-w-6xl">
+        {/* Encabezado principal de la página. */}
         <div className="mb-7">
           <h1 className="text-3xl font-bold text-gray-900">
             {fromPermissions
@@ -630,7 +942,9 @@ Coordinación Académica`;
           </p>
         </div>
 
+        {/* Tarjeta principal del formulario. */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
+          {/* Cabecera visual de la tarjeta. */}
           <div className="border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white px-8 py-6">
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 text-white shadow-md">
@@ -653,8 +967,14 @@ Coordinación Académica`;
             </div>
           </div>
 
+          {/* Contenido del formulario. */}
           <div className="p-8">
+            {/* =====================================================
+                DESTINATARIO Y CURSO
+                ===================================================== */}
+
             <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+              {/* Campo de destinatario. */}
               <div>
                 <label className="mb-2 block text-sm font-bold text-gray-900">
                   1. Destinatario
@@ -696,6 +1016,7 @@ Coordinación Académica`;
                     )}
                   </div>
 
+                  {/* Dropdown de docentes filtrados. */}
                   {showTeacherDropdown &&
                     teacherSearch &&
                     filteredTeachers.length > 0 &&
@@ -719,6 +1040,7 @@ Coordinación Académica`;
                       </div>
                     )}
 
+                  {/* Tarjeta de destinatario seleccionado o precargado. */}
                   {recipientEmail && (
                     <div
                       className={`mt-3 rounded-xl border p-4 ${
@@ -771,6 +1093,7 @@ Coordinación Académica`;
                 </div>
               </div>
 
+              {/* Campo de curso. */}
               <div>
                 <label className="mb-2 block text-sm font-bold text-gray-900">
                   2. Curso
@@ -816,6 +1139,7 @@ Coordinación Académica`;
                     )}
                   </div>
 
+                  {/* Dropdown de cursos filtrados. */}
                   {showCourseDropdown &&
                     courseSearch &&
                     filteredCourses.length > 0 &&
@@ -839,6 +1163,7 @@ Coordinación Académica`;
                       </div>
                     )}
 
+                  {/* Tarjeta del curso seleccionado o precargado. */}
                   {hasCourseSelected && (
                     <div className="mt-3 rounded-xl border border-green-100 bg-green-50 p-4">
                       <div className="flex items-center gap-3">
@@ -865,6 +1190,10 @@ Coordinación Académica`;
                 </div>
               </div>
             </div>
+
+            {/* =====================================================
+                MENSAJE GENERADO DESDE PERMISOS
+                ===================================================== */}
 
             {fromPermissions && (
               <div className="mt-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
@@ -897,6 +1226,10 @@ Coordinación Académica`;
               </div>
             )}
 
+            {/* =====================================================
+                MENSAJE MANUAL
+                ===================================================== */}
+
             {!fromPermissions && (
               <div className="mt-7">
                 <div className="mb-2 flex items-center justify-between">
@@ -922,6 +1255,10 @@ Coordinación Académica`;
                 />
               </div>
             )}
+
+            {/* =====================================================
+                ARCHIVOS ADJUNTOS
+                ===================================================== */}
 
             <div className="mt-7">
               <label className="mb-2 block text-sm font-bold text-gray-900">
@@ -962,6 +1299,7 @@ Coordinación Académica`;
                 </div>
               </label>
 
+              {/* Lista de archivos adjuntos seleccionados. */}
               {attachments.length > 0 && (
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                   {attachments.map((file, index) => (
@@ -997,6 +1335,10 @@ Coordinación Académica`;
               )}
             </div>
 
+            {/* =====================================================
+                RESULTADO DEL ENVÍO
+                ===================================================== */}
+
             {sendResult !== "idle" && (
               <div
                 className={`mt-7 rounded-2xl border p-5 ${
@@ -1029,6 +1371,10 @@ Coordinación Académica`;
                 </div>
               </div>
             )}
+
+            {/* =====================================================
+                BOTONES DE ACCIÓN
+                ===================================================== */}
 
             <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-6">
               <button
