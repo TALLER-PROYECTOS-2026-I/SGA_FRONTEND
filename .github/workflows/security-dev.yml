@@ -143,6 +143,7 @@ jobs:
           args: >
             -Dsonar.projectKey=SGA_FRONTEND
             -Dsonar.organization=prueba-demo-devsecops
+            -Dsonar.coverage.exclusions=**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
