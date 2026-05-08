@@ -5,8 +5,8 @@ interface CourseCodeInputProps {
 export default function CourseCodeInput({ courseCode }: CourseCodeInputProps) {
   return (
     <div className="mb-6">
-      <label className="block text-lg font-semibold text-gray-800 mb-2">
-        3. Código de Asignatura
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+        Código de Asignatura
       </label>
       <input
         type="text"

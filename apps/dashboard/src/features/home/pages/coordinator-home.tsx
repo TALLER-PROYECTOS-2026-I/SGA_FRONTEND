@@ -1,4 +1,12 @@
-import { Key, Mail, FileSearch, List, Plus, Edit } from "lucide-react";
+import {
+  Key,
+  Mail,
+  FileSearch,
+  List,
+  Plus,
+  Edit,
+  ClipboardList,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import React from "react";
 
@@ -16,7 +24,12 @@ interface Module {
   disabled?: boolean;
 }
 
-function ModuleCard({ icon, title, onClick, disabled }: ModuleCardProps) {
+function ModuleCard({
+  icon,
+  title,
+  onClick,
+  disabled,
+}: ModuleCardProps) {
   return (
     <button
       onClick={!disabled ? onClick : undefined}
@@ -62,6 +75,11 @@ export default function CoordinatorHome() {
       icon: <FileSearch size={32} />,
       title: "Revisión Académica",
       onClick: () => navigate("/coordinator/review-syllabus"),
+    },
+    {
+      icon: <ClipboardList size={32} />,
+      title: "Seguimiento de Sílabos",
+      onClick: () => navigate("/coordinator/syllabus-tracking"),
     },
     {
       icon: <List size={32} />,
