@@ -597,10 +597,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               items={[
                 `Presencial (${checked(datos.modalidad, "presencial")})`,
                 `Semipresencial (${checked(datos.modalidad, "semipresencial")})`,
-                `A distancia (${
-                  checked(datos.modalidad, "a distancia") ||
-                  checked(datos.modalidad, "aDistancia")
-                })`,
+                `A distancia (${checked(datos.modalidad, "aDistancia")})`,
               ]}
             />
 
