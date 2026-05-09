@@ -24,7 +24,6 @@ import ReviewSyllabusList from "./features/coordinator/pages/review-syllabus-lis
 import ReviewSyllabusDetail from "./features/coordinator/pages/review-syllabus-detail";
 import ReviewSyllabusSummary from "./features/coordinator/pages/review-syllabus-summary";
 import SyllabusCatalog from "./features/coordinator/pages/syllabus-catalog";
-import SyllabusTracking from "./features/coordinator/pages/syllabus-tracking";
 
 const queryClient = new QueryClient();
 
@@ -158,14 +157,7 @@ export default function App() {
                   </MainLayout>
                 }
               />
-              <Route
-                path="/coordinator/syllabus-tracking"
-                element={
-                  <MainLayout title="Seguimiento de Sílabos">
-                    <SyllabusTracking />
-                  </MainLayout>
-                }
-              />
+
               {/* Fallback route */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

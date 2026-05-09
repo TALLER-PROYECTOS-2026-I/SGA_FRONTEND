@@ -11,6 +11,7 @@ import CourseCodeInput from "../components/course-code-input";
 import AcademicPeriodInput from "../components/academic-period-input";
 import MessageTextarea from "../components/message-textarea";
 import FormActions from "../components/form-actions";
+import { UserPlus } from "lucide-react";
 
 export default function Management() {
   const toast = useToast();
@@ -177,8 +178,12 @@ export default function Management() {
         syllabusId,
         courseCode: courseCode.trim(),
         academicPeriod: academicPeriod.trim(),
-        message: message.trim(), // <-- CORRECCIÓN: Se envía siempre, aunque esté vacío
       };
+
+      // Solo agregar message si tiene contenido
+      if (message.trim()) {
+        assignmentData.message = message.trim();
+      }
 
       await createAssignment.mutateAsync(assignmentData);
 
@@ -197,8 +202,12 @@ export default function Management() {
           courseName: selectedCourse.name,
           courseCode: courseCode.trim(),
           academicPeriod: academicPeriod.trim(),
-          additionalMessage: message.trim(), // <-- CORRECCIÓN: Se envía siempre, aunque esté vacío
         };
+
+        // Solo agregar additionalMessage si tiene contenido
+        if (message.trim()) {
+          emailData.additionalMessage = message.trim();
+        }
 
         await sendEmail(emailData);
 
@@ -338,94 +347,80 @@ export default function Management() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Nuevo Header / Título Principal */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">
-          Asignar Docente a Sílabo
+  <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-7">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Asignar Docente
         </h1>
-        <p className="text-slate-600">
-          Registre la asignación de un docente responsable a un sílabo de curso
-          para un periodo académico específico
+        <p className="text-sm text-gray-500 mt-1">
+          Completa los datos para asignar un sílabo a un docente.
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-        {/* Componentes de Input - Mantenemos sus props originales */}
-        <TeacherSelect
-          selectedTeacher={selectedTeacher}
-          teacherSearch={teacherSearch}
-          setTeacherSearch={setTeacherSearch}
-          showTeacherDropdown={showTeacherDropdown}
-          setShowTeacherDropdown={setShowTeacherDropdown}
-          onTeacherSelect={handleTeacherSelect}
-          onClearTeacher={handleClearTeacher}
-          teachers={filteredTeachers}
-        />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+        <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+          <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+            <UserPlus size={30} />
+          </div>
 
-        <CourseSelect
-          selectedCourse={selectedCourse}
-          courseSearch={courseSearch}
-          setCourseSearch={setCourseSearch}
-          showCourseDropdown={showCourseDropdown}
-          setShowCourseDropdown={setShowCourseDropdown}
-          onCourseSelect={handleCourseSelect}
-          onClearCourse={handleClearCourse}
-          courses={filteredCourses}
-        />
-
-        <CourseCodeInput courseCode={courseCode} />
-
-        <AcademicPeriodInput academicPeriod={academicPeriod} />
-
-        <MessageTextarea
-          message={message}
-          onChange={handleMessageChange}
-          charCount={charCount}
-          maxChars={maxChars}
-        />
-
-        {/* Nueva Caja Morada de Información Importante */}
-        <div className="my-8 bg-[#F9F5FF] border-l-4 border-purple-600 p-5 rounded-r-xl">
-          <div className="flex gap-3">
-            <svg
-              className="w-6 h-6 text-purple-600 shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
             <div>
-              <h4 className="text-sm font-bold text-[#4B1194] mb-2">
-                Información Importante
-              </h4>
-              <ul className="text-sm text-[#5D2B9F] space-y-1.5 list-disc list-inside">
-                <li>
-                  Solo se muestran docentes activos disponibles para asignación
-                </li>
-                <li>
-                  Un sílabo no puede tener más de un docente responsable en el
-                  mismo periodo
-                </li>
-                <li>
-                  El docente asignado podrá visualizar el sílabo en "Mis
-                  asignaciones"
-                </li>
-                <li>La asignación cambia el estado del sílabo a "ASIGNADO"</li>
-              </ul>
+              <h2 className="text-xl font-bold text-gray-900">
+                Datos de la Asignación
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Selecciona el docente, la asignatura y envía el mensaje de
+                asignación.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Notar que isUpdating no estaba definido en el original para pasarlo a FormActions, lo dejo como estaba */}
-        <FormActions onGoBack={handleGoBack} onSubmit={handleSubmit} />
+        <div className="p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <TeacherSelect
+              selectedTeacher={selectedTeacher}
+              teacherSearch={teacherSearch}
+              setTeacherSearch={setTeacherSearch}
+              showTeacherDropdown={showTeacherDropdown}
+              setShowTeacherDropdown={setShowTeacherDropdown}
+              onTeacherSelect={handleTeacherSelect}
+              onClearTeacher={handleClearTeacher}
+              teachers={filteredTeachers}
+            />
+
+            <CourseSelect
+              selectedCourse={selectedCourse}
+              courseSearch={courseSearch}
+              setCourseSearch={setCourseSearch}
+              showCourseDropdown={showCourseDropdown}
+              setShowCourseDropdown={setShowCourseDropdown}
+              onCourseSelect={handleCourseSelect}
+              onClearCourse={handleClearCourse}
+              courses={filteredCourses}
+            />
+
+            <CourseCodeInput courseCode={courseCode} />
+
+            <AcademicPeriodInput academicPeriod={academicPeriod} />
+          </div>
+
+          <div className="mt-7">
+            <MessageTextarea
+              message={message}
+              onChange={handleMessageChange}
+              charCount={charCount}
+              maxChars={maxChars}
+            />
+          </div>
+
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <FormActions onGoBack={handleGoBack} onSubmit={handleSubmit} />
+          </div>
+        </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

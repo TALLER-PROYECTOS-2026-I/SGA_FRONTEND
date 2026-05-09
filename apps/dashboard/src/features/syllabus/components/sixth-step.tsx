@@ -11,8 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../common/components/ui/select";
+import {
+  Calculator,
+  ClipboardCheck,
+  FileText,
+  Info,
+  Loader2,
+  Sigma,
+  BookOpen,
+} from "lucide-react";
 
-// Tipos
 interface Legend {
   key: string;
   description: string;
@@ -33,8 +41,6 @@ interface MainFormula {
   subFormulas: SubFormula[];
 }
 
-// Data mockeada - Fórmulas principales disponibles
-// En producción, esto vendría del backend con las subfórmulas ya desglosadas
 const availableFormulas: MainFormula[] = [
   {
     id: "1",
@@ -137,10 +143,8 @@ export default function SixthStep() {
   const { syllabusId } = useSyllabusContext();
   const [selectedFormula, setSelectedFormula] = useState<string>("1");
 
-  // Intentar cargar fórmula del API
   const { data: formulaFromApi, isLoading } = useFormulaQuery(syllabusId);
 
-  // Si hay fórmula del API, mostrar mensaje en consola
   useEffect(() => {
     if (formulaFromApi) {
       console.log("Fórmula cargada desde API:", formulaFromApi);
@@ -157,14 +161,18 @@ export default function SixthStep() {
       formula: currentFormula,
       fromApi: formulaFromApi,
     });
+
     nextStep();
   };
 
   if (isLoading) {
     return (
       <Step step={6} onNextStep={handleNextStep}>
-        <div className="w-full p-6">
-          <p className="text-center">Cargando fórmula de evaluación...</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+            <Loader2 size={18} className="animate-spin" />
+            Cargando fórmula de evaluación...
+          </div>
         </div>
       </Step>
     );
@@ -172,94 +180,299 @@ export default function SixthStep() {
 
   return (
     <Step step={6} onNextStep={handleNextStep}>
-      <div className="w-full p-6 space-y-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="text-lg font-bold text-black">7.</div>
-          <h2 className="text-lg font-semibold text-black">
-            Evaluación del Aprendizaje
-          </h2>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+        <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+              <span className="text-2xl font-bold">6</span>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Evaluación del Aprendizaje
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Selecciona la fórmula que se utilizará para calcular el promedio
+                final de la asignatura.
+              </p>
+            </div>
+
+            <div className="ml-auto hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold">
+              Sistema de evaluación
+            </div>
+          </div>
         </div>
 
-        {/* Selector de Fórmula Principal */}
-        <div className="bg-white border border-gray-300 rounded-lg p-6">
-          <p className="text-gray-700 mb-4 font-semibold">
-            Selecciona la fórmula para el promedio final (PF) de la asignatura:
-          </p>
+        <div className="p-8">
+          <div className="mb-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <Info size={20} />
+                </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fórmula del Promedio Final
-            </label>
-            <Select value={selectedFormula} onValueChange={setSelectedFormula}>
-              <SelectTrigger className="w-full bg-white">
-                <SelectValue placeholder="Selecciona una fórmula" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableFormulas.map((formula) => (
-                  <SelectItem key={formula.id} value={formula.id}>
-                    {formula.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <div>
+                  <h3 className="font-bold text-gray-900">
+                    Información del paso
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    La fórmula seleccionada define cómo se calculará el promedio
+                    final del estudiante.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Fórmulas
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {availableFormulas.length}
+                  </p>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Selección
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {selectedFormula}
+                  </p>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Desgloses
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {currentFormula?.subFormulas.length ?? 0}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {currentFormula && (
-            <>
-              {/* Fórmula Principal */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-center text-xl font-bold text-gray-800">
-                  {currentFormula.formula}
-                </p>
+          <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-7">
+            <aside className="space-y-6">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center">
+                      <Calculator size={20} />
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Fórmula del Promedio Final
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Selecciona una fórmula disponible.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <label className="block text-sm font-bold text-gray-900 mb-2">
+                    Fórmula
+                  </label>
+
+                  <Select
+                    value={selectedFormula}
+                    onValueChange={setSelectedFormula}
+                  >
+                    <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500">
+                      <SelectValue placeholder="Selecciona una fórmula" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {availableFormulas.map((formula) => (
+                        <SelectItem key={formula.id} value={formula.id}>
+                          {formula.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {currentFormula && (
+                    <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
+                      <p className="text-xs font-bold text-red-700 uppercase">
+                        Fórmula seleccionada
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900 mt-1">
+                        {currentFormula.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Leyenda de la Fórmula Principal */}
-              <div className="space-y-2 text-gray-700 mb-6">
-                <p className="font-semibold">Donde:</p>
-                {currentFormula.legend.map((item, index) => (
-                  <p key={index} className="ml-4">
-                    <span className="font-medium">{item.key}</span> ={" "}
-                    {item.description}
-                  </p>
-                ))}
-              </div>
+              <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <BookOpen size={18} />
+                  </div>
 
-              {/* Fórmulas Desglosadas */}
-              {currentFormula.subFormulas.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                    Fórmulas Desglosadas
-                  </h3>
-                  <div className="space-y-6">
-                    {currentFormula.subFormulas.map((subFormula, index) => (
-                      <div
-                        key={index}
-                        className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-                      >
-                        <h4 className="font-semibold text-gray-800 mb-2">
-                          {subFormula.name}
-                        </h4>
-                        <div className="bg-white border border-gray-300 rounded-lg p-3 mb-3">
-                          <p className="text-center text-lg font-bold text-gray-800">
-                            {subFormula.formula}
+                  <div>
+                    <h3 className="font-bold text-blue-900">
+                      Recomendación
+                    </h3>
+                    <p className="text-sm text-blue-700 leading-relaxed mt-1">
+                      Revisa la leyenda y las fórmulas desglosadas antes de
+                      continuar para asegurar que correspondan al sistema de
+                      evaluación del curso.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <section className="space-y-6">
+              {currentFormula && (
+                <>
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center">
+                          <Sigma size={20} />
+                        </div>
+
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">
+                            Fórmula Principal
+                          </h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Cálculo del promedio final de la asignatura.
                           </p>
                         </div>
-                        <div className="space-y-1 text-sm text-gray-700">
-                          <p className="font-semibold">Donde:</p>
-                          {subFormula.legend.map((item, legendIndex) => (
-                            <p key={legendIndex} className="ml-4">
-                              <span className="font-medium">{item.key}</span> ={" "}
-                              {item.description}
-                            </p>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="rounded-2xl bg-blue-50 border border-blue-100 px-6 py-6 mb-6">
+                        <p className="text-center text-2xl font-bold text-gray-900 tracking-wide">
+                          {currentFormula.formula}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 mb-3">
+                          Donde:
+                        </h4>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {currentFormula.legend.map((item, index) => (
+                            <div
+                              key={index}
+                              className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3"
+                            >
+                              <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-white border border-gray-100 text-xs font-bold text-red-700 mr-2">
+                                {item.key}
+                              </span>
+
+                              <span className="text-sm text-gray-700">
+                                {item.description}
+                              </span>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
+
+                  {currentFormula.subFormulas.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+                      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center">
+                            <ClipboardCheck size={20} />
+                          </div>
+
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">
+                              Fórmulas Desglosadas
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Detalle de los componentes usados en la fórmula
+                              principal.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 space-y-5">
+                        {currentFormula.subFormulas.map((subFormula, index) => (
+                          <div
+                            key={index}
+                            className="rounded-2xl border border-gray-100 bg-gray-50 p-5"
+                          >
+                            <div className="flex items-start justify-between gap-4 mb-4">
+                              <div>
+                                <h4 className="font-bold text-gray-900">
+                                  {subFormula.name}
+                                </h4>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Variable: {subFormula.variable}
+                                </p>
+                              </div>
+
+                              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-white border border-gray-100 text-xs font-bold text-gray-700">
+                                #{index + 1}
+                              </span>
+                            </div>
+
+                            <div className="bg-white border border-gray-100 rounded-xl p-4 mb-4">
+                              <p className="text-center text-lg font-bold text-gray-900">
+                                {subFormula.formula}
+                              </p>
+                            </div>
+
+                            <div>
+                              <h5 className="text-sm font-bold text-gray-900 mb-3">
+                                Donde:
+                              </h5>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {subFormula.legend.map(
+                                  (item, legendIndex) => (
+                                    <div
+                                      key={legendIndex}
+                                      className="rounded-xl border border-gray-100 bg-white px-4 py-3"
+                                    >
+                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
+                                        {item.key}
+                                      </span>
+
+                                      <span className="text-sm text-gray-700">
+                                        {item.description}
+                                      </span>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!currentFormula && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-md p-8 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="text-gray-400" size={30} />
+                  </div>
+
+                  <p className="text-sm font-semibold text-gray-700">
+                    No se encontró una fórmula seleccionada.
+                  </p>
                 </div>
               )}
-            </>
-          )}
+            </section>
+          </div>
         </div>
       </div>
     </Step>

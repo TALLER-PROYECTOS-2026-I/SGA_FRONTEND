@@ -65,7 +65,9 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
 
     if (totalBytes > MAX_TOTAL_BYTES) {
       throw new Error(
-        `Límite total excedido (${humanSize(totalBytes)} > ${humanSize(MAX_TOTAL_BYTES)})`,
+        `Límite total excedido (${humanSize(totalBytes)} > ${humanSize(
+          MAX_TOTAL_BYTES,
+        )})`,
       );
     }
 
@@ -131,6 +133,9 @@ export function useSendMail() {
     },
     onSuccess: () => {
       toast.dismiss("send-mail");
+      toast.success("Mensaje enviado con éxito", {
+        duration: 5000,
+      });
     },
     onError: (error: Error) => {
       toast.dismiss("send-mail");

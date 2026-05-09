@@ -114,7 +114,7 @@ export default function FirstStep() {
   const { data, isLoading, isError, error } = useSyllabusGeneral(
     isReviewMode || isCreateMode ? null : syllabusId,
   );
-  
+
   useEffect(() => {
     const fetchDocentes = async () => {
       try {
@@ -201,14 +201,7 @@ export default function FirstStep() {
           ? String(json.horasPractica)
           : s.horasPractica,
     }));
-  }, [
-    data,
-    isError,
-    error,
-    setCourseName,
-    isReviewMode,
-    isCreateMode,
-  ]);
+  }, [data, isError, error, setCourseName, isReviewMode, isCreateMode]);
 
   useEffect(() => {
     if (!isReviewMode || !sectionData) return;
@@ -341,6 +334,36 @@ export default function FirstStep() {
     }));
   };
 
+  const clearField = (name: string) => {
+    updateField(name, "");
+
+    if (name === "docentes") {
+      setDocenteSearch("");
+      setSelectedDocenteId("");
+    }
+  };
+
+  const ClearButton = ({
+    fieldName,
+    visible,
+  }: {
+    fieldName: string;
+    visible: boolean;
+  }) => {
+    if (!visible) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => clearField(fieldName)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+        title="Limpiar campo"
+      >
+        ×
+      </button>
+    );
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
 
@@ -412,6 +435,7 @@ export default function FirstStep() {
       const creditosTeoria = Number(form.creditosTeoria || 0);
       const creditosPractica = Number(form.creditosPractica || 0);
       const docenteId = Number(selectedDocenteId || form.docentes);
+
       console.log("DOCENTE SELECCIONADO FRONT:", docenteId);
 
       const draft = {
@@ -509,505 +533,614 @@ export default function FirstStep() {
     }
   };
 
-  const renderInput = (name: string) => (
-    <>
-      <input
-        name={name}
-        value={String(form[name] ?? "")}
-        onChange={(e) => updateField(name, e.target.value)}
-        disabled={isReadOnly}
-        className={`w-full rounded-md px-3 py-2 border ${
-          isReadOnly
-            ? "bg-gray-100 border-gray-300"
-            : "bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        } ${errors[name] ? "border-red-500" : ""}`}
-      />
+  const inputClass = (hasError?: boolean, disabled?: boolean) =>
+    `w-full h-11 rounded-xl px-4 border text-sm transition-all outline-none ${
+      disabled
+        ? "bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed"
+        : "bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+    } ${hasError ? "border-red-500 focus:ring-red-500" : ""}`;
 
-      {errors[name] && (
-        <div className="text-red-600 text-sm mt-1">{errors[name]}</div>
-      )}
-    </>
-  );
+  const textareaClass = (hasError?: boolean, disabled?: boolean) =>
+    `w-full min-h-[88px] rounded-xl px-4 py-3 border text-sm resize-none transition-all outline-none ${
+      disabled
+        ? "bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed"
+        : "bg-gray-50 border-gray-200 text-gray-700 focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+    } ${hasError ? "border-red-500 focus:ring-red-500" : ""}`;
+
+  const readonlyBoxClass =
+    "w-full min-h-11 rounded-xl px-4 py-3 bg-gray-100 border border-gray-200 text-sm text-gray-700 flex items-center";
+
+  const errorText = (name: string) =>
+    errors[name] ? (
+      <div className="text-red-600 text-xs font-medium mt-1">
+        {errors[name]}
+      </div>
+    ) : null;
+
+  const renderInput = (name: string) => {
+    const value = String(form[name] ?? "");
+    const disabled = isReadOnly || isCreating;
+    const canClear = !disabled && value.trim() !== "";
+
+    return (
+      <>
+        <div className="relative">
+          <input
+            name={name}
+            value={value}
+            onChange={(e) => updateField(name, e.target.value)}
+            disabled={disabled}
+            className={`${inputClass(Boolean(errors[name]), disabled)} ${
+              canClear ? "pr-10" : ""
+            }`}
+          />
+
+          <ClearButton fieldName={name} visible={canClear} />
+        </div>
+
+        {errorText(name)}
+      </>
+    );
+  };
 
   return (
     <Step step={1} onNextStep={validateAndNext}>
-      <div className="bg-white rounded-md overflow-visible shadow-sm">
-        <div className="bg-white px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="text-lg font-bold text-black">1.</div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-visible">
+        <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+              <span className="text-2xl font-bold">1</span>
+            </div>
 
-            <h2 className="text-lg font-semibold text-black">
-              Datos Generales
-            </h2>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Datos Generales
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Registra la información principal de la asignatura y del sílabo.
+              </p>
+            </div>
 
-            <div className="ml-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-              i
+            <div className="ml-auto hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold">
+              Información inicial
             </div>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-8 pb-24">
           {isLoading && !isCreateMode && (
-            <div className="mb-4 text-sm text-gray-700">
+            <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
               Cargando datos generales...
             </div>
           )}
 
           {apiError && (
-            <div className="mb-4 text-sm text-red-600">
+            <div className="mb-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
               Error cargando datos: {apiError}
             </div>
           )}
 
-          <div className="mb-6">
+          <div className="mb-8">
+            <label className="block text-sm font-bold text-gray-900 mb-2">
+              Nombre de la asignatura
+            </label>
+
             {isCreateMode ? (
-              <input
-                name="nombreAsignatura"
-                value={form.nombreAsignatura}
-                onChange={(e) =>
-                  updateField("nombreAsignatura", e.target.value)
-                }
-                placeholder="Nombre de la asignatura"
-                disabled={isCreating}
-                className={`w-full h-12 rounded-md px-4 flex items-center text-lg bg-white border ${
-                  errors.nombreAsignatura
-                    ? "border-red-500"
-                    : "border-blue-100"
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
+              <div className="relative">
+                <input
+                  name="nombreAsignatura"
+                  value={form.nombreAsignatura}
+                  onChange={(e) =>
+                    updateField("nombreAsignatura", e.target.value)
+                  }
+                  placeholder="Nombre de la asignatura"
+                  disabled={isCreating}
+                  className={`w-full h-12 rounded-xl px-4 pr-10 border text-base font-semibold transition-all outline-none ${
+                    errors.nombreAsignatura
+                      ? "border-red-500 focus:ring-red-500"
+                      : "border-gray-200 focus:ring-red-500"
+                  } bg-gray-50 focus:bg-white focus:ring-2 focus:border-transparent`}
+                />
+
+                <ClearButton
+                  fieldName="nombreAsignatura"
+                  visible={!isCreating && form.nombreAsignatura.trim() !== ""}
+                />
+              </div>
             ) : (
-              <div className="w-full h-12 rounded-md px-4 flex items-center text-lg bg-blue-50 border border-blue-100">
+              <div className="w-full h-12 rounded-xl px-4 flex items-center text-base font-semibold bg-blue-50 border border-blue-100 text-blue-900">
                 {form.nombreAsignatura || "Sin nombre de asignatura"}
               </div>
             )}
 
-            {errors.nombreAsignatura && (
-              <div className="text-red-600 text-sm mt-1">
-                {errors.nombreAsignatura}
-              </div>
-            )}
+            {errorText("nombreAsignatura")}
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-6">
             {fields.map(([label, name]) => (
-              <div key={name}>
-                <div className="grid grid-cols-[250px_24px_1fr] items-start gap-2 py-2 border-b last:border-b-0">
-                  <div className="text-sm text-gray-700 flex items-center">
-                    <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded w-full text-center">
-                      {label}
+              <div
+                key={name}
+                className={
+                  name === "requisitos" || name === "docentes"
+                    ? "xl:col-span-2"
+                    : ""
+                }
+              >
+                <label className="block text-sm font-bold text-gray-900 mb-2">
+                  {label}
+                </label>
+
+                {name === "requisitos" ? (
+                  isCreateMode ? (
+                    <>
+                      <div className="relative">
+                        <textarea
+                          name="requisitos"
+                          value={form.requisitos}
+                          onChange={(e) => updateField("requisitos", e.target.value)}
+                          placeholder="Requisitos"
+                          disabled={isCreating}
+                          className={`${textareaClass(
+                            Boolean(errors.requisitos),
+                            isCreating,
+                          )} ${form.requisitos.trim() && !isCreating ? "pr-12" : ""}`}
+                        />
+
+                        {form.requisitos.trim() && !isCreating && (
+                          <button
+                            type="button"
+                            onClick={() => clearField("requisitos")}
+                            className="absolute right-3 top-3 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                            title="Limpiar requisitos"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {errorText("requisitos")}
+                    </>
+                  ) : (
+                    <div className="w-full min-h-[88px] rounded-xl px-4 py-3 bg-gray-100 text-left whitespace-pre-line border border-gray-200 text-sm text-gray-700">
+                      {String(form.requisitos ?? "")
+                        .split(",")
+                        .map((req) => req.trim())
+                        .filter(Boolean)
+                        .join("\n")}
                     </div>
-                  </div>
-
-                  <div className="text-gray-400 flex items-center justify-left">
-                    -
-                  </div>
-
-                  <div className="pr-2">
-                    {name === "requisitos" ? (
-                      isCreateMode ? (
+                  )
+                ) : name === "creditos" ? (
+                  <div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {isCreateMode ? (
                         <>
-                          <textarea
-                            name="requisitos"
-                            value={form.requisitos}
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            name="creditosTeoria"
+                            value={form.creditosTeoria}
                             onChange={(e) =>
-                              updateField("requisitos", e.target.value)
+                              updateField("creditosTeoria", e.target.value)
                             }
-                            placeholder="Requisitos"
+                            placeholder="Teoría"
                             disabled={isCreating}
-                            className={`w-full min-h-[44px] rounded-md px-3 py-2 border bg-white ${
-                              errors.requisitos
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                            className={inputClass(
+                              Boolean(errors.creditosTeoria),
+                              isCreating,
+                            )}
                           />
 
-                          {errors.requisitos && (
-                            <div className="text-red-600 text-sm mt-1">
-                              {errors.requisitos}
-                            </div>
-                          )}
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            name="creditosPractica"
+                            value={form.creditosPractica}
+                            onChange={(e) =>
+                              updateField("creditosPractica", e.target.value)
+                            }
+                            placeholder="Práctica"
+                            disabled={isCreating}
+                            className={inputClass(
+                              Boolean(errors.creditosPractica),
+                              isCreating,
+                            )}
+                          />
+
+                          <input
+                            name="creditosTotal"
+                            value={form.creditosTotal}
+                            readOnly
+                            tabIndex={-1}
+                            className="w-full h-11 rounded-xl px-4 border border-gray-200 bg-gray-100 text-sm text-gray-700 text-center font-semibold cursor-not-allowed outline-none"
+                          />
                         </>
                       ) : (
-                        <div className="w-full min-h-[44px] rounded-md px-3 py-2 bg-gray-100 text-left whitespace-pre-line border border-gray-300">
-                          {String(form.requisitos ?? "")
-                            .split(",")
-                            .map((req) => req.trim())
-                            .filter(Boolean)
-                            .join("\n")}
-                        </div>
-                      )
-                    ) : name === "creditos" ? (
-                      <div>
-                        <div className="flex gap-2">
-                          {isCreateMode ? (
-                            <>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                name="creditosTeoria"
-                                value={form.creditosTeoria}
-                                onChange={(e) =>
-                                  updateField("creditosTeoria", e.target.value)
-                                }
-                                placeholder="Teoría"
-                                disabled={isCreating}
-                                className={`flex-1 rounded-md px-3 py-2 border bg-white text-center ${
-                                  errors.creditosTeoria
-                                    ? "border-red-500"
-                                    : "border-gray-300"
-                                }`}
-                              />
+                        <>
+                          <div className={readonlyBoxClass}>
+                            Teoría (
+                            {String(form.creditosTeoria || "0").padStart(
+                              2,
+                              "0",
+                            )}
+                            )
+                          </div>
 
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                name="creditosPractica"
-                                value={form.creditosPractica}
-                                onChange={(e) =>
-                                  updateField(
-                                    "creditosPractica",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Práctica"
-                                disabled={isCreating}
-                                className={`flex-1 rounded-md px-3 py-2 border bg-white text-center ${
-                                  errors.creditosPractica
-                                    ? "border-red-500"
-                                    : "border-gray-300"
-                                }`}
-                              />
+                          <div className={readonlyBoxClass}>
+                            Práctica (
+                            {String(form.creditosPractica || "0").padStart(
+                              2,
+                              "0",
+                            )}
+                            )
+                          </div>
 
-                              <input
-                                name="creditosTotal"
-                                value={form.creditosTotal}
-                                disabled
-                                className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Teoría (
-                                {String(form.creditosTeoria || "0").padStart(
-                                  2,
-                                  "0",
-                                )}
-                                )
-                              </div>
+                          <div className={readonlyBoxClass}>
+                            Total créditos (
+                            {String(form.creditosTotal || "0").padStart(
+                              2,
+                              "0",
+                            )}
+                            )
+                          </div>
+                        </>
+                      )}
+                    </div>
 
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Práctica (
-                                {String(form.creditosPractica || "0").padStart(
-                                  2,
-                                  "0",
-                                )}
-                                )
-                              </div>
-
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Total créditos (
-                                {String(form.creditosTotal || "0").padStart(
-                                  2,
-                                  "0",
-                                )}
-                                )
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {(errors.creditosTeoria ||
+                    {(errors.creditosTeoria ||
+                      errors.creditosPractica ||
+                      errors.creditosTotal) && (
+                      <div className="text-red-600 text-xs font-medium mt-1">
+                        {errors.creditosTeoria ||
                           errors.creditosPractica ||
-                          errors.creditosTotal) && (
-                          <div className="text-red-600 text-sm mt-1">
-                            {errors.creditosTeoria ||
-                              errors.creditosPractica ||
-                              errors.creditosTotal}
-                          </div>
-                        )}
+                          errors.creditosTotal}
                       </div>
-                    ) : name === "horas" ? (
-                      <div>
-                        <div className="flex gap-2">
-                          {isCreateMode ? (
-                            <>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                name="horasTeoria"
-                                value={form.horasTeoria}
-                                onChange={(e) =>
-                                  updateField("horasTeoria", e.target.value)
-                                }
-                                placeholder="Teoría"
-                                disabled={isCreating}
-                                className={`flex-1 rounded-md px-3 py-2 border bg-white text-center ${
-                                  errors.horasTeoria
-                                    ? "border-red-500"
-                                    : "border-gray-300"
-                                }`}
-                              />
-
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                name="horasPractica"
-                                value={form.horasPractica}
-                                onChange={(e) =>
-                                  updateField("horasPractica", e.target.value)
-                                }
-                                placeholder="Práctica"
-                                disabled={isCreating}
-                                className={`flex-1 rounded-md px-3 py-2 border bg-white text-center ${
-                                  errors.horasPractica
-                                    ? "border-red-500"
-                                    : "border-gray-300"
-                                }`}
-                              />
-
-                              <input
-                                name="horasTotal"
-                                value={totalHours}
-                                disabled
-                                className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Teoría (
-                                {String(form.horasTeoria || "0").padStart(
-                                  2,
-                                  "0",
-                                )}
-                                )
-                              </div>
-
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Práctica (
-                                {String(form.horasPractica || "0").padStart(
-                                  2,
-                                  "0",
-                                )}
-                                )
-                              </div>
-
-                              <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                                Total horas (
-                                {String(totalHours || 0).padStart(2, "0")})
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {(errors.horasTeoria || errors.horasPractica) && (
-                          <div className="text-red-600 text-sm mt-1">
-                            {errors.horasTeoria || errors.horasPractica}
-                          </div>
-                        )}
-                      </div>
-                    ) : name === "docentes" ? (
-                      isCreateMode ? (
-                        <div className="relative">
+                    )}
+                  </div>
+                ) : name === "horas" ? (
+                  <div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {isCreateMode ? (
+                        <>
                           <input
-                            name="docentes"
-                            value={docenteSearch}
-                            onChange={(e) => {
-                              setDocenteSearch(e.target.value);
+                            type="number"
+                            min="0"
+                            step="1"
+                            name="horasTeoria"
+                            value={form.horasTeoria}
+                            onChange={(e) =>
+                              updateField("horasTeoria", e.target.value)
+                            }
+                            placeholder="Teoría"
+                            disabled={isCreating}
+                            className={inputClass(
+                              Boolean(errors.horasTeoria),
+                              isCreating,
+                            )}
+                          />
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            name="horasPractica"
+                            value={form.horasPractica}
+                            onChange={(e) =>
+                              updateField("horasPractica", e.target.value)
+                            }
+                            placeholder="Práctica"
+                            disabled={isCreating}
+                            className={inputClass(
+                              Boolean(errors.horasPractica),
+                              isCreating,
+                            )}
+                          />
+
+                          <input
+                            name="horasTotal"
+                            value={totalHours}
+                            readOnly
+                            tabIndex={-1}
+                            className="w-full h-11 rounded-xl px-4 border border-gray-200 bg-gray-100 text-sm text-gray-700 text-center font-semibold cursor-not-allowed outline-none"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <div className={readonlyBoxClass}>
+                            Teoría (
+                            {String(form.horasTeoria || "0").padStart(2, "0")})
+                          </div>
+
+                          <div className={readonlyBoxClass}>
+                            Práctica (
+                            {String(form.horasPractica || "0").padStart(
+                              2,
+                              "0",
+                            )}
+                            )
+                          </div>
+
+                          <div className={readonlyBoxClass}>
+                            Total horas (
+                            {String(totalHours || 0).padStart(2, "0")})
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {(errors.horasTeoria || errors.horasPractica) && (
+                      <div className="text-red-600 text-xs font-medium mt-1">
+                        {errors.horasTeoria || errors.horasPractica}
+                      </div>
+                    )}
+                  </div>
+                ) : name === "docentes" ? (
+                  isCreateMode ? (
+                    <div className="relative z-50">
+                      <div className="relative">
+                        <input
+                          name="docentes"
+                          value={docenteSearch}
+                          onChange={(e) => {
+                            setDocenteSearch(e.target.value);
+                            setSelectedDocenteId("");
+                            updateField("docentes", "");
+                          }}
+                          placeholder="Buscar docente por nombre o correo..."
+                          disabled={isCreating}
+                          className={`${inputClass(
+                            Boolean(errors.docentes),
+                            isCreating,
+                          )} ${docenteSearch.trim() ? "pr-10" : ""}`}
+                        />
+
+                        {docenteSearch.trim() && !isCreating && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDocenteSearch("");
                               setSelectedDocenteId("");
                               updateField("docentes", "");
                             }}
-                            placeholder="Buscar docente por nombre o correo..."
-                            disabled={isCreating}
-                            className={`w-full rounded-md px-3 py-2 border bg-white ${
-                              errors.docentes
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          />
-
-                          {docenteSearch.trim() && !form.docentes && (
-                            <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-md border border-gray-300 bg-white shadow-lg">
-                              {filteredDocentes.length > 0 ? (
-                                filteredDocentes.map((docente) => {
-                                 const nombre =
-                                    docente.nombre_docente ||
-                                    docente.nombreDocente ||
-                                    docente.correo ||
-                                    "";
-                                  const correo = docente.correo || "";
-
-                                  return (
-                                    <button
-                                      key={docente.id}
-                                      type="button"
-                                      onClick={() => {
-                                        const id = String(docente.id);
-
-                                        setSelectedDocenteId(id);
-                                        updateField("docentes", id);
-                                        setDocenteSearch(correo || nombre);
-                                      }}
-                                      className="w-full px-3 py-2 text-left hover:bg-blue-50"
-                                    >
-                                      <div className="font-medium text-gray-900">
-                                        {nombre}
-                                      </div>
-
-                                      {correo && (
-                                        <div className="text-xs text-gray-500">
-                                          {correo}
-                                        </div>
-                                      )}
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <div className="px-3 py-2 text-sm text-gray-500">
-                                  No se encontraron docentes.
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {errors.docentes && (
-                            <div className="text-red-600 text-sm mt-1">
-                              {errors.docentes}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-full rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-left">
-                          {getDocenteLabel(form.docentes)}
-                        </div>
-                      )
-                    ) : name === "tipoEstudios" ? (
-                      isCreateMode ? (
-                        <>
-                          <select
-                            name="tipoEstudios"
-                            value={form.tipoEstudios}
-                            onChange={(e) =>
-                              updateField("tipoEstudios", e.target.value)
-                            }
-                            disabled={isCreating}
-                            className={`w-full rounded-md px-3 py-2 border bg-white ${
-                              errors.tipoEstudios
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                            title="Limpiar docente"
                           >
-                            <option value="">Seleccione tipo de estudios</option>
-                            <option value="general">General</option>
-                            <option value="especifica">Específica</option>
-                            <option value="especialidad">Especialidad</option>
-                          </select>
+                            ×
+                          </button>
+                        )}
+                      </div>
 
-                          {errors.tipoEstudios && (
-                            <div className="text-red-600 text-sm mt-1">
-                              {errors.tipoEstudios}
+                      {docenteSearch.trim() && !form.docentes && (
+                        <div className="absolute left-0 right-0 top-full z-[9999] mt-2 max-h-72 overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-2xl">
+                          {filteredDocentes.length > 0 ? (
+                            filteredDocentes.map((docente) => {
+                              const nombre =
+                                docente.nombre_docente ||
+                                docente.nombreDocente ||
+                                docente.correo ||
+                                "";
+                              const correo = docente.correo || "";
+
+                              return (
+                                <button
+                                  key={docente.id}
+                                  type="button"
+                                  onClick={() => {
+                                    const id = String(docente.id);
+
+                                    setSelectedDocenteId(id);
+                                    updateField("docentes", id);
+                                    setDocenteSearch(correo || nombre);
+                                  }}
+                                  className="w-full px-4 py-3 text-left hover:bg-red-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                                >
+                                  <div className="font-semibold text-gray-900">
+                                    {nombre}
+                                  </div>
+
+                                  {correo && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {correo}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="px-4 py-4 text-sm text-gray-500 text-center">
+                              No se encontraron docentes.
                             </div>
                           )}
-                        </>
-                      ) : (
-                        <div className="flex gap-2">
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            General (
-                            {form.tipoEstudios?.toLowerCase() === "general"
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
-
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            Específica (
-                            {["especifica", "específica"].includes(
-                              form.tipoEstudios?.toLowerCase(),
-                            )
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
-
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            Especialidad (
-                            {form.tipoEstudios?.toLowerCase() ===
-                            "especialidad"
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
                         </div>
-                      )
-                    ) : name === "modalidad" ? (
-                      isCreateMode ? (
-                        <>
-                          <select
-                            name="modalidad"
-                            value={form.modalidad}
-                            onChange={(e) =>
-                              updateField("modalidad", e.target.value)
-                            }
-                            disabled={isCreating}
-                            className={`w-full rounded-md px-3 py-2 border bg-white ${
-                              errors.modalidad
-                                ? "border-red-500"
-                                : "border-gray-300"
-                            }`}
-                          >
-                            <option value="">Seleccione modalidad</option>
-                            <option value="presencial">Presencial</option>
-                            <option value="semipresencial">
-                              Semipresencial
-                            </option>
-                            <option value="aDistancia">A distancia</option>
-                          </select>
+                      )}
 
-                          {errors.modalidad && (
-                            <div className="text-red-600 text-sm mt-1">
-                              {errors.modalidad}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="flex gap-2">
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            Presencial (
-                            {form.modalidad?.toLowerCase() === "presencial"
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
+                      {errorText("docentes")}
+                    </div>
+                  ) : (
+                    <div className={readonlyBoxClass}>
+                      {getDocenteLabel(form.docentes)}
+                    </div>
+                  )
+                ) : name === "tipoEstudios" ? (
+                  isCreateMode ? (
+                    <>
+                      <select
+                        name="tipoEstudios"
+                        value={form.tipoEstudios}
+                        onChange={(e) =>
+                          updateField("tipoEstudios", e.target.value)
+                        }
+                        disabled={isCreating}
+                        className={inputClass(
+                          Boolean(errors.tipoEstudios),
+                          isCreating,
+                        )}
+                      >
+                        <option value="">Seleccione tipo de estudios</option>
+                        <option value="general">General</option>
+                        <option value="especifica">Específica</option>
+                        <option value="especialidad">Especialidad</option>
+                      </select>
 
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            Semipresencial (
-                            {form.modalidad?.toLowerCase() ===
-                            "semipresencial"
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
+                      {errorText("tipoEstudios")}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className={readonlyBoxClass}>
+                        General (
+                        {form.tipoEstudios?.toLowerCase() === "general"
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
 
-                          <div className="flex-1 rounded-md px-3 py-2 bg-gray-100 border border-gray-300 text-center">
-                            A distancia (
-                            {form.modalidad === "aDistancia" ||
-                            form.modalidad?.toLowerCase() === "a distancia"
-                              ? "X"
-                              : " "}
-                            )
-                          </div>
-                        </div>
-                      )
-                    ) : (
-                      renderInput(name)
-                    )}
-                  </div>
-                </div>
+                      <div className={readonlyBoxClass}>
+                        Específica (
+                        {["especifica", "específica"].includes(
+                          form.tipoEstudios?.toLowerCase(),
+                        )
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
+
+                      <div className={readonlyBoxClass}>
+                        Especialidad (
+                        {form.tipoEstudios?.toLowerCase() === "especialidad"
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
+                    </div>
+                  )
+                ) : name === "modalidad" ? (
+                  isCreateMode ? (
+                    <>
+                      <select
+                        name="modalidad"
+                        value={form.modalidad}
+                        onChange={(e) =>
+                          updateField("modalidad", e.target.value)
+                        }
+                        disabled={isCreating}
+                        className={inputClass(
+                          Boolean(errors.modalidad),
+                          isCreating,
+                        )}
+                      >
+                        <option value="">Seleccione modalidad</option>
+                        <option value="presencial">Presencial</option>
+                        <option value="semipresencial">Semipresencial</option>
+                        <option value="aDistancia">A distancia</option>
+                      </select>
+
+                      {errorText("modalidad")}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className={readonlyBoxClass}>
+                        Presencial (
+                        {form.modalidad?.toLowerCase() === "presencial"
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
+
+                      <div className={readonlyBoxClass}>
+                        Semipresencial (
+                        {form.modalidad?.toLowerCase() === "semipresencial"
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
+
+                      <div className={readonlyBoxClass}>
+                        A distancia (
+                        {form.modalidad === "aDistancia" ||
+                        form.modalidad?.toLowerCase() === "a distancia"
+                          ? "X"
+                          : " "}
+                        )
+                      </div>
+                    </div>
+                  )
+                ) : name === "semestreAcademico" ? (
+                  <>
+                    <input
+                      name="semestreAcademico"
+                      value={form.semestreAcademico}
+                      readOnly
+                      tabIndex={-1}
+                      className="w-full h-11 rounded-xl px-4 border border-gray-200 bg-gray-100 text-sm text-gray-700 cursor-not-allowed outline-none"
+                    />
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      El semestre académico se genera automáticamente.
+                    </p>
+
+                    {errorText("semestreAcademico")}
+                  </>
+                ) : name === "tipoAsignatura" ? (
+                  isCreateMode ? (
+                    <>
+                      <select
+                        name="tipoAsignatura"
+                        value={form.tipoAsignatura}
+                        onChange={(e) =>
+                          updateField("tipoAsignatura", e.target.value)
+                        }
+                        disabled={isCreating}
+                        className={inputClass(
+                          Boolean(errors.tipoAsignatura),
+                          isCreating,
+                        )}
+                      >
+                        <option value="">Seleccione tipo de asignatura</option>
+                        <option value="Obligatoria">Obligatoria</option>
+                        <option value="Electiva">Electiva</option>
+                      </select>
+
+                      {errorText("tipoAsignatura")}
+                    </>
+                  ) : (
+                    <div className={readonlyBoxClass}>
+                      {form.tipoAsignatura || "Sin tipo de asignatura"}
+                    </div>
+                  )
+                ) : name === "ciclo" ? (
+                  isCreateMode ? (
+                    <>
+                      <select
+                        name="ciclo"
+                        value={form.ciclo}
+                        onChange={(e) => updateField("ciclo", e.target.value)}
+                        disabled={isCreating}
+                        className={inputClass(Boolean(errors.ciclo), isCreating)}
+                      >
+                        <option value="">Seleccione ciclo</option>
+                        <option value="I">I</option>
+                        <option value="II">II</option>
+                        <option value="III">III</option>
+                        <option value="IV">IV</option>
+                        <option value="V">V</option>
+                        <option value="VI">VI</option>
+                        <option value="VII">VII</option>
+                        <option value="VIII">VIII</option>
+                        <option value="IX">IX</option>
+                        <option value="X">X</option>
+                      </select>
+
+                      {errorText("ciclo")}
+                    </>
+                  ) : (
+                    <div className={readonlyBoxClass}>
+                      {form.ciclo || "Sin ciclo"}
+                    </div>
+                  )
+                ) : (
+                  renderInput(name)
+                )}
               </div>
             ))}
           </div>

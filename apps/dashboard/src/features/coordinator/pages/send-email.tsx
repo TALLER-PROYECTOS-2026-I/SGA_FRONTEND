@@ -41,6 +41,35 @@ type AuditEventPayload = {
   newValues?: unknown;
 };
 
+function buildManualNotificationMessage({
+  teacherName,
+  courseName,
+  courseCode,
+}: {
+  teacherName?: string;
+  courseName?: string;
+  courseCode?: string;
+}) {
+  const safeTeacherName = teacherName?.trim() || "Docente responsable";
+  const safeCourseName = courseName?.trim() || "Asignatura seleccionada";
+  const safeCourseCode = courseCode?.trim() || "No informado";
+
+  return `Estimado(a) ${safeTeacherName},
+
+Se le informa que el sílabo correspondiente a la asignatura indicada presenta observaciones pendientes de atención.
+
+Curso/Sílabo: ${safeCourseName}
+Código: ${safeCourseCode}
+
+Acción esperada:
+Ingrese al Sistema de Gestión Académica, revise las observaciones correspondientes y realice las actualizaciones necesarias en el sílabo asignado.
+
+Atentamente,
+Comité Curricular EPICS`;
+}
+
+const DEFAULT_MANUAL_MESSAGE = buildManualNotificationMessage({});
+
 function formatFileSize(size: number) {
   return `${Math.round(size / 1024)} KB`;
 }
@@ -113,7 +142,6 @@ export default function SendEmail() {
   const accessLabelParam = searchParams.get("accessLabel") || "";
   const accessTypeParam = searchParams.get("accessType") || "";
   const enabledSectionsParam = searchParams.get("enabledSections") || "";
-
   const docenteIdParam = searchParams.get("docenteId") || "";
   const silaboIdParam = searchParams.get("silaboId") || "";
 
@@ -139,8 +167,8 @@ export default function SendEmail() {
   const [courseSearch, setCourseSearch] = useState("");
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
 
-  const [message, setMessage] = useState("");
-  const [charCount, setCharCount] = useState(0);
+  const [message, setMessage] = useState(DEFAULT_MANUAL_MESSAGE);
+  const [charCount, setCharCount] = useState(DEFAULT_MANUAL_MESSAGE.length);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sendResult, setSendResult] = useState<SendResult>("idle");
   const [resultMessage, setResultMessage] = useState("");
@@ -285,6 +313,26 @@ export default function SendEmail() {
       silaboId,
   );
 
+  useEffect(() => {
+    if (fromPermissions) return;
+
+    const nextMessage = buildManualNotificationMessage({
+      teacherName: selectedTeacher?.name || teacherNameParam,
+      courseName: selectedCourse?.name || courseNameParam,
+      courseCode: selectedCourse?.code || courseCodeParam,
+    });
+
+    setMessage(nextMessage);
+    setCharCount(nextMessage.length);
+  }, [
+    fromPermissions,
+    selectedTeacher,
+    selectedCourse,
+    teacherNameParam,
+    courseNameParam,
+    courseCodeParam,
+  ]);
+
   const permissionMessage = useMemo(() => {
     const safeCourseName = courseName || "Sílabo asignado";
     const safeCourseCode = courseCode || "N/A";
@@ -312,7 +360,7 @@ Acción esperada:
 Ingrese al Sistema de Gestión Académica y revise el sílabo asignado según el alcance de edición autorizado.
 
 Atentamente,
-Coordinación Académica`;
+Comité Curricular EPICS`;
   }, [
     recipientName,
     courseName,
@@ -364,7 +412,7 @@ Coordinación Académica`;
 
         <p style="margin: 0;">
           Atentamente,<br/>
-          Coordinación Académica
+          Comité Curricular EPICS
         </p>
       </div>
     `;
@@ -580,8 +628,10 @@ Coordinación Académica`;
         setTeacherSearch("");
         setSelectedCourse(null);
         setCourseSearch("");
-        setMessage("");
-        setCharCount(0);
+
+        const resetMessage = buildManualNotificationMessage({});
+        setMessage(resetMessage);
+        setCharCount(resetMessage.length);
       }
 
       setAttachments([]);
@@ -609,13 +659,18 @@ Coordinación Académica`;
 
   if (sessionLoading) {
     return (
-      <div className="p-6 text-center text-gray-600">Cargando sesión...</div>
+      <div className="min-h-[calc(100vh-72px)] bg-gray-50 flex items-center justify-center">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-md px-8 py-6 flex items-center gap-3 text-gray-600">
+          <Loader2 className="animate-spin text-red-600" size={22} />
+          Cargando sesión...
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
-      <div className="mx-auto max-w-6xl">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-7">
           <h1 className="text-3xl font-bold text-gray-900">
             {fromPermissions
@@ -623,17 +678,17 @@ Coordinación Académica`;
               : "Enviar Correo"}
           </h1>
 
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mt-1">
             {fromPermissions
               ? "Notifica al docente que su alcance de edición fue configurado."
               : "Envía notificaciones académicas a docentes con archivos adjuntos."}
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
-          <div className="border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white px-8 py-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 text-white shadow-md">
+              <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
                 <Mail size={30} />
               </div>
 
@@ -644,7 +699,7 @@ Coordinación Académica`;
                     : "Datos del Correo"}
                 </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mt-1">
                   {fromPermissions
                     ? "Revisa el contenido generado y envía la notificación al docente."
                     : "Selecciona el destinatario, curso y escribe el mensaje."}
@@ -654,9 +709,9 @@ Coordinación Académica`;
           </div>
 
           <div className="p-8">
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               <div>
-                <label className="mb-2 block text-sm font-bold text-gray-900">
+                <label className="block text-sm font-bold text-gray-900 mb-2">
                   1. Destinatario
                 </label>
 
@@ -671,8 +726,8 @@ Coordinación Académica`;
                       type="text"
                       value={teacherSearch}
                       disabled={fromPermissions}
-                      onChange={(event) => {
-                        setTeacherSearch(event.target.value);
+                      onChange={(e) => {
+                        setTeacherSearch(e.target.value);
                         setSelectedTeacher(null);
                         setShowTeacherDropdown(true);
                       }}
@@ -681,7 +736,7 @@ Coordinación Académica`;
                           setShowTeacherDropdown(true);
                         }
                       }}
-                      className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-12 pr-12 text-sm text-gray-700 transition-all placeholder:text-gray-400 focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      className="w-full h-12 pl-12 pr-12 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100 transition-all"
                       placeholder="Buscar docente por nombre o correo..."
                     />
 
@@ -689,7 +744,7 @@ Coordinación Académica`;
                       <button
                         type="button"
                         onClick={handleClearTeacher}
-                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <X size={18} />
                       </button>
@@ -700,18 +755,18 @@ Coordinación Académica`;
                     teacherSearch &&
                     filteredTeachers.length > 0 &&
                     !fromPermissions && (
-                      <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-xl">
+                      <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
                         {filteredTeachers.map((teacher) => (
                           <button
                             type="button"
                             key={teacher.id}
                             onClick={() => handleTeacherSelect(teacher)}
-                            className="w-full border-b border-gray-100 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-red-50"
+                            className="w-full px-4 py-4 text-left hover:bg-red-50 border-b border-gray-100 last:border-b-0 transition-colors"
                           >
                             <div className="font-semibold text-gray-900">
                               {teacher.name}
                             </div>
-                            <div className="mt-1 text-sm text-gray-500">
+                            <div className="text-sm text-gray-500 mt-1">
                               {teacher.email}
                             </div>
                           </button>
@@ -729,7 +784,7 @@ Coordinación Académica`;
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-xl text-white ${
+                          className={`w-10 h-10 rounded-xl text-white flex items-center justify-center ${
                             isInstitutionalEmail(recipientEmail)
                               ? "bg-blue-600"
                               : "bg-red-600"
@@ -772,7 +827,7 @@ Coordinación Académica`;
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-bold text-gray-900">
+                <label className="block text-sm font-bold text-gray-900 mb-2">
                   2. Curso
                 </label>
 
@@ -787,8 +842,8 @@ Coordinación Académica`;
                       type="text"
                       value={courseSearch}
                       disabled={fromPermissions || isLoadingCourses}
-                      onChange={(event) => {
-                        setCourseSearch(event.target.value);
+                      onChange={(e) => {
+                        setCourseSearch(e.target.value);
                         setSelectedCourse(null);
                         setShowCourseDropdown(true);
                       }}
@@ -797,7 +852,7 @@ Coordinación Académica`;
                           setShowCourseDropdown(true);
                         }
                       }}
-                      className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-12 pr-12 text-sm text-gray-700 transition-all placeholder:text-gray-400 focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      className="w-full h-12 pl-12 pr-12 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:cursor-not-allowed disabled:bg-gray-100 transition-all"
                       placeholder={
                         isLoadingCourses
                           ? "Cargando cursos..."
@@ -809,7 +864,7 @@ Coordinación Académica`;
                       <button
                         type="button"
                         onClick={handleClearCourse}
-                        className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <X size={18} />
                       </button>
@@ -820,18 +875,19 @@ Coordinación Académica`;
                     courseSearch &&
                     filteredCourses.length > 0 &&
                     !fromPermissions && (
-                      <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-xl">
+                      <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
                         {filteredCourses.map((course: Course) => (
                           <button
                             type="button"
                             key={course.id}
                             onClick={() => handleCourseSelect(course)}
-                            className="w-full border-b border-gray-100 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-red-50"
+                            className="w-full px-4 py-4 text-left hover:bg-red-50 border-b border-gray-100 last:border-b-0 transition-colors"
                           >
                             <div className="font-semibold text-gray-900">
                               {course.name}
                             </div>
-                            <div className="mt-1 text-sm text-gray-500">
+
+                            <div className="text-sm text-gray-500 mt-1">
                               Código: {course.code}
                             </div>
                           </button>
@@ -839,10 +895,20 @@ Coordinación Académica`;
                       </div>
                     )}
 
+                  {showCourseDropdown &&
+                    courseSearch &&
+                    filteredCourses.length === 0 &&
+                    !isLoadingCourses &&
+                    !fromPermissions && (
+                      <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl p-5 text-center text-sm text-gray-500">
+                        No se encontraron cursos
+                      </div>
+                    )}
+
                   {hasCourseSelected && (
-                    <div className="mt-3 rounded-xl border border-green-100 bg-green-50 p-4">
+                    <div className="mt-3 rounded-xl bg-green-50 border border-green-100 p-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white">
+                        <div className="w-10 h-10 rounded-xl bg-green-600 text-white flex items-center justify-center">
                           <BookOpen size={20} />
                         </div>
 
@@ -850,9 +916,11 @@ Coordinación Académica`;
                           <div className="font-bold text-green-950">
                             {courseName || "Curso seleccionado"}
                           </div>
+
                           <div className="text-sm text-green-700">
                             Código: {courseCode || "No informado"}
                           </div>
+
                           {fromPermissions && (
                             <div className="text-xs text-green-700">
                               Tipo de acceso: {accessLabel}
@@ -873,11 +941,14 @@ Coordinación Académica`;
                 </h3>
 
                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800">
-                  <p className="font-semibold">Tipo de acceso: {accessLabel}</p>
+                  <p className="font-semibold">
+                    Tipo de acceso: {accessLabel}
+                  </p>
 
                   {enabledSections.length > 0 ? (
                     <div className="mt-2">
                       <p className="font-semibold">Secciones habilitadas:</p>
+
                       <ul className="mt-1 list-inside list-disc space-y-1">
                         {enabledSections.map((section) => (
                           <li key={section}>{section}</li>
@@ -886,7 +957,9 @@ Coordinación Académica`;
                     </div>
                   ) : (
                     <p className="mt-2">
-                      No se habilitaron secciones para edición.
+                      {accessTypeParam === "READ_ONLY"
+                        ? "No se habilitaron secciones para edición."
+                        : "Todas las secciones configurables del sílabo fueron habilitadas."}
                     </p>
                   )}
                 </div>
@@ -899,7 +972,7 @@ Coordinación Académica`;
 
             {!fromPermissions && (
               <div className="mt-7">
-                <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-bold text-gray-900">
                     3. Mensaje al Docente
                   </label>
@@ -916,15 +989,15 @@ Coordinación Académica`;
                 <textarea
                   value={message}
                   onChange={handleMessageChange}
-                  placeholder="Escribe el mensaje que será enviado al docente..."
+                  placeholder={DEFAULT_MANUAL_MESSAGE}
                   rows={8}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 transition-all placeholder:text-gray-400 focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 resize-none bg-gray-50 text-sm text-gray-700 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 />
               </div>
             )}
 
             <div className="mt-7">
-              <label className="mb-2 block text-sm font-bold text-gray-900">
+              <label className="block text-sm font-bold text-gray-900 mb-2">
                 4. Archivos Adjuntos{" "}
                 <span className="font-medium text-gray-400">(opcional)</span>
               </label>
@@ -940,13 +1013,13 @@ Coordinación Académica`;
 
               <label
                 htmlFor="file-upload"
-                className={`flex cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-4 py-6 transition-colors ${
+                className={`flex items-center justify-center gap-3 px-4 py-6 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${
                   attachments.length >= MAX_FILES
-                    ? "cursor-not-allowed border-gray-200 bg-gray-100"
+                    ? "border-gray-200 bg-gray-100 cursor-not-allowed"
                     : "border-gray-200 bg-gray-50 hover:border-red-400 hover:bg-red-50"
                 }`}
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-100 bg-white shadow-sm">
+                <div className="w-11 h-11 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
                   <Upload size={22} className="text-gray-500" />
                 </div>
 
@@ -956,28 +1029,30 @@ Coordinación Académica`;
                       ? `Máximo ${MAX_FILES} archivos`
                       : "Seleccionar archivos"}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">
+
+                  <p className="text-xs text-gray-500 mt-1">
                     Máximo 3MB por archivo
                   </p>
                 </div>
               </label>
 
               {attachments.length > 0 && (
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {attachments.map((file, index) => (
                     <div
                       key={`${file.name}-${index}`}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm"
+                      className="flex items-center justify-between gap-3 px-4 py-3 bg-white rounded-xl border border-gray-100 shadow-sm"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
                           <Paperclip size={18} />
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-gray-800">
+                          <p className="text-sm font-medium text-gray-800 truncate">
                             {file.name}
                           </p>
+
                           <p className="text-xs text-gray-500">
                             {formatFileSize(file.size)}
                           </p>
@@ -987,7 +1062,7 @@ Coordinación Académica`;
                       <button
                         type="button"
                         onClick={() => removeAttachment(index)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50"
+                        className="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <X size={18} />
                       </button>
@@ -1024,17 +1099,18 @@ Coordinación Académica`;
                         ? "Resultado del envío registrado"
                         : "Fallo en el envío"}
                     </p>
+
                     <p>{resultMessage}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-6">
+            <div className="mt-8 border-t border-gray-100 pt-6 flex items-center justify-between">
               <button
                 type="button"
                 onClick={handleGoBack}
-                className="flex h-11 items-center gap-2 rounded-xl bg-gray-900 px-6 font-semibold text-white shadow-sm transition-colors hover:bg-gray-800"
+                className="h-11 px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center gap-2 font-semibold shadow-sm"
               >
                 <ArrowLeft size={18} />
                 Volver
@@ -1044,7 +1120,7 @@ Coordinación Académica`;
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSending}
-                className="flex h-11 items-center gap-2 rounded-xl bg-red-600 px-8 font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
+                className="h-11 px-8 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2 font-semibold shadow-sm"
               >
                 {isSending ? (
                   <>

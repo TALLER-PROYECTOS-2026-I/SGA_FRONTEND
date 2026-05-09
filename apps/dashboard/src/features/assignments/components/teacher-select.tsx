@@ -28,10 +28,11 @@ export default function TeacherSelect({
   teachers,
 }: TeacherSelectProps) {
   return (
-    <div className="mb-6">
-      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-        Docente Responsable <span className="text-red-500">*</span>
+    <div>
+      <label className="block text-sm font-bold text-gray-900 mb-2">
+        1. Asignar Docente
       </label>
+
       <SearchableSelect
         value={teacherSearch}
         onChange={setTeacherSearch}
@@ -44,10 +45,10 @@ export default function TeacherSelect({
         placeholder="Buscar docente..."
         getItemKey={(teacher) => teacher.id}
         renderItem={(teacher) => (
-          <>
-            <div className="font-medium text-gray-800">{teacher.name}</div>
+          <div>
+            <div className="font-semibold text-gray-900">{teacher.name}</div>
             <div className="text-sm text-gray-500">{teacher.email}</div>
-          </>
+          </div>
         )}
         noResultsText="No se encontraron docentes"
       />

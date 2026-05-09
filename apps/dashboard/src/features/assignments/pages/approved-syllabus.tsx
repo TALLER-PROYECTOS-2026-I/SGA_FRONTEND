@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  ArrowLeft,
-  CheckCircle2,
-  Download,
-  FileText,
-  Printer,
   Search,
+  Download,
   X,
+  Printer,
+  FileCheck2,
+  Calendar,
+  Loader2,
   AlertTriangle,
+  CheckCircle2,
+  ArrowLeft,
+  FileText,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -31,7 +34,6 @@ function buildSelectedFromTracking(params: {
   syllabusId: number;
   courseCodeParam: string;
   courseNameParam: string;
-  teacherNameParam: string;
 }): ApprovedSyllabusType {
   return {
     id: params.syllabusId,
@@ -110,13 +112,7 @@ function buildFileName(syllabus?: ApprovedSyllabusType | null) {
   return `silabo-oficial-${cleanCode}.pdf`;
 }
 
-function SectionCheck({
-  ok,
-  label,
-}: {
-  ok: boolean;
-  label: string;
-}) {
+function SectionCheck({ ok, label }: { ok: boolean; label: string }) {
   return (
     <p className={ok ? "text-green-800" : "font-semibold text-red-700"}>
       {ok ? "✓" : "✕"} {label}
@@ -140,6 +136,7 @@ export default function ApprovedSyllabus() {
   const [selectedSyllabus, setSelectedSyllabus] =
     useState<ApprovedSyllabusType | null>(null);
 
+  const [approvalDate, setApprovalDate] = useState<string>("");
   const [warningMessage, setWarningMessage] = useState("");
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -160,6 +157,11 @@ export default function ApprovedSyllabus() {
   } = useApprovedSyllabi();
 
   useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    setApprovalDate(today);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -170,6 +172,7 @@ export default function ApprovedSyllabus() {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
@@ -194,7 +197,6 @@ export default function ApprovedSyllabus() {
       syllabusId,
       courseCodeParam,
       courseNameParam,
-      teacherNameParam,
     });
 
     setSelectedSyllabus(selectedFromTracking);
@@ -206,7 +208,6 @@ export default function ApprovedSyllabus() {
     syllabusIdParam,
     courseCodeParam,
     courseNameParam,
-    teacherNameParam,
     statusParam,
     toast,
   ]);
@@ -322,21 +323,27 @@ export default function ApprovedSyllabus() {
     }
   };
 
+  const ensureGeneratedPdfData = async () => {
+    if (generatedPdfData) return generatedPdfData;
+
+    const data = await loadCompleteSyllabus();
+    setGeneratedPdfData(data);
+    setIsPdfGenerated(true);
+
+    return data;
+  };
+
   const handlePreviewPDF = async () => {
-    if (!generatedPdfData) {
-      toast.error(
-        "PDF no generado",
-        "Primero presiona el botón Generar PDF Oficial.",
-      );
-      return;
-    }
+    if (!validateApprovedSyllabus()) return;
 
     setIsPreviewingPDF(true);
 
     try {
-      const blob = await pdf(
-        <SyllabusPDFDocument data={generatedPdfData} />,
-      ).toBlob();
+      toast.info("Generando impresión previa", "Abriendo PDF...");
+
+      const data = await ensureGeneratedPdfData();
+
+      const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
       const url = URL.createObjectURL(blob);
 
       window.open(url, "_blank");
@@ -354,20 +361,16 @@ export default function ApprovedSyllabus() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!generatedPdfData) {
-      toast.error(
-        "PDF no generado",
-        "Primero presiona el botón Generar PDF Oficial.",
-      );
-      return;
-    }
+    if (!validateApprovedSyllabus()) return;
 
     setIsDownloadingPDF(true);
 
     try {
-      const blob = await pdf(
-        <SyllabusPDFDocument data={generatedPdfData} />,
-      ).toBlob();
+      toast.info("Generando PDF", "Descargando sílabo oficial...");
+
+      const data = await ensureGeneratedPdfData();
+
+      const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -386,7 +389,7 @@ export default function ApprovedSyllabus() {
       console.error("Error al descargar PDF:", err);
       toast.error(
         "Error",
-        "Error al descargar el PDF. Por favor intenta nuevamente.",
+        "Error al generar el PDF. Por favor intenta nuevamente.",
       );
     } finally {
       setIsDownloadingPDF(false);
@@ -395,16 +398,19 @@ export default function ApprovedSyllabus() {
 
   if (isLoading && !syllabusIdParam) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-600">Cargando sílabos aprobados...</div>
+      <div className="min-h-[calc(100vh-72px)] bg-gray-50 flex items-center justify-center">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-md px-8 py-6 text-gray-600 flex items-center gap-3">
+          <Loader2 className="animate-spin text-red-600" size={22} />
+          Cargando sílabos aprobados...
+        </div>
       </div>
     );
   }
 
   if (isError && !syllabusIdParam) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-red-600">
+      <div className="min-h-[calc(100vh-72px)] bg-gray-50 flex items-center justify-center">
+        <div className="bg-white border border-red-100 rounded-2xl shadow-md px-8 py-6 text-red-600">
           Error al cargar sílabos: {error?.message}
         </div>
       </div>
@@ -412,250 +418,375 @@ export default function ApprovedSyllabus() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7f8] px-6 py-8">
-      <div className="mx-auto w-full max-w-4xl">
-        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-red-700" />
-            <h1 className="text-xl font-bold text-gray-900">
-              CA1: Seleccionar Sílabo Aprobado
-            </h1>
+    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Sílabos Aprobados
+          </h1>
+
+          <p className="text-sm text-gray-500 mt-1">
+            Busca, revisa, genera y descarga sílabos aprobados en formato PDF
+            oficial.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+                <FileCheck2 size={28} />
+              </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Consulta de Sílabos
+                </h2>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Selecciona un sílabo aprobado para generar su PDF oficial.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="mb-5">
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Sílabo aprobado *
-            </label>
+          <div className="p-8 space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-800 mb-2">
+                Buscar sílabo por código o asignatura
+              </label>
 
-            <div className="relative" ref={dropdownRef}>
-              <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3">
-                <input
-                  type="text"
-                  value={searchText}
-                  disabled={Boolean(syllabusIdParam)}
-                  onChange={(event) => {
-                    setSearchText(event.target.value);
-                    setSelectedSyllabus(null);
-                    setGeneratedPdfData(null);
-                    setIsPdfGenerated(false);
-                    setWarningMessage("");
-                    setShowDropdown(true);
-                  }}
-                  onFocus={() => {
-                    if (!syllabusIdParam) {
+              <div className="relative" ref={dropdownRef}>
+                <div className="flex items-center gap-3 h-13 border border-gray-200 rounded-xl px-4 bg-white shadow-sm focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent">
+                  <Search className="text-gray-400" size={20} />
+
+                  <input
+                    type="text"
+                    value={searchText}
+                    disabled={Boolean(syllabusIdParam)}
+                    onChange={(e) => {
+                      setSearchText(e.target.value);
+                      setSelectedSyllabus(null);
+                      setGeneratedPdfData(null);
+                      setIsPdfGenerated(false);
+                      setWarningMessage("");
                       setShowDropdown(true);
-                    }
-                  }}
-                  placeholder="Buscar por código o nombre de asignatura..."
-                  className="flex-1 bg-transparent text-sm text-gray-700 outline-none disabled:text-gray-700"
+                    }}
+                    onFocus={() => {
+                      if (!syllabusIdParam) {
+                        setShowDropdown(true);
+                      }
+                    }}
+                    placeholder="Buscar por código o nombre de asignatura..."
+                    className="flex-1 h-12 outline-none text-sm text-gray-700 placeholder:text-gray-400 disabled:text-gray-700"
+                  />
+
+                  {searchText && !syllabusIdParam && (
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <X className="text-gray-500" size={18} />
+                    </button>
+                  )}
+                </div>
+
+                {showDropdown && searchText && filteredSyllabi.length > 0 && (
+                  <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-80 overflow-y-auto">
+                    {filteredSyllabi.slice(0, 15).map((syllabus) => (
+                      <button
+                        type="button"
+                        key={syllabus.id}
+                        onClick={() => handleSyllabusSelect(syllabus)}
+                        className="w-full px-4 py-4 text-left hover:bg-red-50 transition-colors border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="font-bold text-gray-900">
+                              {syllabus.codigo}
+                            </div>
+
+                            <div className="text-sm text-gray-600 mt-1">
+                              {syllabus.asignatura}
+                            </div>
+                          </div>
+
+                          {syllabus.ciclo && (
+                            <span className="shrink-0 text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-3 py-1">
+                              Ciclo {syllabus.ciclo}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showDropdown && searchText && filteredSyllabi.length === 0 && (
+                  <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl p-5">
+                    <p className="text-gray-500 text-center text-sm">
+                      No se encontraron sílabos aprobados con ese criterio.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {selectedSyllabus && (
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-gray-900 mb-3">
+                      Sílabo seleccionado
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-gray-900">
+                          Código:
+                        </span>{" "}
+                        {selectedSyllabus.codigo}
+                      </p>
+
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-gray-900">
+                          Asignatura:
+                        </span>{" "}
+                        {selectedSyllabus.asignatura}
+                      </p>
+
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-gray-900">
+                          Periodo:
+                        </span>{" "}
+                        {generatedPdfData?.datosGenerales?.semestreAcademico ||
+                          "No informado"}
+                      </p>
+
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-gray-900">
+                          Docente:
+                        </span>{" "}
+                        {teacherNameParam ||
+                          generatedPdfData?.datosGenerales?.docentes ||
+                          "No asignado"}
+                      </p>
+
+                      {selectedSyllabus.ciclo && (
+                        <p className="text-gray-600">
+                          <span className="font-semibold text-gray-900">
+                            Ciclo:
+                          </span>{" "}
+                          {selectedSyllabus.ciclo}
+                        </p>
+                      )}
+
+                      {selectedSyllabus.escuela && (
+                        <p className="text-gray-600">
+                          <span className="font-semibold text-gray-900">
+                            Escuela:
+                          </span>{" "}
+                          {selectedSyllabus.escuela}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-green-700 bg-white border border-green-200">
+                    Aprobado
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-gray-800 mb-2">
+                Fecha de aprobación
+              </label>
+
+              <div className="relative">
+                <Calendar
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={20}
                 />
 
-                <Search className="text-gray-400" size={19} />
+                <input
+                  type="date"
+                  value={approvalDate}
+                  onChange={(e) => setApprovalDate(e.target.value)}
+                  className="w-full h-12 pl-12 pr-4 border border-gray-200 rounded-xl text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+              </div>
+            </div>
 
-                {searchText && !syllabusIdParam && (
+            {warningMessage && (
+              <div className="flex gap-3 rounded-2xl border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+
+                <div>
+                  <p className="font-semibold">Advertencia de información</p>
+                  <p className="text-sm">{warningMessage}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleGenerateOfficialPDF}
+                disabled={!selectedSyllabus || isGeneratingPDF}
+                className="h-12 px-8 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
+              >
+                {isGeneratingPDF ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    {isPdfGenerated
+                      ? "Regenerar PDF Oficial"
+                      : "Generar PDF Oficial"}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {!selectedSyllabus && (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FileCheck2 className="text-gray-400" size={30} />
+                </div>
+
+                <p className="text-sm text-gray-500">
+                  Busca y selecciona un sílabo aprobado para poder generar su
+                  PDF oficial.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+            {isPdfGenerated && generatedPdfData && (
+              <section className="mt-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <h2 className="text-xl font-bold text-gray-900">
+                    PDF generado correctamente
+                  </h2>
+                </div>
+
+                <div
+                  className={`rounded-2xl border p-5 ${
+                    warningMessage
+                      ? "border-yellow-300 bg-yellow-50"
+                      : "border-green-200 bg-green-50"
+                  }`}
+                >
+                  <p
+                    className={`mb-4 flex items-center gap-2 text-sm font-semibold ${
+                      warningMessage ? "text-yellow-800" : "text-green-800"
+                    }`}
+                  >
+                    {warningMessage ? (
+                      <AlertTriangle size={16} />
+                    ) : (
+                      <CheckCircle2 size={16} />
+                    )}
+                    El PDF oficial fue generado. Verificación de secciones:
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-x-10 gap-y-1 text-sm md:grid-cols-2">
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.datosGenerales)}
+                      label="I. Datos Generales"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.sumilla)}
+                      label="II. Sumilla"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.competenciasCurso?.length)}
+                      label="III. Competencias"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.unidadesDidacticas?.length)}
+                      label="IV. Programación de Contenidos"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.estrategiasMetodologicas?.length)}
+                      label="V. Estrategias Metodológicas"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.recursosDidacticos)}
+                      label="VI. Recursos Didácticos"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.evaluacionAprendizaje)}
+                      label="VII. Sistema de Evaluación"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.fuentes?.length)}
+                      label="VIII. Fuentes de Información"
+                    />
+
+                    <SectionCheck
+                      ok={Boolean(generatedPdfData.aportesResultadosPrograma?.length)}
+                      label="IX. Aportes y Contribuciones"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={handleClear}
-                    className="rounded-full p-1 transition hover:bg-gray-100"
+                    onClick={handleDownloadPDF}
+                    disabled={isDownloadingPDF}
+                    className="h-11 min-w-[190px] px-6 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
                   >
-                    <X className="text-gray-500" size={18} />
+                    {isDownloadingPDF ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Descargando...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        Descargar PDF
+                      </>
+                    )}
                   </button>
-                )}
-              </div>
 
-              {showDropdown && searchText && filteredSyllabi.length > 0 && (
-                <div className="absolute z-10 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg">
-                  {filteredSyllabi.slice(0, 15).map((syllabus) => (
-                    <button
-                      key={syllabus.id}
-                      type="button"
-                      onClick={() => handleSyllabusSelect(syllabus)}
-                      className="w-full border-b border-gray-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-red-50"
-                    >
-                      <div className="font-medium text-gray-900">
-                        {syllabus.codigo}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {syllabus.asignatura}
-                      </div>
-                      {syllabus.ciclo && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Ciclo: {syllabus.ciclo}
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={handlePreviewPDF}
+                    disabled={isPreviewingPDF}
+                    className="h-11 min-w-[160px] px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
+                  >
+                    {isPreviewingPDF ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="w-5 h-5" />
+                        Imprimir
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-
-              {showDropdown && searchText && filteredSyllabi.length === 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-300 bg-white p-4 shadow-lg">
-                  <p className="text-center text-gray-500">
-                    No se encontraron sílabos aprobados con ese criterio.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {selectedSyllabus && (
-            <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="mb-3 text-sm font-semibold text-green-800">
-                Sílabo seleccionado:
-              </p>
-
-              <div className="grid grid-cols-1 gap-2 text-sm text-green-900 md:grid-cols-2">
-                <p>
-                  <span className="font-semibold">Código:</span>{" "}
-                  {selectedSyllabus.codigo}
-                </p>
-
-                <p>
-                  <span className="font-semibold">Periodo:</span>{" "}
-                  {generatedPdfData?.datosGenerales?.semestreAcademico ||
-                    "No informado"}
-                </p>
-
-                <p className="md:col-span-2">
-                  <span className="font-semibold">Asignatura:</span>{" "}
-                  {selectedSyllabus.asignatura}
-                </p>
-
-                <p className="md:col-span-2">
-                  <span className="font-semibold">Docente:</span>{" "}
-                  {teacherNameParam ||
-                    generatedPdfData?.datosGenerales?.docentes ||
-                    "No asignado"}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={handleGenerateOfficialPDF}
-              disabled={!selectedSyllabus || isGeneratingPDF}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-7 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-gray-400"
-            >
-              <FileText size={18} />
-              {isGeneratingPDF
-                ? "Generando PDF..."
-                : "CA2: Generar PDF Oficial"}
-            </button>
-          </div>
-        </section>
-
-        {warningMessage && (
-          <section className="mt-5 flex gap-3 rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-semibold">Advertencia de información</p>
-              <p className="text-sm">{warningMessage}</p>
-            </div>
-          </section>
-        )}
-
-        {isPdfGenerated && generatedPdfData && (
-          <section className="mt-5 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <h2 className="text-xl font-bold text-gray-900">
-                CA3: PDF Generado Correctamente
-              </h2>
-            </div>
-
-            <div
-              className={`rounded-lg border p-4 ${
-                warningMessage
-                  ? "border-yellow-300 bg-yellow-50"
-                  : "border-green-200 bg-green-50"
-              }`}
-            >
-              <p
-                className={`mb-2 flex items-center gap-2 text-sm font-semibold ${
-                  warningMessage ? "text-yellow-800" : "text-green-800"
-                }`}
-              >
-                {warningMessage ? (
-                  <AlertTriangle size={16} />
-                ) : (
-                  <CheckCircle2 size={16} />
-                )}
-                El PDF oficial fue generado. Verificación de secciones:
-              </p>
-
-              <div className="grid grid-cols-1 gap-1 text-sm md:grid-cols-2">
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.datosGenerales)}
-                  label="I. Datos Generales"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.sumilla)}
-                  label="II. Sumilla"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.competenciasCurso?.length)}
-                  label="III. Competencias"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.unidadesDidacticas?.length)}
-                  label="IV. Programación de Contenidos"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.estrategiasMetodologicas?.length)}
-                  label="V. Estrategias Metodológicas"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.recursosDidacticos)}
-                  label="VI. Recursos Didácticos"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.evaluacionAprendizaje)}
-                  label="VII. Sistema de Evaluación"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.fuentes?.length)}
-                  label="VIII. Fuentes de Información"
-                />
-
-                <SectionCheck
-                  ok={Boolean(generatedPdfData.aportesResultadosPrograma?.length)}
-                  label="IX. Aportes y Contribuciones"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-center gap-4">
-              <button
-                type="button"
-                onClick={handlePreviewPDF}
-                disabled={isPreviewingPDF}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-              >
-                <Printer size={18} />
-                {isPreviewingPDF ? "Abriendo..." : "Vista Previa"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDownloadPDF}
-                disabled={isDownloadingPDF}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-6 py-3 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-gray-400"
-              >
-                <Download size={18} />
-                {isDownloadingPDF ? "Descargando..." : "Descargar PDF"}
-              </button>
-            </div>
-          </section>
-        )}
+              </section>
+            )}
 
         <div className="mt-6 flex items-center justify-between gap-4">
           <button
