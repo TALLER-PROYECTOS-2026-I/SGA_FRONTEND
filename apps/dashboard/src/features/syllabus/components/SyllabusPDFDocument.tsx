@@ -587,7 +587,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               label="Tipo de estudios"
               items={[
                 `General (${checked(datos.tipoEstudios, "general")})`,
-                `Específica (${checked(datos.tipoEstudios, "especifica") || checked(datos.tipoEstudios, "específica")})`,
+                `Específica (${checked(datos.tipoEstudios, "específica")})`,
                 `Especialidad (${checked(datos.tipoEstudios, "especialidad")})`,
               ]}
             />
