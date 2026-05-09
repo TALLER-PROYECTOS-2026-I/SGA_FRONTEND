@@ -237,13 +237,12 @@ function extractSumilla(value: unknown): string {
 
 function getDatosGenerales(complete: unknown): Record<string, unknown> {
   const completeObject = asObject(complete);
+  const datosGeneralesRaw =
+    completeObject.datosGenerales ??
+    completeObject.datos_generales ??
+    completeObject.generalData;
 
-  return (
-    asObject(completeObject.datosGenerales) ||
-    asObject(completeObject.datos_generales) ||
-    asObject(completeObject.generalData) ||
-    {}
-  );
+  return asObject(datosGeneralesRaw);
 }
 
 function buildPDFItem(
