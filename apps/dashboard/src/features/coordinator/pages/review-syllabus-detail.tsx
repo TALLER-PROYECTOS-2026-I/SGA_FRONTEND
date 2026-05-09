@@ -1,6 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardCheck,
+  CheckCircle,
+  XCircle,
+  MessageCircle,
+  FileText,
+  Loader2,
+  AlertTriangle,
+  Send,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,16 +19,13 @@ import {
   SelectValue,
 } from "../../../common/components/ui/select";
 
-// Import contexts
 import { SyllabusProvider } from "../../syllabus/contexts/syllabus-context";
 import { StepsContext } from "../../syllabus/contexts/steps-context-provider";
 import { ReviewModeProvider } from "../contexts/review-mode-context";
 
-// Import hooks
 import { useSyllabusSections } from "../hooks/syllabus-sections-query";
 import { useSyllabusSectionData } from "../hooks/syllabus-section-data-query";
 
-// Import step components
 import FirstStep from "../../syllabus/components/first-step";
 import SecondStep from "../../syllabus/components/second-step";
 import ThirdStep from "../../syllabus/components/third-step";
@@ -32,14 +39,15 @@ export default function ReviewSyllabusDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const [selectedSection, setSelectedSection] = useState("1");
   const [reviewData, setReviewData] = useState<
     Record<string, { status: "approved" | "rejected" | null; comment: string }>
   >({});
 
-  // Cargar datos de revisión guardados al iniciar
   useEffect(() => {
     const savedData = sessionStorage.getItem(`reviewData_${id}`);
+
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
@@ -50,14 +58,13 @@ export default function ReviewSyllabusDetail() {
     }
   }, [id]);
 
-  // Guardar datos de revisión automáticamente cuando cambien
   useEffect(() => {
     if (Object.keys(reviewData).length > 0) {
       try {
         sessionStorage.setItem(`reviewData_${id}`, JSON.stringify(reviewData));
       } catch (error) {
         console.error("Error al guardar datos de revisión:", error);
-        // Notificar al usuario si el storage está lleno
+
         if (
           error instanceof DOMException &&
           error.name === "QuotaExceededError"
@@ -70,7 +77,6 @@ export default function ReviewSyllabusDetail() {
     }
   }, [reviewData, id]);
 
-  // Obtener parámetros de la URL
   const courseName = searchParams.get("courseName") || "Curso sin nombre";
   const courseCode = searchParams.get("courseCode") || "Código no disponible";
   const teacherName =
@@ -78,7 +84,6 @@ export default function ReviewSyllabusDetail() {
   const syllabusId = searchParams.get("syllabusId");
   const docenteIdParam = searchParams.get("docenteId");
 
-  // Obtener secciones disponibles del backend
   const {
     data: syllabusSections = [],
     isLoading: sectionsLoading,
@@ -88,45 +93,38 @@ export default function ReviewSyllabusDetail() {
     docenteIdParam ? parseInt(docenteIdParam) : null,
   );
 
-  // Obtener los datos de la sección seleccionada
+  const shouldLoadSectionData = ["1", "2", "3", "4"].includes(selectedSection);
+
   const {
     data: sectionData,
     isLoading: sectionDataLoading,
     isError: sectionDataError,
   } = useSyllabusSectionData(
-    syllabusId ? parseInt(syllabusId) : null,
-    selectedSection,
+    syllabusId && shouldLoadSectionData ? parseInt(syllabusId) : null,
+    shouldLoadSectionData ? selectedSection : null,
   );
 
-  // Información de secciones disponible para UI
-
-  // Actualizar selectedSection cuando se carguen las secciones
   useEffect(() => {
     if (
       Array.isArray(syllabusSections) &&
       syllabusSections.length > 0 &&
       !selectedSection
     ) {
-      // Seleccionar la primera sección disponible
       setSelectedSection(syllabusSections[0].seccion.toString());
     }
   }, [syllabusSections, selectedSection]);
 
-  // Create a mock stepper context value
-  // Mock de stepperValue para simular el contexto
-  // Ajustamos el currentStep para que coincida con los step={} de los componentes
   const stepperValue = useMemo(() => {
-    // Mapeo de sección ID a step number del componente
     const sectionToStepMap: Record<string, number> = {
       "1": 1,
       "2": 2,
       "3": 3,
       "4": 4,
       "5": 5,
-      "6": 5, // FifthStep (step=5) se usa para ambas secciones 5 y 6
-      "7": 6, // SixthStep (step=6)
-      "8": 7, // SeventhStep (step=7)
-      "9": 8, // EighthStep (step=8)
+      "6": 5,
+      "7": 6,
+      "8": 7,
+      "9": 8,
     };
 
     const currentStep = sectionToStepMap[selectedSection] || 1;
@@ -167,7 +165,6 @@ export default function ReviewSyllabusDetail() {
     navigate("/coordinator/review-syllabus");
   };
 
-  // Calcular estadísticas de revisión
   const reviewStats = useMemo(() => {
     const fields = Object.values(reviewData);
     const approved = fields.filter((f) => f.status === "approved").length;
@@ -179,33 +176,34 @@ export default function ReviewSyllabusDetail() {
   }, [reviewData]);
 
   const handleFinalize = () => {
-    // Guardar reviewData en sessionStorage para usarlo en el resumen
     sessionStorage.setItem(`reviewData_${id}`, JSON.stringify(reviewData));
 
-    // Navegar al resumen con los parámetros
     navigate(
-      `/coordinator/review-syllabus/${id}/summary?courseName=${encodeURIComponent(courseName)}&courseCode=${encodeURIComponent(courseCode)}&teacherName=${encodeURIComponent(teacherName)}&syllabusId=${syllabusId}`,
+      `/coordinator/review-syllabus/${id}/summary?courseName=${encodeURIComponent(
+        courseName,
+      )}&courseCode=${encodeURIComponent(
+        courseCode,
+      )}&teacherName=${encodeURIComponent(
+        teacherName,
+      )}&syllabusId=${syllabusId}`,
     );
   };
 
-  // Definir IDs y nombres de secciones (sin componentes)
   const sectionDefinitions = useMemo(
     () => [
-      { id: "1", name: "Datos generales" },
-      { id: "2", name: "Sumilla" },
-      { id: "3", name: "Competencias y componentes" },
-      { id: "4", name: "Programación del contenido" },
-      { id: "5", name: "Estrategias metodológicas" },
-      { id: "6", name: "Recursos didácticos" },
-      { id: "7", name: "Evaluación de aprendizaje" },
-      { id: "8", name: "Fuentes de consulta" },
-      { id: "9", name: "Resultados (outcomes)" },
+      { id: "1", display: "1", name: "Datos generales" },
+      { id: "2", display: "2", name: "Sumilla" },
+      { id: "3", display: "3", name: "Competencias y componentes" },
+      { id: "4", display: "4", name: "Programación del contenido" },
+      { id: "5", display: "5", name: "Estrategias metodológicas" },
+      { id: "6", display: "5.1", name: "Recursos didácticos" },
+      { id: "7", display: "6", name: "Evaluación de aprendizaje" },
+      { id: "8", display: "7", name: "Fuentes de consulta" },
+      { id: "9", display: "8", name: "Aporte de la asignatura" },
     ],
     [],
   );
 
-  // Mapeo de componentes por ID (no memoizado)
-  // La sección 5 y 6 comparten el mismo componente (FifthStep)
   const getComponentById = (id: string): React.ReactNode => {
     const componentMap: Record<string, React.ReactNode> = {
       "1": <FirstStep />,
@@ -213,22 +211,20 @@ export default function ReviewSyllabusDetail() {
       "3": <ThirdStep />,
       "4": <FourthStep />,
       "5": <FifthStep />,
-      "6": <FifthStep />, // Comparte con sección 5
+      "6": <FifthStep />,
       "7": <SixthStep />,
       "8": <SeventhStep />,
       "9": <EighthStep />,
     };
+
     return componentMap[id];
   };
 
-  // Filtrar secciones disponibles según lo que devuelve el backend
   const availableSections = useMemo(() => {
-    // Si está cargando, no mostrar secciones aún
     if (sectionsLoading) {
       return [];
     }
 
-    // Si hay error o no hay secciones, mostrar mensaje
     if (
       sectionsError ||
       !syllabusSections ||
@@ -238,7 +234,6 @@ export default function ReviewSyllabusDetail() {
       return [];
     }
 
-    // Filtrar sectionDefinitions para incluir solo las secciones permitidas
     const allowedSectionNumbers = syllabusSections.map((s) =>
       s.seccion.toString(),
     );
@@ -248,11 +243,10 @@ export default function ReviewSyllabusDetail() {
     );
   }, [syllabusSections, sectionsLoading, sectionsError, sectionDefinitions]);
 
-  // Actualizar la sección seleccionada cuando se carguen las secciones desde la API
   useEffect(() => {
     if (!sectionsLoading && !sectionsError && availableSections.length > 0) {
-      // Si la sección actual no está en las disponibles, seleccionar la primera disponible
       const availableSectionIds = availableSections.map((s) => s.id);
+
       if (!availableSectionIds.includes(selectedSection)) {
         setSelectedSection(availableSections[0].id);
       }
@@ -275,139 +269,233 @@ export default function ReviewSyllabusDetail() {
         sectionDataError={sectionDataError}
       >
         <StepsContext.Provider value={stepperValue}>
-          <div className="p-6 w-full mx-auto" style={{ maxWidth: "1600px" }}>
-            <div
-              className="bg-white border border-gray-300 rounded-lg p-8"
-              translate="no"
-            >
-              {/* Header */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-black mb-2">
-                      Revisión de Sílabo
-                    </h1>
-                    <h2 className="text-xl font-semibold text-black mb-1">
-                      {courseName}
-                    </h2>
-                    <p className="text-sm text-gray-600 mb-1">
-                      Código: {courseCode}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Docente: {teacherName}
-                    </p>
-                  </div>
+          <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="mb-7">
 
-                  {/* Estadísticas */}
-                  <div className="flex flex-col items-end gap-3">
-                    {reviewStats.total > 0 && (
-                      <div className="flex items-center gap-4 text-sm bg-gray-50 px-4 py-2 rounded-lg">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-green-600">
-                            ✓ {reviewStats.approved}
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Revisión de Sílabo
+                </h1>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Revisa cada sección del sílabo, aprueba campos y agrega
+                  observaciones si corresponde.
+                </p>
+              </div>
+
+              <div
+                className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-visible"
+                translate="no"
+              >
+                <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white rounded-t-2xl">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md shrink-0">
+                        <ClipboardCheck size={30} />
+                      </div>
+
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {courseName}
+                        </h2>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-600">
+                          <span>
+                            <span className="font-semibold text-gray-900">
+                              Código:
+                            </span>{" "}
+                            {courseCode}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-red-600">
-                            ✗ {reviewStats.rejected}
+
+                          <span>
+                            <span className="font-semibold text-gray-900">
+                              Docente:
+                            </span>{" "}
+                            {teacherName}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-blue-600">
-                            💬 {reviewStats.withComments}
-                          </span>
-                        </div>
-                        <div className="text-gray-500">
-                          Total: {reviewStats.total}
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle size={18} />
+                          <span className="text-xs font-bold">Aprobados</span>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                          {reviewStats.approved}
+                        </p>
+                      </div>
+
+                      <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-red-600">
+                          <XCircle size={18} />
+                          <span className="text-xs font-bold">Rechazados</span>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                          {reviewStats.rejected}
+                        </p>
+                      </div>
+
+                      <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-blue-600">
+                          <MessageCircle size={18} />
+                          <span className="text-xs font-bold">
+                            Comentarios
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                          {reviewStats.withComments}
+                        </p>
+                      </div>
+
+                      <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <FileText size={18} />
+                          <span className="text-xs font-bold">Total</span>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                          {reviewStats.total}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Section Selector */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Seleccionar Sección
-                </label>
-                {sectionsLoading ? (
-                  <div className="text-gray-500 text-sm">
-                    Cargando secciones disponibles...
+                <div className="p-8">
+                  <div className="mb-7 bg-white border border-gray-100 rounded-2xl shadow-md p-5 overflow-visible">
+                    <div className="flex flex-col md:flex-row md:items-end gap-4">
+                      <div className="flex-1">
+                        <label className="block text-sm font-bold text-gray-900 mb-2">
+                          Seleccionar sección
+                        </label>
+
+                        {sectionsLoading ? (
+                          <div className="h-12 flex items-center gap-2 text-gray-500 text-sm bg-gray-50 border border-gray-200 rounded-xl px-4">
+                            <Loader2
+                              size={18}
+                              className="animate-spin text-red-600"
+                            />
+                            Cargando secciones disponibles...
+                          </div>
+                        ) : sectionsError ? (
+                          <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-4 rounded-xl border border-red-100">
+                            <AlertTriangle size={18} />
+                            Error al cargar las secciones del sílabo
+                          </div>
+                        ) : availableSections.length === 0 ? (
+                          <div className="flex items-center gap-2 text-yellow-700 text-sm bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                            <AlertTriangle size={18} />
+                            Este curso no tiene permisos para revisar ninguna
+                            sección del sílabo.
+                          </div>
+                        ) : (
+                          <Select
+                            value={selectedSection}
+                            onValueChange={setSelectedSection}
+                          >
+                            <SelectTrigger
+                              className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500"
+                              translate="no"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <SelectValue placeholder="Seleccione una sección" />
+                            </SelectTrigger>
+
+                            <SelectContent
+                              translate="no"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {availableSections.map((section) => (
+                                <SelectItem
+                                  key={section.id}
+                                  value={section.id}
+                                  translate="no"
+                                >
+                                  <span translate="no">
+                                    {section.display}. {section.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
+                      {currentSection && (
+                        <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 min-w-[240px]">
+                          <p className="text-xs font-semibold text-red-700">
+                            Sección actual
+                          </p>
+                          <p className="text-sm font-bold text-gray-900 mt-1">
+                            {currentSection.display}. {currentSection.name}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : sectionsError ? (
-                  <div className="text-red-500 text-sm">
-                    Error al cargar las secciones del sílabo
+
+                  <div className="bg-white border border-gray-100 rounded-2xl shadow-md overflow-visible">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Contenido de la sección
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Marca los campos como aprobados o rechazados según la
+                        revisión.
+                      </p>
+                    </div>
+
+                    <div className="p-6 overflow-visible">
+                      {sectionDataLoading && (
+                        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+                          <Loader2 size={18} className="animate-spin" />
+                          Cargando datos de la sección...
+                        </div>
+                      )}
+
+                      {sectionDataError && (
+                        <div className="mb-6 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700 flex items-center gap-2">
+                          <AlertTriangle size={18} />
+                          No hay datos guardados para esta sección todavía.
+                        </div>
+                      )}
+
+                      {currentSection ? (
+                        <div className="syllabus-review-readonly overflow-visible">
+                          {getComponentById(currentSection.id)}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-gray-500">
+                          No hay una sección seleccionada para mostrar.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : availableSections.length === 0 ? (
-                  <div className="text-yellow-600 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                    Este curso no tiene permisos para revisar ninguna sección
-                    del sílabo.
-                  </div>
-                ) : (
-                  <Select
-                    value={selectedSection}
-                    onValueChange={setSelectedSection}
-                  >
-                    <SelectTrigger
-                      className="w-full"
-                      translate="no"
-                      onClick={(e) => e.stopPropagation()}
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-6 mt-8 border-t border-gray-100">
+                    <button
+                      type="button"
+                      data-review-button="true"
+                      onClick={handleGoBack}
+                      className="h-11 px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
                     >
-                      <SelectValue placeholder="Seleccione una sección" />
-                    </SelectTrigger>
-                    <SelectContent
-                      translate="no"
-                      onClick={(e) => e.stopPropagation()}
+                      <ArrowLeft size={18} />
+                      Volver
+                    </button>
+
+                    <button
+                      type="button"
+                      data-review-button="true"
+                      onClick={handleFinalize}
+                      className="h-11 px-8 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
                     >
-                      {availableSections.map((section) => (
-                        <SelectItem
-                          key={section.id}
-                          value={section.id}
-                          translate="no"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                        >
-                          <span translate="no">
-                            {section.id}. {section.name}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {/* Current Section Content */}
-              <div className="mb-8">
-                {currentSection && (
-                  <div className="syllabus-review-readonly">
-                    {getComponentById(currentSection.id)}
+                      <Send size={18} />
+                      Finalizar Revisión
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  data-review-button="true"
-                  onClick={handleGoBack}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <ArrowLeft size={20} />
-                  <span>Volver</span>
-                </button>
-                <button
-                  type="button"
-                  data-review-button="true"
-                  onClick={handleFinalize}
-                  className="px-8 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Finalizar Revisión
-                </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,14 +1,22 @@
 import { useState } from "react";
 import { Step } from "./step";
 import { useSyllabusContext } from "../contexts/syllabus-context";
-import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import { useSubmitToAnalysis } from "../hooks/use-submit-to-analysis";
 import { useSaveResultados } from "../hooks/eighth-step-query";
-import { ChevronDown } from "lucide-react";
+import {
+  ChevronDown,
+  GraduationCap,
+  Info,
+  AlertTriangle,
+  Loader2,
+  CheckCircle,
+  FileText,
+  Send,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
-// Tipos
 interface StudentOutcome {
   id: number;
   code: string;
@@ -16,7 +24,6 @@ interface StudentOutcome {
   level: "K" | "R" | "";
 }
 
-// Data mockeada
 const mockStudentOutcomes: StudentOutcome[] = [
   {
     id: 1,
@@ -65,7 +72,7 @@ const mockStudentOutcomes: StudentOutcome[] = [
 
 export default function EighthStep() {
   const { syllabusId } = useSyllabusContext();
-  const { hasEditPermissionForSection } = usePermissionsContext();
+  const { isReviewMode } = useReviewMode();
   const navigate = useNavigate();
 
   const [outcomes, setOutcomes] =
@@ -75,8 +82,11 @@ export default function EighthStep() {
   const saveResultados = useSaveResultados();
   const submitToAnalysis = useSubmitToAnalysis();
 
-  // Verificar si tiene permisos para editar la sección 9 (Step 8)
-  const canEdit = hasEditPermissionForSection(9);
+  const canEdit = !isReviewMode;
+
+  const selectedK = outcomes.filter((outcome) => outcome.level === "K").length;
+  const selectedR = outcomes.filter((outcome) => outcome.level === "R").length;
+  const notApply = outcomes.filter((outcome) => outcome.level === "").length;
 
   const handleNextStep = async () => {
     if (!syllabusId) {
@@ -87,11 +97,9 @@ export default function EighthStep() {
     try {
       setIsSubmitting(true);
 
-      // 1. Guardar los datos del step 8 SOLO si tiene permisos de edición
       if (canEdit) {
         console.log("💾 Guardando resultados del paso 8...", outcomes);
 
-        // Convertir outcomes a formato esperado por la API (usar "" en lugar de null)
         const resultadosData = {
           resultados: outcomes.map((outcome) => ({
             id: outcome.id,
@@ -104,7 +112,7 @@ export default function EighthStep() {
         await saveResultados.mutateAsync({
           syllabusId,
           data: resultadosData,
-          isCreating: false, // TODO: Ajustar según lógica de creación
+          isCreating: false,
         });
 
         toast.success("Datos guardados correctamente");
@@ -114,7 +122,6 @@ export default function EighthStep() {
         );
       }
 
-      // 2. Pedir confirmación para enviar a análisis
       const confirmed = window.confirm(
         "¿Estás seguro de que deseas enviar el sílabo a revisión?\n\n" +
           "Esta acción cambiará el estado del sílabo a 'ANALIZANDO' y " +
@@ -129,7 +136,6 @@ export default function EighthStep() {
         return;
       }
 
-      // 3. Enviar a análisis (cambiar estado a ANALIZANDO)
       console.log("📤 Enviando sílabo a análisis...");
 
       await submitToAnalysis.mutateAsync({ syllabusId });
@@ -138,10 +144,8 @@ export default function EighthStep() {
         description: "El coordinador revisará tu sílabo pronto.",
       });
 
-      // 4. Navegar a página de confirmación o lista
-      // Esperar un momento para que el usuario vea el mensaje
       setTimeout(() => {
-        navigate("/my-syllabus"); // O la ruta que corresponda
+        navigate("/my-syllabus");
       }, 2000);
     } catch (error) {
       console.error("❌ Error:", error);
@@ -169,158 +173,252 @@ export default function EighthStep() {
 
   return (
     <Step step={8} onNextStep={handleNextStep} hideControls={isSubmitting}>
-      <div className="w-full max-w-6xl mx-auto p-6">
-        <h2 className="text-2xl font-bold mb-4">
-          9. Aporte de la Asignatura al logro de resultados
-        </h2>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+        <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+              <span className="text-2xl font-bold">8</span>
+            </div>
 
-        {/* Mensaje de solo lectura si no tiene permisos */}
-        {!canEdit && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Aporte de la Asignatura
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Define el nivel de aporte de la asignatura al logro de los
+                resultados del estudiante.
+              </p>
+            </div>
+
+            <div className="ml-auto hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold">
+              Resultados del estudiante
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8">
+          {!canEdit && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-yellow-500 text-white flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+
+                <div>
+                  <p className="text-sm font-bold text-yellow-800">
+                    Modo solo lectura
+                  </p>
+                  <p className="text-sm text-yellow-700 mt-1 leading-relaxed">
+                    No tienes permisos para editar esta sección. Puedes revisar
+                    el contenido y finalizar el proceso de envío.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <Info size={20} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-gray-900">
+                    Información del paso
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    El aporte de la asignatura al logro de los Resultados del
+                    Estudiante en la formación del graduado se establece en la
+                    tabla siguiente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Clave
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">{selectedK}</p>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Relacionado
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">{selectedR}</p>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    No aplica
+                  </p>
+                  <p className="text-xl font-bold text-gray-900">{notApply}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 bg-blue-50 rounded-2xl border border-blue-100 p-5">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg
-                  className="w-5 h-5 text-yellow-600"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <GraduationCap size={18} />
               </div>
+
               <div>
-                <p className="text-sm font-semibold text-yellow-800">
-                  Modo solo lectura
-                </p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  No tienes permisos para editar esta sección. Puedes revisar el
-                  contenido y finalizar el proceso de envío.
-                </p>
+                <h3 className="font-bold text-blue-900">Leyenda</h3>
+                <div className="flex flex-wrap gap-3 mt-3">
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-100 text-sm text-blue-800">
+                    <strong>K</strong> = Clave
+                  </span>
+
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-100 text-sm text-blue-800">
+                    <strong>R</strong> = Relacionado
+                  </span>
+
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-100 text-sm text-blue-800">
+                    <strong>-</strong> = No aplica
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Descripción */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-          <p className="text-gray-700 leading-relaxed">
-            El aporte de la asignatura al logro de los Resultados del Estudiante
-            (Student Outcomes) en la formación del graduado en Ingeniería de
-            Computación y Sistemas, se establece en la tabla siguiente:
-          </p>
-        </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center">
+                  <FileText size={20} />
+                </div>
 
-        {/* Leyenda */}
-        <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-center gap-8 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">K =</span>
-              <span>Clave</span>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Tabla de resultados del estudiante
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Selecciona el nivel correspondiente para cada resultado.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">R =</span>
-              <span>Relacionado</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">Recuadro vacío =</span>
-              <span>No aplica</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Tabla de Student Outcomes */}
-        <div className="space-y-6">
-          <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-300">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold w-12">
-                    #
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">
-                    Descripción
-                  </th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold w-32">
-                    Nivel
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {outcomes.map((outcome, index) => (
-                  <tr
-                    key={outcome.id}
-                    className={`border-b border-gray-200 ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {outcome.id}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {outcome.description}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center">
-                        <div className="relative">
-                          <select
-                            value={outcome.level}
-                            onChange={(e) =>
-                              handleLevelChange(
-                                outcome.id,
-                                e.target.value as "K" | "R" | "",
-                              )
-                            }
-                            disabled={!canEdit}
-                            className={`appearance-none border rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              canEdit
-                                ? "bg-white border-gray-300 cursor-pointer hover:border-gray-400"
-                                : "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500"
-                            }`}
-                          >
-                            <option value="">-</option>
-                            <option value="K">K</option>
-                            <option value="R">R</option>
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
+                    <th className="px-6 py-4 text-left font-bold w-[8%]">
+                      #
+                    </th>
+                    <th className="px-6 py-4 text-left font-bold w-[72%]">
+                      Descripción
+                    </th>
+                    <th className="px-6 py-4 text-center font-bold w-[20%]">
+                      Nivel
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {outcomes.map((outcome) => (
+                    <tr
+                      key={outcome.id}
+                      className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-5">
+                        <div className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold text-sm">
+                          {outcome.id}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-5 text-gray-700 leading-relaxed">
+                        {outcome.description}
+                      </td>
+
+                      <td className="px-6 py-5">
+                        <div className="flex justify-center">
+                          <div className="relative">
+                            <select
+                              value={outcome.level}
+                              onChange={(e) =>
+                                handleLevelChange(
+                                  outcome.id,
+                                  e.target.value as "K" | "R" | "",
+                                )
+                              }
+                              disabled={!canEdit}
+                              className={`appearance-none h-10 min-w-[90px] rounded-xl px-4 pr-10 text-sm font-bold outline-none transition-all ${
+                                canEdit
+                                  ? "bg-gray-50 border border-gray-200 text-gray-700 cursor-pointer hover:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                  : "bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed"
+                              }`}
+                            >
+                              <option value="">-</option>
+                              <option value="K">K</option>
+                              <option value="R">R</option>
+                            </select>
+
+                            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                              <ChevronDown className="w-4 h-4 text-gray-400" />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        {/* Información adicional */}
-        <div className="mt-6 text-sm text-gray-600">
-          <p>
-            * Selecciona el nivel de aporte de la asignatura para cada resultado
-            del estudiante.
-          </p>
-        </div>
+          <div className="mt-6 bg-gray-50 border border-gray-100 rounded-2xl p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gray-800 text-white flex items-center justify-center shrink-0">
+                <CheckCircle size={18} />
+              </div>
 
-        {/* Indicador de envío */}
-        {isSubmitting && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
               <div>
-                <p className="text-sm font-semibold text-blue-700">
-                  Procesando...
-                </p>
-                <p className="text-xs text-blue-600">
-                  Guardando datos y enviando a revisión
+                <h3 className="font-bold text-gray-900">
+                  Antes de finalizar
+                </h3>
+                <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                  Verifica que los niveles seleccionados correspondan al aporte
+                  real de la asignatura. Al continuar, el sílabo será enviado a
+                  revisión.
                 </p>
               </div>
             </div>
           </div>
-        )}
+
+          {isSubmitting && (
+            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-2xl p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <Loader2 size={20} className="animate-spin" />
+                </div>
+
+                <div>
+                  <p className="text-sm font-bold text-blue-700">
+                    Procesando...
+                  </p>
+                  <p className="text-sm text-blue-600 mt-1">
+                    Guardando datos y enviando a revisión.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isSubmitting && (
+            <div className="mt-4 flex items-center justify-end">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-100 text-sm font-semibold">
+                <Send size={17} />
+                Enviando sílabo...
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Step>
   );

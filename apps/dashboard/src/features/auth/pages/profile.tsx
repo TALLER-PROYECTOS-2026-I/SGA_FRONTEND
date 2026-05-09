@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { getRoleName } from "@/common/constants/roles";
 import { UserAvatar } from "@/components/ui/UserAvatar";
@@ -8,18 +8,31 @@ import {
   useProfile,
   type ProfileData,
 } from "@/features/auth/hooks/use-profile";
+import {
+  ArrowLeft,
+  Briefcase,
+  Check,
+  Loader2,
+  Mail,
+  Pencil,
+  Phone,
+  Save,
+  ShieldCheck,
+  User,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 
 const roleDisplayNames = {
-  docente: "Profesor",
+  docente: "Docente",
   coordinadora_academica: "Coordinador Académico",
   director_escuela: "Director",
   indeterminado: "Usuario",
 } as const;
 
 export default function Profile() {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useSession();
+  const { user: sessionUser } = useSession();
   const toast = useToast();
 
   const { profile, isLoading, isError, updateProfile, isUpdating } =
@@ -35,69 +48,30 @@ export default function Profile() {
     photo: null,
   });
 
-  const roleName = getRoleName(user?.role);
+  const roleName = getRoleName(sessionUser?.role);
   const roleDisplayName =
     roleDisplayNames[roleName as keyof typeof roleDisplayNames] || "Usuario";
 
-  // ✅ Resetear estado al cambiar de ruta
   useEffect(() => {
     setIsEditing(false);
   }, [location.pathname]);
 
   useEffect(() => {
     if (profile && !isEditing) {
-      setProfileData({
-        ...profile,
-        phone: profile.phone || "", // Asegurar que no sea null
-      });
+      setProfileData(profile);
     }
   }, [profile, isEditing]);
 
   const handleInputChange = (field: keyof ProfileData, value: string) => {
-    let sanitizedValue = value;
-
-    // Validación en tiempo real según el campo
-    if (field === "firstName" || field === "lastName") {
-      // Reemplaza cualquier número (0-9) por nada (lo elimina)
-      sanitizedValue = value.replace(/[0-9]/g, "");
-    } else if (field === "phone") {
-      // Reemplaza cualquier cosa que NO sea un dígito por nada (solo deja números)
-      sanitizedValue = value.replace(/\D/g, "");
-    }
-
-    setProfileData((prev) => ({ ...prev, [field]: sanitizedValue }));
+    setProfileData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = () => {
-    // 1. Validaciones Frontend antes de enviar al Backend
-    if (!profileData.firstName?.trim()) {
-      return toast.error("Validación", "El campo Nombres es obligatorio.");
-    }
-    if (!profileData.lastName?.trim()) {
-      return toast.error("Validación", "El campo Apellidos es obligatorio.");
-    }
-    if (!profileData.profession?.trim()) {
-      return toast.error(
-        "Validación",
-        "El campo Grado/Profesión Académica es obligatorio.",
-      );
-    }
-
-    // Validación de celular peruano (solo si ingresó algo)
-    const phoneValue = profileData.phone?.trim();
-    if (phoneValue && !/^9\d{8}$/.test(phoneValue)) {
-      return toast.error(
-        "Validación",
-        "El teléfono celular debe tener 9 dígitos y empezar con 9.",
-      );
-    }
-
-    // 2. Ejecutar actualización
     updateProfile(profileData, {
       onSuccess: () => {
         toast.success(
-          "Datos actualizados correctamente",
-          "Los cambios se han guardado exitosamente",
+          "Perfil actualizado",
+          "Los cambios se guardaron correctamente ✅",
         );
         setIsEditing(false);
       },
@@ -110,7 +84,7 @@ export default function Profile() {
         } else {
           toast.error(
             "Error",
-            "No se pudo actualizar el perfil. Verifique los datos e intente nuevamente.",
+            error.message || "No se pudo actualizar el perfil ⚠️",
           );
         }
       },
@@ -119,297 +93,325 @@ export default function Profile() {
 
   const handleCancel = () => {
     if (profile) {
-      setProfileData({ ...profile, phone: profile.phone || "" });
+      setProfileData(profile);
     }
+
     setIsEditing(false);
   };
 
+  const handleBackHome = () => {
+    window.location.href = "/";
+  };
+
+  const fields = [
+    {
+      label: "Nombre",
+      field: "firstName" as const,
+      icon: User,
+      type: "text",
+      placeholder: "Ingrese su nombre",
+    },
+    {
+      label: "Apellidos",
+      field: "lastName" as const,
+      icon: User,
+      type: "text",
+      placeholder: "Ingrese sus apellidos",
+    },
+    {
+      label: "Profesión",
+      field: "profession" as const,
+      icon: Briefcase,
+      type: "text",
+      placeholder: "Ingrese su profesión",
+    },
+    {
+      label: "Correo",
+      field: "email" as const,
+      icon: Mail,
+      type: "email",
+      placeholder: "correo@usmp.pe",
+    },
+    {
+      label: "Teléfono",
+      field: "phone" as const,
+      icon: Phone,
+      type: "tel",
+      placeholder: "999999999",
+    },
+  ];
+
   if (isLoading && !profile) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-lg">Cargando perfil...</div>
+      <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl px-8 py-7 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+            <Loader2 className="animate-spin" size={24} />
+          </div>
+
+          <div>
+            <p className="text-base font-bold text-gray-900">
+              Cargando perfil
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Obteniendo información de tu cuenta...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="text-lg text-red-600">
-          Error al cargar el perfil. Por favor, intente de nuevo.
+      <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-red-100 shadow-xl p-8 max-w-md w-full">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-5">
+            <AlertTriangle size={30} />
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900">
+            Error al cargar el perfil
+          </h1>
+
+          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+            No se pudo obtener la información del perfil. Por favor, intenta
+            nuevamente.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleBackHome}
+            className="mt-6 h-11 px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
+          >
+            <ArrowLeft size={18} />
+            Volver al inicio
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Botón Volver (Fuera de la tarjeta) */}
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-6 font-medium transition-colors"
-        >
-          <svg
-            className="w-5 h-5 mr-1"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Volver
-        </button>
+    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-7">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Perfil {roleDisplayName}
+          </h1>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          {/* Cabecera de la tarjeta: Título y Botones */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <h1 className="text-3xl font-bold text-slate-800">
-              Perfil {roleDisplayName}
-            </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Consulta y actualiza la información de tu cuenta institucional.
+          </p>
+        </div>
 
-            <div className="flex gap-3">
-              {isEditing ? (
-                <>
-                  <button
-                    onClick={handleCancel}
-                    className="px-6 py-2.5 bg-slate-500 text-white font-medium rounded-lg hover:bg-slate-600 transition-colors"
-                    disabled={isUpdating}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={isUpdating}
-                    className="px-6 py-2.5 bg-red-700 text-white font-medium rounded-lg hover:bg-red-800 transition-colors disabled:opacity-60 flex items-center gap-2"
-                  >
-                    {isUpdating ? "Guardando..." : "Guardar"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-6 py-2.5 bg-red-700 text-white font-medium rounded-lg hover:bg-red-800 transition-colors flex items-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                  Editar
-                </button>
-              )}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="px-8 py-7 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex items-center gap-5">
+                <div className="relative">
+                  <UserAvatar className="w-24 h-24 border-4 border-white shadow-md" />
+
+                  <div className="absolute -bottom-1 -right-1 w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md">
+                    <ShieldCheck size={18} />
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {`${profileData.firstName || ""} ${
+                      profileData.lastName || ""
+                    }`.trim() ||
+                      sessionUser?.name ||
+                      "Usuario"}
+                  </h2>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    {profileData.email ||
+                      sessionUser?.email ||
+                      "Correo no disponible"}
+                  </p>
+
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                    <ShieldCheck size={14} />
+                    {roleDisplayName}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {isEditing ? (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 border border-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
+                    <Pencil size={16} />
+                    Modo edición
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-green-50 border border-green-100 px-4 py-2 text-sm font-semibold text-green-700">
+                    <Check size={16} />
+                    Perfil activo
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Contenido principal */}
-          <div className="flex flex-col lg:flex-row gap-10">
-            {/* Avatar */}
-            <div className="flex flex-col items-center">
-              <div className="w-40 h-40 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 overflow-hidden shadow-sm">
-                <UserAvatar className="w-full h-full" />
-              </div>
-            </div>
-
-            {/* Formulario */}
-            <div className="flex-1">
-              {/* Sección 1: Datos Personales (Editables) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Nombres <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.firstName || ""}
-                    onChange={(e) =>
-                      handleInputChange("firstName", e.target.value)
-                    }
-                    disabled={!isEditing}
-                    className={`w-full p-3 border rounded-lg transition-colors ${
-                      isEditing
-                        ? "border-gray-300 bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
-                        : "border-gray-200 bg-slate-50 text-slate-600"
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Apellidos <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.lastName || ""}
-                    onChange={(e) =>
-                      handleInputChange("lastName", e.target.value)
-                    }
-                    disabled={!isEditing}
-                    className={`w-full p-3 border rounded-lg transition-colors ${
-                      isEditing
-                        ? "border-gray-300 bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
-                        : "border-gray-200 bg-slate-50 text-slate-600"
-                    }`}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Grado/Profesión Académica{" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.profession || ""}
-                    onChange={(e) =>
-                      handleInputChange("profession", e.target.value)
-                    }
-                    disabled={!isEditing}
-                    className={`w-full p-3 border rounded-lg transition-colors ${
-                      isEditing
-                        ? "border-gray-300 bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
-                        : "border-gray-200 bg-slate-50 text-slate-600"
-                    }`}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Teléfono Celular
-                  </label>
-                  <input
-                    type="tel"
-                    value={profileData.phone || ""}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
-                    disabled={!isEditing}
-                    maxLength={9}
-                    className={`w-full p-3 border rounded-lg transition-colors ${
-                      isEditing
-                        ? "border-gray-300 bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
-                        : "border-gray-200 bg-slate-50 text-slate-600"
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Sección 2: Datos Institucionales (Solo lectura) */}
-              <div className="border-t border-gray-100 pt-6">
-                <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                  Datos Institucionales (Solo lectura)
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Correo Institucional
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        value={profileData.email || ""}
-                        disabled
-                        className="w-full p-3 pr-10 border border-gray-200 bg-slate-50 text-slate-500 rounded-lg cursor-not-allowed"
-                      />
-                      <svg
-                        className="w-5 h-5 text-slate-400 absolute right-3 top-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                    </div>
+          <div className="p-8">
+            {isEditing && (
+              <div className="mb-7 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <Pencil size={19} />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Rol Funcional
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={roleDisplayName}
-                        disabled
-                        className="w-full p-3 pr-10 border border-gray-200 bg-slate-50 text-slate-500 rounded-lg cursor-not-allowed"
-                      />
-                      <svg
-                        className="w-5 h-5 text-slate-400 absolute right-3 top-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                    </div>
+                    <p className="text-sm font-bold text-blue-900">
+                      Editando perfil
+                    </p>
+                    <p className="text-sm text-blue-700 mt-1 leading-relaxed">
+                      Solo modifica los campos que deseas actualizar. El correo
+                      institucional permanece bloqueado.
+                    </p>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Sección 3: Reglas de Edición (Caja Azul) */}
-              <div className="mt-8 bg-blue-50/50 border-l-4 border-blue-600 p-5 rounded-r-xl">
-                <div className="flex gap-3">
-                  <svg
-                    className="w-6 h-6 text-blue-600 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
+              <aside className="rounded-2xl border border-gray-100 bg-gray-50 p-6 h-fit">
+                <div className="flex flex-col items-center text-center">
+                  <UserAvatar className="w-36 h-36 border-4 border-white shadow-md" />
+
+                  <h3 className="text-lg font-bold text-gray-900 mt-5">
+                    {profileData.firstName || "Usuario"}
+                  </h3>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    {roleDisplayName}
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  <div className="rounded-xl bg-white border border-gray-100 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                      Rol
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 mt-1">
+                      {roleDisplayName}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-white border border-gray-100 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                      Estado
+                    </p>
+                    <p className="text-sm font-semibold text-green-700 mt-1">
+                      Activo
+                    </p>
+                  </div>
+                </div>
+              </aside>
+
+              <section>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {fields.map(
+                    ({ label, field, icon: Icon, type, placeholder }) => {
+                      const isEmail = field === "email";
+                      const disabled = isEmail || !isEditing;
+
+                      return (
+                        <div key={field}>
+                          <label className="block text-sm font-bold text-gray-900 mb-2">
+                            {label}
+                          </label>
+
+                          <div className="relative">
+                            <Icon
+                              size={18}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                            />
+
+                            <input
+                              type={type}
+                              value={profileData[field] || ""}
+                              onChange={(e) =>
+                                handleInputChange(field, e.target.value)
+                              }
+                              disabled={disabled}
+                              placeholder={placeholder}
+                              className={`w-full h-12 pl-12 pr-4 rounded-xl border text-sm outline-none transition-all ${
+                                disabled
+                                  ? "bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed"
+                                  : "bg-white border-gray-200 text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                              }`}
+                            />
+                          </div>
+
+                          {isEmail && (
+                            <p className="text-xs text-gray-400 mt-2">
+                              El correo institucional no se puede editar.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handleBackHome}
+                    className="h-11 px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-900 mb-2">
-                      Reglas de Edición del Perfil
-                    </h4>
-                    <ul className="text-sm text-blue-800 space-y-1.5 list-disc list-inside">
-                      <li>
-                        <strong>Campos editables:</strong> Nombres, Apellidos,
-                        Grado/Profesión Académica y Teléfono
-                      </li>
-                      <li>
-                        <strong>Campos bloqueados:</strong> Correo Institucional
-                        y Rol Funcional (datos de control)
-                      </li>
-                      <li>
-                        <strong>Formato de teléfono:</strong> Debe tener 9
-                        dígitos y empezar con 9 (formato peruano)
-                      </li>
-                      <li>
-                        Los campos marcados con{" "}
-                        <span className="text-red-600 font-bold">*</span> son
-                        obligatorios
-                      </li>
-                    </ul>
+                    <ArrowLeft size={18} />
+                    Volver al inicio
+                  </button>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleCancel}
+                          className="h-11 px-6 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
+                          disabled={isUpdating}
+                        >
+                          <X size={18} />
+                          Cancelar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={isUpdating}
+                          className="h-11 px-7 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
+                        >
+                          {isUpdating ? (
+                            <>
+                              <Loader2 size={18} className="animate-spin" />
+                              Guardando...
+                            </>
+                          ) : (
+                            <>
+                              <Save size={18} />
+                              Guardar cambios
+                            </>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(true)}
+                        className="h-11 px-7 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-semibold shadow-sm"
+                      >
+                        <Pencil size={18} />
+                        Editar perfil
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </div>

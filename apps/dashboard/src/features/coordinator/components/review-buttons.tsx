@@ -25,13 +25,13 @@ export function ReviewButtons({
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [comment, setComment] = useState(initialComment);
 
-  // Sincronizar con initialStatus e initialComment cuando cambien
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
 
   useEffect(() => {
     setComment(initialComment);
+
     if (initialComment && initialComment.trim() !== "") {
       setShowCommentBox(true);
     }
@@ -39,96 +39,128 @@ export function ReviewButtons({
 
   const handleApprove = () => {
     const newStatus = status === "approved" ? null : "approved";
+
     setStatus(newStatus);
     onStatusChange?.(fieldId, newStatus);
   };
 
   const handleReject = () => {
     const newStatus = status === "rejected" ? null : "rejected";
+
     setStatus(newStatus);
     onStatusChange?.(fieldId, newStatus);
   };
 
   const handleToggleComment = () => {
-    setShowCommentBox(!showCommentBox);
+    setShowCommentBox((prev) => !prev);
   };
 
   const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newComment = e.target.value;
+
     setComment(newComment);
     onCommentChange?.(fieldId, newComment);
   };
 
   return (
-    <div className="relative flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {/* Botón Aprobar */}
+    <div className="w-full">
+      <div className="flex flex-wrap items-center gap-2">
         <button
+          type="button"
           data-review-button="true"
           onClick={handleApprove}
-          className={`p-2 rounded-lg transition-all ${
+          className={`h-10 w-10 rounded-xl transition-all flex items-center justify-center ${
             status === "approved"
-              ? "bg-green-500 text-white shadow-md"
-              : "bg-white text-green-500 border border-green-500 hover:bg-green-50"
+              ? "bg-green-600 text-white shadow-md"
+              : "bg-white text-green-600 border border-green-500 hover:bg-green-50"
           }`}
           title="Aprobar"
         >
-          <Check size={16} />
+          <Check size={18} />
         </button>
 
-        {/* Botón Rechazar */}
         <button
+          type="button"
           data-review-button="true"
           onClick={handleReject}
-          className={`p-2 rounded-lg transition-all ${
+          className={`h-10 w-10 rounded-xl transition-all flex items-center justify-center ${
             status === "rejected"
-              ? "bg-red-500 text-white shadow-md"
-              : "bg-white text-red-500 border border-red-500 hover:bg-red-50"
+              ? "bg-red-600 text-white shadow-md"
+              : "bg-white text-red-600 border border-red-500 hover:bg-red-50"
           }`}
           title="Rechazar"
         >
-          <X size={16} />
+          <X size={18} />
         </button>
 
-        {/* Botón Comentario */}
         <button
+          type="button"
           data-review-button="true"
           onClick={handleToggleComment}
-          className={`p-2 rounded-lg transition-all relative ${
+          className={`h-10 w-10 rounded-xl transition-all flex items-center justify-center ${
             showCommentBox || comment
-              ? "bg-blue-500 text-white shadow-md"
-              : "bg-white text-blue-500 border border-blue-500 hover:bg-blue-50"
+              ? "bg-blue-600 text-white shadow-md"
+              : "bg-white text-blue-600 border border-blue-500 hover:bg-blue-50"
           }`}
           title="Agregar comentario"
         >
-          <MessageSquare size={16} />
+          <MessageSquare size={18} />
         </button>
+
+        {comment.trim() !== "" && !showCommentBox && (
+          <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-3 py-1">
+            Comentario agregado
+          </span>
+        )}
       </div>
 
-      {/* Caja de comentario flotante estilo GitHub */}
       {showCommentBox && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-700">
-              Comentario
-            </span>
+        <div className="mt-4 w-full max-w-xl rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-gray-900">Comentario</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Agrega una observación para este campo o paso.
+              </p>
+            </div>
+
             <button
+              type="button"
               data-review-button="true"
               onClick={handleToggleComment}
-              className="text-gray-400 hover:text-gray-600"
+              className="h-8 w-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-colors"
+              title="Cerrar comentario"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
-          <textarea
-            data-review-comment="true"
-            value={comment}
-            onChange={handleCommentChange}
-            placeholder="Escribe un comentario..."
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white text-gray-900"
-            autoFocus
-          />
+
+          <div className="p-4">
+            <textarea
+              data-review-comment="true"
+              value={comment}
+              onChange={handleCommentChange}
+              placeholder="Escribe un comentario..."
+              rows={4}
+              className="w-full min-h-[120px] px-4 py-3 border border-gray-200 rounded-xl resize-y outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-gray-50 focus:bg-white text-gray-900 placeholder:text-gray-400"
+              autoFocus
+            />
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-400">
+                El comentario se guarda automáticamente.
+              </p>
+
+              <button
+                type="button"
+                data-review-button="true"
+                onClick={handleToggleComment}
+                className="h-9 px-4 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-semibold"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

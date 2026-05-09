@@ -28,10 +28,11 @@ export default function CourseSelect({
   courses,
 }: CourseSelectProps) {
   return (
-    <div className="mb-6">
-      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-        Sílabo del Curso <span className="text-red-500">*</span>
+    <div>
+      <label className="block text-sm font-bold text-gray-900 mb-2">
+        2. Nombre de la Asignatura
       </label>
+
       <SearchableSelect
         value={courseSearch}
         onChange={setCourseSearch}
@@ -41,13 +42,13 @@ export default function CourseSelect({
         selectedItem={selectedCourse}
         showDropdown={showCourseDropdown}
         setShowDropdown={setShowCourseDropdown}
-        placeholder="Buscar un Sílabo"
+        placeholder="Buscar asignatura..."
         getItemKey={(course) => course.id}
         renderItem={(course) => (
-          <>
-            <div className="font-medium text-gray-800">{course.name}</div>
+          <div>
+            <div className="font-semibold text-gray-900">{course.name}</div>
             <div className="text-sm text-gray-500">Código: {course.code}</div>
-          </>
+          </div>
         )}
         noResultsText="No se encontraron asignaturas"
       />

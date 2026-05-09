@@ -11,18 +11,45 @@ export interface PermissionsResponse {
   permisos: Permission[];
 }
 
+function getApiBase(baseUrl?: string) {
+  return (
+    baseUrl ??
+    import.meta.env.VITE_API_BASE_URL ??
+    "http://localhost:7071/api"
+  ).replace(/\/+$/, "");
+}
+
+async function readErrorMessage(response: Response) {
+  const text = await response.text().catch(() => "");
+
+  if (!text) {
+    return `Error HTTP ${response.status}`;
+  }
+
+  try {
+    const json = JSON.parse(text) as {
+      name?: string;
+      message?: string;
+      error?: string;
+    };
+
+    return json.message || json.error || text;
+  } catch {
+    return text;
+  }
+}
+
 class PermissionsManager {
   async fetchByDocente(docenteId: number | string, baseUrl?: string) {
-    const apiBase =
-      baseUrl ??
-      import.meta.env.VITE_API_BASE_URL ??
-      "http://localhost:7071/api";
+    const apiBase = getApiBase(baseUrl);
     const url = `${apiBase}/permisos/${encodeURIComponent(String(docenteId))}`;
+
     const res = await fetch(url);
+
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`${res.status} ${t}`);
+      throw new Error(await readErrorMessage(res));
     }
+
     const json = await res.json();
     return json as Permission[];
   }
@@ -31,21 +58,23 @@ class PermissionsManager {
     data: PermissionsResponse,
     baseUrl?: string,
   ): Promise<void> {
-    const apiBase =
-      baseUrl ??
-      import.meta.env.VITE_API_BASE_URL ??
-      "http://localhost:7071/api";
-    const url = `${apiBase}/permisos/`;
+    const apiBase = getApiBase(baseUrl);
+    const url = `${apiBase}/permisos`;
+
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        silaboId: Number(data.silaboId),
+        docenteId: Number(data.docenteId),
+        permisos: Array.isArray(data.permisos) ? data.permisos : [],
+      }),
     });
+
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`${res.status} ${t}`);
+      throw new Error(await readErrorMessage(res));
     }
   }
 }
@@ -62,9 +91,9 @@ export const usePermissions = (
       permissionsManager.fetchByDocente(docenteId as number | string),
     enabled: docenteId !== null && docenteId !== undefined,
     retry: false,
-    staleTime: 30_000, // 30 segundos - balance entre frescura y performance
-    refetchOnMount: true, // Siempre refetch al montar el componente
-    refetchOnWindowFocus: false, // No refetch al volver al tab
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     ...options,
   });
 };
@@ -76,7 +105,6 @@ export const useSavePermissions = () => {
     mutationFn: (data: PermissionsResponse) =>
       permissionsManager.savePermissions(data),
     onSuccess: (_data, variables) => {
-      // Invalidar la caché de permisos para el docente específico
       queryClient.invalidateQueries({
         queryKey: ["permissions", variables.docenteId],
       });
