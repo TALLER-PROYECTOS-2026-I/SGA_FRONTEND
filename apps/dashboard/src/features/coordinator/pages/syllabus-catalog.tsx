@@ -48,7 +48,11 @@ interface SyllabusCatalogItem {
 }
 
 async function fetchJson(url: string) {
-  const response = await fetch(url);
+  const baseURL = import.meta.env.VITE_API_BASE_URL || "";
+  const cleanBaseURL = baseURL.replace(/\/$/, "");
+  const fullUrl = `${cleanBaseURL}${url}`;
+
+  const response = await fetch(fullUrl);
 
   if (!response.ok) {
     throw new Error(await response.text().catch(() => "Error al consultar API"));
