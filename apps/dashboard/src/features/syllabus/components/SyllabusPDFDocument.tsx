@@ -587,7 +587,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               label="Tipo de estudios"
               items={[
                 `General (${checked(datos.tipoEstudios, "general")})`,
-                `Específica (${checked(datos.tipoEstudios, "específica")})`,
+                `Específica (${checked(datos.tipoEstudios, "especifica") || checked(datos.tipoEstudios, "específica")})`,
                 `Especialidad (${checked(datos.tipoEstudios, "especialidad")})`,
               ]}
             />
@@ -597,7 +597,10 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               items={[
                 `Presencial (${checked(datos.modalidad, "presencial")})`,
                 `Semipresencial (${checked(datos.modalidad, "semipresencial")})`,
-                `A distancia (${checked(datos.modalidad, "aDistancia")})`,
+                `A distancia (${
+                  checked(datos.modalidad, "a distancia") ||
+                  checked(datos.modalidad, "aDistancia")
+                })`,
               ]}
             />
 
