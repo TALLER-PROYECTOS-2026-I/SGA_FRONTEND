@@ -251,8 +251,6 @@ export default function FourthStep() {
 
   const [selectedUnidad, setSelectedUnidad] = useState<number>(1);
   const [selectedSemana, setSelectedSemana] = useState<string>("1");
-  const [, setProgramacionForm] = useState<Partial<ProgramacionResponse>>({});
-
   const [entryForm, setEntryForm] = useState<EntryForm>(emptyEntryForm());
   const [listasPorSemana, setListasPorSemana] = useState<
     Record<string, SemanaEntry[]>
@@ -272,7 +270,6 @@ export default function FourthStep() {
       first.semanaInicio ?? unitWeekRanges[unidadNumero]?.[0] ?? 1,
     );
 
-    setProgramacionForm(first);
     setSelectedUnidad(unidadNumero);
     setSelectedSemana(semanaInicio);
     setListasPorSemana(

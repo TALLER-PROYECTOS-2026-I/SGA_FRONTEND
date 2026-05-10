@@ -9,7 +9,6 @@ import {
 } from "../hooks/fourth-step-query";
 import type {
   CreateProgramacionBody,
-  ProgramacionResponse,
   UpdateProgramacionBody,
 } from "../hooks/fourth-step-query";
 import { Step } from "./step";
@@ -156,7 +155,9 @@ const serializeConceptualesPorSemana = (
         .map((item) => item.contenidoConceptual.trim())
         .filter(Boolean);
 
-      return conceptos.length > 0 ? `Semana ${semana}:\n${conceptos.join("\n")}` : "";
+      return conceptos.length > 0
+        ? `Semana ${semana}:\n${conceptos.join("\n")}`
+        : "";
     })
     .filter(Boolean)
     .join("\n\n");
@@ -251,9 +252,6 @@ export default function FourthStep() {
 
   const [selectedUnidad, setSelectedUnidad] = useState<number>(1);
   const [selectedSemana, setSelectedSemana] = useState<string>("1");
-  const [programacionForm, setProgramacionForm] = useState<
-    Partial<ProgramacionResponse>
-  >({});
 
   const [entryForm, setEntryForm] = useState<EntryForm>(emptyEntryForm());
   const [listasPorSemana, setListasPorSemana] = useState<
@@ -274,7 +272,6 @@ export default function FourthStep() {
       first.semanaInicio ?? unitWeekRanges[unidadNumero]?.[0] ?? 1,
     );
 
-    setProgramacionForm(first);
     setSelectedUnidad(unidadNumero);
     setSelectedSemana(semanaInicio);
     setListasPorSemana(
@@ -469,9 +466,7 @@ export default function FourthStep() {
       nextStep();
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Error guardando programación",
+        error instanceof Error ? error.message : "Error guardando programación",
       );
     }
   };
@@ -642,7 +637,10 @@ export default function FourthStep() {
                     maxLength={400}
                     value={entryForm.contenidoConceptual}
                     onChange={(event) =>
-                      updateEntryField("contenidoConceptual", event.target.value)
+                      updateEntryField(
+                        "contenidoConceptual",
+                        event.target.value,
+                      )
                     }
                     placeholder="Ingrese el contenido conceptual..."
                     className="w-full min-h-[120px] rounded-2xl px-5 py-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
