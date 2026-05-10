@@ -251,7 +251,7 @@ export default function FourthStep() {
 
   const [selectedUnidad, setSelectedUnidad] = useState<number>(1);
   const [selectedSemana, setSelectedSemana] = useState<string>("1");
-  const [programacionForm, setProgramacionForm] = useState<
+  const [, setProgramacionForm] = useState<
     Partial<ProgramacionResponse>
   >({});
 

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const getApiBase = (baseUrl?: string): string => {
   return (
-    baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api"
+    baseUrl ?? import.meta.env.VITE_API_BASE_URL ??
   );
 };
 
