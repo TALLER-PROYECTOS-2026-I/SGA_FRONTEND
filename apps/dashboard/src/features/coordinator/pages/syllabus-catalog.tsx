@@ -62,7 +62,7 @@ async function fetchJson(url: string) {
 }
 
 async function fetchSyllabusCatalog() {
-  const json = await fetchJson("/api/syllabus/catalog");
+  const json = await fetchJson("/syllabus/catalog");
 
   const data = Array.isArray(json)
     ? json
