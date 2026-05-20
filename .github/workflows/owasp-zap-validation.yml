@@ -9,6 +9,10 @@ on:
       - dev
       - main
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   zap-scan:
     runs-on: ubuntu-latest
@@ -36,8 +40,8 @@ jobs:
         with:
           target: 'http://127.0.0.1:4010'
           format: openapi
-          file: swagger.yaml
           fail_action: false
+          allow_issue_writing: false
           cmd_options: '-I'
 
       - name: Subir reporte ZAP
