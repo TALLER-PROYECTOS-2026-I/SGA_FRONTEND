@@ -23,7 +23,7 @@ jobs:
       - name: Instalar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Instalar Prism
         run: npm install -g @stoplight/prism-cli
@@ -35,11 +35,10 @@ jobs:
         run: sleep 5
 
       - name: OWASP ZAP API Scan
-        uses: zaproxy/action-api-scan@v0.7.0
+        uses: zaproxy/action-api-scan@v0.9.0
         with:
           target: 'http://127.0.0.1:4010'
           format: openapi
           fail_action: false
           allow_issue_writing: false
           cmd_options: '-I'
-
