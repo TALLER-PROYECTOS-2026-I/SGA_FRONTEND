@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: SGA - API Backend
+  version: 1.0.0
+
+servers:
+  - url: http://127.0.0.1:4010
+
+paths:
+
+  /auth/login:
+    post:
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  description: Token de Azure AD (MSAL)
+                  example: "eyJhbGciOiJSUzI1NiJ9..."
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  usuario:
+                    $ref: '#/components/schemas/Usuario'
+        '401':
+          description: Token inválido
+
+  /usuarios:
+    get:
+      summary: Listar usuarios
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+        '401':
+          description: No autorizado
+
+  /usuarios/{id}:
+    get:
+      summary: Obtener usuario por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '404':
+          description: No encontrado
+
+  /cursos:
+    get:
+      summary: Listar cursos
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Curso'
+
+    post:
+      summary: Crear curso
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoInput'
+      responses:
+        '201':
+          description: Creado
+        '400':
+          description: Datos inválidos
+
+  /matriculas:
+    get:
+      summary: Listar matrículas
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: estudianteId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Matricula'
+
+    post:
+      summary: Crear matrícula
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatriculaInput'
+      responses:
+        '201':
+          description: Matrícula creada
+        '400':
+          description: Datos inválidos
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "u001"
+        nombre:
+          type: string
+          example: "Hugo Meneses"
+        email:
+          type: string
+          example: "hugo@usmp.pe"
+        rol:
+          type: string
+          enum: [admin, docente, estudiante]
+          example: "estudiante"
+
+    Curso:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "c001"
+        nombre:
+          type: string
+          example: "Ingeniería de Software"
+        codigo:
+          type: string
+          example: "IS-301"
+        creditos:
+          type: integer
+          example: 4
+        ciclo:
+          type: integer
+          example: 6
+
+    CursoInput:
+      type: object
+      required: [nombre, codigo, creditos, ciclo]
+      properties:
+        nombre:
+          type: string
+          example: "Ingeniería de Software"
+        codigo:
+          type: string
+          example: "IS-301"
+        creditos:
+          type: integer
+          example: 4
+        ciclo:
+          type: integer
+          example: 6
+
+    Matricula:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "m001"
+        estudianteId:
+          type: string
+          example: "u001"
+        cursoId:
+          type: string
+          example: "c001"
+        estado:
+          type: string
+          enum: [activa, anulada]
+          example: "activa"
+
+    MatriculaInput:
+      type: object
+      required: [estudianteId, cursoId]
+      properties:
+        estudianteId:
+          type: string
+          example: "u001"
+        cursoId:
+          type: string
+          example: "c001"

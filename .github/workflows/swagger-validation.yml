@@ -1,0 +1,27 @@
+name: Swagger Validation
+ 
+on:
+  push:
+    branches: [feature/swagger-docs]
+  pull_request:
+    branches: [dev, main]
+ 
+jobs:
+  validate-swagger:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+ 
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+ 
+      - name: Instalar Spectral
+        run: npm install -g @stoplight/spectral-cli
+ 
+      - name: Validar swagger.yaml
+        run: spectral lint swagger.yaml --ruleset .spectral.yaml
+ 
