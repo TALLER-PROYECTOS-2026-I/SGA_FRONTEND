@@ -1,1259 +1,892 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Image,
+} from "@react-pdf/renderer";
+import LogoUsmpSilabo from "@/assets/logo_usmp_silabo.jpeg";
+import { PdfUsmpPageFooter } from "./pdf-usmp-page-footer";
+import { EvaluationSection } from "./pdf/evaluation-pdf-parts";
+import { buildOutcomeRowsForPdf } from "./pdf/outcome-code";
+import { OutcomesTablePdf } from "./pdf/outcomes-table-pdf";
+import { fuenteText } from "./pdf/fuente-text";
+import { cleanPdfText, isPdfValueNonEmpty } from "./pdf/format-pdf-value";
+import {
+  ProgramActivityCell,
+  ProgramContentCell,
+  ProgramHourCell,
+  ProgramLines,
+} from "./pdf/render-program-lines";
+import { renderBulletList } from "./pdf/render-bullet-list";
+import {
+  formatTwoDigits,
+  getWeeks,
+  isEventWeek,
+  markOption,
+  resourceNoteText,
+  resourceText,
+  roman,
+  strategyText,
+  toNumber,
+} from "./pdf/syllabus-format-helpers";
+import { BulletList, GeneralRow, SectionTitle } from "./pdf/syllabus-pdf-ui";
 import type { CompleteSyllabus } from "../types/complete-syllabus";
 
 const styles = StyleSheet.create({
   page: {
-    padding: "20mm 15mm",
+    paddingTop: 28,
+    paddingHorizontal: 34,
+    paddingBottom: 92,
     fontFamily: "Helvetica",
-    fontSize: 10,
-    lineHeight: 1.2,
+    fontSize: 8,
+    lineHeight: 1.25,
+    color: "#111111",
   },
+
+  pageLandscape: {
+    paddingTop: 24,
+    paddingBottom: 86,
+    paddingHorizontal: 26,
+    fontFamily: "Helvetica",
+    fontSize: 6.4,
+    lineHeight: 1.18,
+    color: "#000000",
+  },
+
+  header: {
+    width: "100%",
+    marginBottom: 10,
+    alignItems: "flex-start",
+  },
+
+  logo: {
+    width: 190,
+    height: 50,
+    objectFit: "contain",
+  },
+
+  titleBlock: {
+    textAlign: "center",
+    marginBottom: 12,
+  },
+
   title: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  mainTitle: {
-    fontSize: 14,
+
+  courseTitle: {
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
-    marginBottom: 2,
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 11,
+
+  areaTitle: {
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
-    marginBottom: 6,
+    textTransform: "uppercase",
   },
+
+  section: {
+    marginBottom: 10,
+  },
+
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginTop: 6,
+    marginTop: 7,
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+
+  text: {
+    fontSize: 8.5,
+    lineHeight: 1.2,
+    marginBottom: 4,
+    textAlign: "justify",
+  },
+
+  paragraph: {
+    fontSize: 8,
+    lineHeight: 1.22,
+    marginBottom: 4,
+    textAlign: "justify",
+  },
+
+  textBold: {
+    fontFamily: "Helvetica-Bold",
+  },
+
+  textItalic: {
+    fontFamily: "Helvetica-Oblique",
+  },
+
+  listItem: {
+    fontSize: 8.2,
+    marginBottom: 2,
+    marginLeft: 10,
+    textAlign: "justify",
+  },
+
+  subsectionTitle: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 4,
     marginBottom: 3,
   },
-  table: {
-    width: "100%",
-    border: "1pt solid black",
-    marginBottom: 6,
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottom: "1pt solid black",
-  },
-  tableCell: {
-    padding: "3pt 5pt",
-    borderRight: "1pt solid black",
-    fontSize: 10,
-  },
-  tableCellHeader: {
-    padding: "3pt 5pt",
-    borderRight: "1pt solid black",
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    backgroundColor: "#f0f0f0",
-  },
-  tableCellLeft: {
-    width: "40%",
-  },
-  tableCellRight: {
-    width: "60%",
-  },
-  text: {
-    fontSize: 10,
+
+  bulletText: {
+    fontSize: 8,
+    lineHeight: 1.2,
     marginBottom: 2,
     textAlign: "justify",
   },
-  textBold: {
-    fontSize: 10,
+
+  emptyText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Oblique",
+    color: "#555",
+  },
+
+  generalTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginBottom: 8,
+  },
+
+  generalRow: {
+    flexDirection: "row",
+    minHeight: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+
+  generalRowLast: {
+    flexDirection: "row",
+    minHeight: 16,
+  },
+
+  generalLabel: {
+    width: "38%",
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    fontSize: 7.5,
+  },
+
+  generalValue: {
+    width: "62%",
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    fontSize: 7.5,
+  },
+
+  generalValueText: {
+    fontSize: 7.5,
+  },
+
+  splitRow: {
+    flexDirection: "row",
+    width: "60%",
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#000000",
+  },
+
+  splitCell: {
+    flex: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    borderRightWidth: 1,
+    borderColor: "#000000",
+    justifyContent: "center",
+  },
+
+  splitCellLast: {
+    flex: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    justifyContent: "center",
+  },
+
+  hoursBlock: {
+    width: "100%",
+  },
+
+  hoursLine: {
+    fontSize: 7.5,
+    marginBottom: 2,
+  },
+
+  programUnitTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginBottom: 10,
+  },
+
+  programUnitTitle: {
+    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    textAlign: "center",
+  },
+
+  programUnitTitleText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+  },
+
+  programCapacity: {
+    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    fontSize: 7,
+  },
+
+  programHeaderRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    minHeight: 18,
+  },
+
+  programRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+
+  programCell: {
+    padding: 2.5,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    fontSize: 6.2,
+  },
+
+  programCellLast: {
+    padding: 2.5,
+    fontSize: 6.2,
+  },
+
+  programHeaderText: {
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+  },
+
+  programText: {
+    fontSize: 6.2,
+    lineHeight: 1.15,
+  },
+
+  hourText: {
+    fontSize: 6.5,
+    textAlign: "center",
+  },
+
+  programWeekCell: {
+    width: "5%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  programConceptualCell: {
+    width: "24%",
+  },
+
+  programProceduralCell: {
+    width: "24%",
+  },
+
+  programActivityCell: {
+    width: "23%",
+  },
+
+  programHourCell: {
+    width: "6%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  compactTable: {
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: "#000000",
+    marginTop: 6,
+  },
+
+  compactRow: {
+    flexDirection: "row",
+  },
+
+  compactHeaderCell: {
+    padding: 4,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#000000",
+    fontFamily: "Helvetica-Bold",
+    fontSize: 7.3,
+  },
+
+  compactCell: {
+    padding: 4,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#000000",
+    fontSize: 7.3,
+  },
+
+  outcomesTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginTop: 6,
+  },
+
+  outcomeHeaderRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    minHeight: 16,
+  },
+
+  outcomeRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+
+  outcomeRowLast: {
+    flexDirection: "row",
+  },
+
+  outcomeCodeCell: {
+    width: "10%",
+    padding: 3,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    fontSize: 7,
+    textAlign: "center",
+  },
+
+  outcomeDescriptionCell: {
+    width: "78%",
+    padding: 3,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    fontSize: 7,
+  },
+
+  outcomeValueCell: {
+    width: "12%",
+    padding: 3,
+    fontSize: 7,
+    textAlign: "center",
     fontFamily: "Helvetica-Bold",
   },
-  textItalic: {
-    fontSize: 10,
-    fontFamily: "Helvetica-Oblique",
+
+  outcomeHeaderText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
   },
-  listItem: {
-    fontSize: 10,
-    marginLeft: 15,
-    marginBottom: 2,
+
+  outcomeText: {
+    fontSize: 7,
+    lineHeight: 1.2,
+  },
+
+  outcomeCenteredText: {
+    fontSize: 7,
+    lineHeight: 1.2,
+    textAlign: "center",
+  },
+
+  outcomeValueText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+  },
+
+  formulaText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4,
   },
 });
 
-interface SyllabusPDFDocumentProps {
+type SyllabusPDFDocumentProps = Readonly<{
   data: CompleteSyllabus;
-}
+}>;
+
+const pdfUiStyles = {
+  generalRow: styles.generalRow,
+  generalRowLast: styles.generalRowLast,
+  generalLabel: styles.generalLabel,
+  generalValue: styles.generalValue,
+  generalValueText: styles.generalValueText,
+  sectionTitle: styles.sectionTitle,
+  bulletText: styles.bulletText,
+  emptyText: styles.emptyText,
+};
+
+const evaluationPdfStyles = {
+  text: styles.text,
+  textBold: styles.textBold,
+  formulaText: styles.formulaText,
+};
+
+const outcomesTableStyles = {
+  outcomesTable: styles.outcomesTable,
+  outcomeHeaderRow: styles.outcomeHeaderRow,
+  outcomeRow: styles.outcomeRow,
+  outcomeRowLast: styles.outcomeRowLast,
+  outcomeCodeCell: styles.outcomeCodeCell,
+  outcomeDescriptionCell: styles.outcomeDescriptionCell,
+  outcomeValueCell: styles.outcomeValueCell,
+  outcomeHeaderText: styles.outcomeHeaderText,
+  outcomeText: styles.outcomeText,
+  outcomeCenteredText: styles.outcomeCenteredText,
+  outcomeValueText: styles.outcomeValueText,
+};
 
 export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
+  const datos = data.datosGenerales;
+
+  const bibliograficas = data.fuentes?.filter(
+    (fuente) => fuente.tipo !== "WEB",
+  );
+
+  const electronicas = data.fuentes?.filter((fuente) => fuente.tipo === "WEB");
+
+  const horasTeoria = toNumber(datos.horasTeoria);
+  const horasPractica = toNumber(datos.horasPractica);
+  const totalHoras =
+    toNumber(datos.horasTotales) || horasTeoria + horasPractica;
+  const creditosTeoria = toNumber(datos.creditosTeoria);
+  const creditosPractica = toNumber(datos.creditosPractica);
+  const totalCreditos =
+    toNumber(datos.creditosTotales) || creditosTeoria + creditosPractica;
+  const outcomeRows = buildOutcomeRowsForPdf(data.aportesResultadosPrograma);
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Encabezado */}
-        <Text style={styles.title}>SÍLABO</Text>
-        <Text style={styles.mainTitle}>
-          {data.datosGenerales.nombreAsignatura?.toUpperCase() || ""}
-        </Text>
-        <Text style={styles.subtitle}>
-          ÁREA CURRICULAR:{" "}
-          {data.datosGenerales.areaCurricular?.toUpperCase() || ""}
-        </Text>
+        <View style={styles.header}>
+          <Image src={LogoUsmpSilabo} style={styles.logo} />
+        </View>
 
-        {/* I. DATOS GENERALES */}
-        <View>
-          <Text style={styles.sectionTitle}>I. DATOS GENERALES</Text>
-          <View style={styles.table}>
-            {/* Departamento Académico */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Departamento Académico</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.departamentoAcademico || ""}</Text>
-              </View>
-            </View>
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>SÍLABO</Text>
+          <Text style={styles.courseTitle}>
+            {cleanPdfText(datos.nombreAsignatura).toUpperCase()}
+          </Text>
+          <Text style={styles.areaTitle}>
+            ÁREA CURRICULAR:{" "}
+            {cleanPdfText(
+              datos.areaCurricular || "TECNOLOGÍA DE INFORMACIÓN",
+            ).toUpperCase()}
+          </Text>
+        </View>
 
-            {/* Escuela Profesional */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Escuela Profesional</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.escuelaProfesional || ""}</Text>
-              </View>
-            </View>
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            I. DATOS GENERALES
+          </SectionTitle>
 
-            {/* Programa académico */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Programa académico</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.programaAcademico || ""}</Text>
-              </View>
-            </View>
+          <View style={styles.generalTable}>
+            <GeneralRow styles={pdfUiStyles} label="Departamento Académico">
+              {datos.departamentoAcademico || ""}
+            </GeneralRow>
 
-            {/* Semestre Académico */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Semestre Académico</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.semestreAcademico || ""}</Text>
-              </View>
-            </View>
+            <GeneralRow styles={pdfUiStyles} label="Escuela Profesional">
+              {datos.escuelaProfesional || ""}
+            </GeneralRow>
 
-            {/* Tipo de asignatura */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Tipo de asignatura</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.tipoAsignatura || ""}</Text>
-              </View>
-            </View>
+            <GeneralRow styles={pdfUiStyles} label="Programa académico">
+              {datos.programaAcademico || ""}
+            </GeneralRow>
 
-            {/* Código de la asignatura */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Código de la asignatura</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.codigoAsignatura || ""}</Text>
-              </View>
-            </View>
+            <GeneralRow styles={pdfUiStyles} label="Semestre Académico">
+              {datos.semestreAcademico || ""}
+            </GeneralRow>
 
-            {/* Ciclo */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Ciclo</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.ciclo || ""}</Text>
-              </View>
-            </View>
+            <GeneralRow styles={pdfUiStyles} label="Tipo de asignatura">
+              {datos.tipoAsignatura || ""}
+            </GeneralRow>
 
-            {/* Cantidad de Créditos */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Cantidad de Créditos</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>
-                  Teoría ({data.datosGenerales.creditosTeoria || "00"}) Práctica
-                  ({data.datosGenerales.creditosPractica || "00"}) Total
-                  créditos ({data.datosGenerales.creditosTotales || "00"})
+            <GeneralRow styles={pdfUiStyles} label="Tipo de estudios">
+              {`General (${markOption(datos.tipoEstudios, "general")})    Específica (${markOption(datos.tipoEstudios, "específica")})    Especialidad (${markOption(datos.tipoEstudios, "especialidad")})`}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Modalidad de la asignatura">
+              {`Presencial (${markOption(datos.modalidad, "presencial")})    Semipresencial (${markOption(datos.modalidad, "semipresencial")})    A distancia (${markOption(datos.modalidad, "a distancia")})`}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Código de la asignatura">
+              {datos.codigoAsignatura || ""}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Ciclo">
+              {datos.ciclo || ""}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Requisitos">
+              {datos.requisitos || "Ninguno"}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Cantidad de horas">
+              <View style={styles.hoursBlock}>
+                <Text style={styles.hoursLine}>
+                  Teoría ({formatTwoDigits(horasTeoria)}) Práctica (
+                  {formatTwoDigits(horasPractica)}) Total horas (
+                  {formatTwoDigits(totalHoras)})
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Teoría lectiva presencial ({formatTwoDigits(horasTeoria)})
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Teoría lectiva a distancia ( )
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Teoría no lectiva presencial ( )
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Teoría no lectiva a distancia ( )
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Práctica lectiva presencial ({formatTwoDigits(horasPractica)})
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Práctica lectiva a distancia ( )
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Práctica no lectiva presencial ( )
+                </Text>
+                <Text style={styles.hoursLine}>
+                  Práctica no lectiva a distancia ( )
                 </Text>
               </View>
-            </View>
+            </GeneralRow>
 
-            {/* Docente(s) */}
-            <View style={styles.tableRow}>
-              <View style={[styles.tableCell, styles.tableCellLeft]}>
-                <Text>Docente(s)</Text>
-              </View>
-              <View style={[styles.tableCell, styles.tableCellRight]}>
-                <Text>{data.datosGenerales.docentes || ""}</Text>
-              </View>
-            </View>
+            <GeneralRow styles={pdfUiStyles} label="Cantidad de Créditos">
+              {`Teoría (${formatTwoDigits(creditosTeoria)})    Práctica (${formatTwoDigits(creditosPractica)})    Total créditos (${formatTwoDigits(totalCreditos)})`}
+            </GeneralRow>
+
+            <GeneralRow styles={pdfUiStyles} label="Docente(s)" last>
+              {datos.docentes || "Pendiente de asignación"}
+            </GeneralRow>
           </View>
         </View>
 
-        {/* II. SUMILLA */}
-        <View>
-          <Text style={styles.sectionTitle}>II. SUMILLA</Text>
-          <Text style={styles.text}>{data.sumilla || ""}</Text>
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>II. SUMILLA</SectionTitle>
+          {isPdfValueNonEmpty(data.sumilla) ? (
+            <Text style={styles.paragraph}>
+              {cleanPdfText(data.sumilla).trim()}
+            </Text>
+          ) : (
+            <Text style={styles.emptyText}>Sin información registrada.</Text>
+          )}
         </View>
 
-        {/* III. COMPETENCIAS */}
-        <View>
-          <Text style={styles.sectionTitle}>
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
             III. COMPETENCIAS Y SUS COMPONENTES COMPRENDIDOS EN LA ASIGNATURA
-          </Text>
+          </SectionTitle>
 
-          {/* Competencias del Curso */}
-          {data.competenciasCurso && data.competenciasCurso.length > 0 && (
-            <View>
-              <Text style={styles.textBold}>3.1 Competencia</Text>
-              {data.competenciasCurso.map((comp, idx) => (
-                <Text key={idx} style={styles.listItem}>
-                  - {comp.descripcion} ({comp.codigo})
-                </Text>
-              ))}
-            </View>
+          <Text style={styles.subsectionTitle}>3.1. Competencias</Text>
+          <BulletList
+            bulletStyle={styles.bulletText}
+            emptyStyle={styles.emptyText}
+            items={data.competenciasCurso}
+          />
+
+          <Text style={styles.subsectionTitle}>3.2. Componentes</Text>
+
+          <Text style={styles.subsectionTitle}>Capacidades</Text>
+          <BulletList
+            bulletStyle={styles.bulletText}
+            emptyStyle={styles.emptyText}
+            items={data.componentesConceptuales}
+          />
+
+          {data.componentesProcedimentales?.length > 0 && (
+            <>
+              <Text style={styles.subsectionTitle}>Procedimentales</Text>
+              <BulletList
+                bulletStyle={styles.bulletText}
+                emptyStyle={styles.emptyText}
+                items={data.componentesProcedimentales}
+              />
+            </>
           )}
 
-          {/* Componentes Conceptuales */}
-          {data.componentesConceptuales &&
-            data.componentesConceptuales.length > 0 && (
-              <View style={{ marginTop: 6 }}>
-                <Text style={styles.textBold}>
-                  3.2 Componentes Conceptuales
-                </Text>
-                {data.componentesConceptuales.map((comp, idx) => (
-                  <Text key={idx} style={styles.listItem}>
-                    - {comp.descripcion} ({comp.codigo})
-                  </Text>
-                ))}
-              </View>
-            )}
-
-          {/* Componentes Procedimentales */}
-          {data.componentesProcedimentales &&
-            data.componentesProcedimentales.length > 0 && (
-              <View style={{ marginTop: 6 }}>
-                <Text style={styles.textBold}>
-                  3.3 Componentes Procedimentales
-                </Text>
-                {data.componentesProcedimentales.map((comp, idx) => (
-                  <Text key={idx} style={styles.listItem}>
-                    - {comp.descripcion} ({comp.codigo})
-                  </Text>
-                ))}
-              </View>
-            )}
-
-          {/* Contenidos actitudinales */}
-          {data.componentesActitudinales &&
-            data.componentesActitudinales.length > 0 && (
-              <View style={{ marginTop: 6 }}>
-                <Text style={styles.textBold}>Contenidos actitudinales</Text>
-                {data.componentesActitudinales.map((cont, idx) => (
-                  <Text key={idx} style={styles.listItem}>
-                    - {cont.descripcion} ({cont.codigo})
-                  </Text>
-                ))}
-              </View>
-            )}
+          <Text style={styles.subsectionTitle}>Contenidos actitudinales</Text>
+          <BulletList
+            bulletStyle={styles.bulletText}
+            emptyStyle={styles.emptyText}
+            items={data.componentesActitudinales}
+          />
         </View>
+
+        <PdfUsmpPageFooter />
       </Page>
 
-      {/* Página 2: Programación de Contenidos - FORMATO HORIZONTAL */}
-      <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.sectionTitle}>IV. PROGRAMACIÓN DE CONTENIDOS</Text>
+      <Page size="A4" orientation="landscape" style={styles.pageLandscape}>
+        <SectionTitle style={styles.sectionTitle}>
+          IV. PROGRAMACIÓN DE CONTENIDOS
+        </SectionTitle>
 
-        {data.unidadesDidacticas &&
-          data.unidadesDidacticas.map((unidad, idx) => (
-            <View
-              key={idx}
-              style={{ marginBottom: 10, border: "1pt solid black" }}
-              wrap={false}
-            >
-              {/* Título de la unidad - centrado */}
-              <View
-                style={{
-                  backgroundColor: "#d9d9d9",
-                  padding: "6pt",
-                  borderBottom: "1pt solid black",
-                }}
-              >
-                <Text
-                  style={[
-                    styles.textBold,
-                    { textAlign: "center", fontSize: 10 },
-                  ]}
-                >
-                  UNIDAD {unidad.numero}: {unidad.titulo?.toUpperCase() || ""}
+        {data.unidadesDidacticas?.map((unidad) => {
+          const semanas = getWeeks(unidad);
+
+          return (
+            <View key={unidad.id} style={styles.programUnitTable}>
+              <View style={styles.programUnitTitle} wrap={false}>
+                <Text style={styles.programUnitTitleText}>
+                  UNIDAD {roman(unidad.numero)} :{" "}
+                  {cleanPdfText(unidad.titulo).toUpperCase()}
                 </Text>
               </View>
 
-              {/* Fila CAPACIDAD que abarca todo el ancho */}
-              <View style={{ borderBottom: "1pt solid black" }}>
-                <View style={{ padding: "4pt 6pt" }}>
-                  <Text style={[styles.textBold, { fontSize: 9 }]}>
-                    CAPACIDAD:
-                  </Text>
-                  {unidad.contenidosConceptuales
-                    ?.split("\n")
-                    .map((linea, i) => (
-                      <Text
-                        key={i}
-                        style={{ fontSize: 8, marginLeft: 8, marginTop: 1 }}
-                      >
-                        - {linea.trim()}
-                      </Text>
-                    ))}
-                </View>
+              <View style={styles.programCapacity}>
+                <Text style={styles.programText}>
+                  <Text style={styles.textBold}>CAPACIDAD:</Text>
+                </Text>
+                <ProgramLines
+                  content={unidad.capacidadesText}
+                  programTextStyle={styles.programText}
+                />
               </View>
 
-              {/* Fila de encabezados de columnas */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  backgroundColor: "#ffffff",
-                  borderBottom: "1pt solid black",
-                }}
-              >
-                <View
-                  style={{
-                    width: "6%",
-                    padding: "3pt 2pt",
-                    borderRight: "1pt solid black",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 7, textAlign: "center" },
-                    ]}
-                  >
-                    SEMANA
-                  </Text>
+              <View style={styles.programHeaderRow} wrap={false}>
+                <View style={[styles.programCell, styles.programWeekCell]}>
+                  <Text style={styles.programHeaderText}>SEMANA</Text>
                 </View>
+
                 <View
-                  style={{
-                    width: "29%",
-                    padding: "3pt",
-                    borderRight: "1pt solid black",
-                    justifyContent: "center",
-                  }}
+                  style={[styles.programCell, styles.programConceptualCell]}
                 >
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 7, textAlign: "center" },
-                    ]}
-                  >
+                  <Text style={styles.programHeaderText}>
                     CONTENIDOS CONCEPTUALES
                   </Text>
                 </View>
+
                 <View
-                  style={{
-                    width: "22%",
-                    padding: "3pt",
-                    borderRight: "1pt solid black",
-                    justifyContent: "center",
-                  }}
+                  style={[styles.programCell, styles.programProceduralCell]}
                 >
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 7, textAlign: "center" },
-                    ]}
-                  >
+                  <Text style={styles.programHeaderText}>
                     CONTENIDOS PROCEDIMENTALES
                   </Text>
                 </View>
-                <View
-                  style={{
-                    width: "21%",
-                    padding: "3pt",
-                    borderRight: "1pt solid black",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 7, textAlign: "center" },
-                    ]}
-                  >
-                    ACTIVIDAD DE APRENDIZAJE
+
+                <View style={[styles.programCell, styles.programActivityCell]}>
+                  <Text style={styles.programHeaderText}>
+                    ACTIVIDADES DE APRENDIZAJE
                   </Text>
                 </View>
-                <View
-                  style={{
-                    width: "10%",
-                    padding: "2pt 1pt",
-                    borderRight: "1pt solid black",
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 6.5, textAlign: "center", marginBottom: 2 },
-                    ]}
-                  >
-                    HORAS
-                  </Text>
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 6.5, textAlign: "center", marginBottom: 2 },
-                    ]}
-                  >
-                    LECTIVAS
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      borderTop: "1pt solid black",
-                      paddingTop: 1,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flex: 1,
-                        borderRight: "0.5pt solid black",
-                        paddingRight: 1,
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.textBold,
-                          { fontSize: 6, textAlign: "center" },
-                        ]}
-                      >
-                        TEORÍA
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, paddingLeft: 1 }}>
-                      <Text
-                        style={[
-                          styles.textBold,
-                          { fontSize: 6, textAlign: "center" },
-                        ]}
-                      >
-                        PRÁCTICA
-                      </Text>
-                    </View>
-                  </View>
+
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HL TEORÍA</Text>
                 </View>
-                <View style={{ width: "12%", padding: "2pt 1pt" }}>
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 6.5, textAlign: "center", marginBottom: 2 },
-                    ]}
-                  >
-                    HORAS NO
-                  </Text>
-                  <Text
-                    style={[
-                      styles.textBold,
-                      { fontSize: 6.5, textAlign: "center", marginBottom: 2 },
-                    ]}
-                  >
-                    LECTIVAS
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      borderTop: "1pt solid black",
-                      paddingTop: 1,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flex: 1,
-                        borderRight: "0.5pt solid black",
-                        paddingRight: 1,
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.textBold,
-                          { fontSize: 6, textAlign: "center" },
-                        ]}
-                      >
-                        TEORÍA
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, paddingLeft: 1 }}>
-                      <Text
-                        style={[
-                          styles.textBold,
-                          { fontSize: 6, textAlign: "center" },
-                        ]}
-                      >
-                        PRÁCTICA
-                      </Text>
-                    </View>
-                  </View>
+
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HL PRÁCTICA</Text>
+                </View>
+
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HNL TEORÍA</Text>
+                </View>
+
+                <View style={[styles.programCellLast, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HNL PRÁCTICA</Text>
                 </View>
               </View>
 
-              {/* Filas con el contenido - una fila por cada semana */}
-              {(unidad.semanas || []).map((semana, semanaIdx) => {
-                const numeroSemana = semana.semana;
+              {semanas.map((semana) => {
+                const isEvent = isEventWeek(semana);
 
                 return (
                   <View
-                    key={semanaIdx}
-                    style={{
-                      flexDirection: "row",
-                      borderTop: semanaIdx > 0 ? "1pt solid black" : "none",
-                      minHeight: 50,
-                    }}
+                    key={semana.id || semana.semana}
+                    style={styles.programRow}
                   >
-                    <View
-                      style={{
-                        width: "6%",
-                        padding: "4pt 2pt",
-                        borderRight: "1pt solid black",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
-                      }}
-                    >
-                      <Text style={{ fontSize: 8, textAlign: "center" }}>
-                        {numeroSemana}
-                      </Text>
+                    <View style={[styles.programCell, styles.programWeekCell]}>
+                      <Text style={styles.hourText}>{semana.semana}</Text>
                     </View>
-                    <View
-                      style={{
-                        width: "29%",
-                        padding: "3pt 4pt",
-                        borderRight: "1pt solid black",
-                      }}
-                    >
-                      {semana.contenidosConceptuales && (
-                        <Text
-                          style={{
-                            fontSize: 7.5,
-                            marginBottom: 1.5,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {semana.contenidosConceptuales}
-                        </Text>
-                      )}
-                    </View>
-                    <View
-                      style={{
-                        width: "22%",
-                        padding: "3pt 4pt",
-                        borderRight: "1pt solid black",
-                      }}
-                    >
-                      {semana.contenidosProcedimentales && (
-                        <Text
-                          style={{
-                            fontSize: 7.5,
-                            marginBottom: 1.5,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {semana.contenidosProcedimentales}
-                        </Text>
-                      )}
-                    </View>
-                    <View
-                      style={{
-                        width: "21%",
-                        padding: "3pt 4pt",
-                        borderRight: "1pt solid black",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginBottom: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: "Helvetica-Bold",
-                            textDecoration: "underline",
-                          }}
-                        >
-                          Taller:
-                        </Text>
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginLeft: 4,
-                          marginBottom: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        - Trabajo grupal en el proyecto – 2 h
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginBottom: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        - Exposición del proyecto final – 2 h
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginBottom: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        - Reunión de coordinación diaria –3 h
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginBottom: 3,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        - Crea informe final del proyecto –3 h.
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginBottom: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: "Helvetica-Bold",
-                            textDecoration: "underline",
-                          }}
-                        >
-                          De trabajo independiente:
-                        </Text>
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 7.5,
-                          marginLeft: 4,
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        - No aplica
-                      </Text>
-                    </View>
-                    <View
-                      style={{ width: "10%", borderRight: "1pt solid black" }}
-                    >
-                      <View
-                        style={{
-                          flex: 1,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flex: 1,
-                            borderRight: "0.5pt solid black",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 7.5, textAlign: "center" }}>
-                            {unidad.horasLectivasTeoria || 0}
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 7.5, textAlign: "center" }}>
-                            {unidad.horasLectivasPractica || 0}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={{ width: "12%" }}>
-                      <View
-                        style={{
-                          flex: 1,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flex: 1,
-                            borderRight: "0.5pt solid black",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 7.5, textAlign: "center" }}>
-                            {unidad.horasNoLectivasTeoria || 0}
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 7.5, textAlign: "center" }}>
-                            {unidad.horasNoLectivasPractica || 0}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
+
+                    <ProgramContentCell
+                      isEvent={isEvent}
+                      content={semana.contenidosConceptuales}
+                      cellStyle={[
+                        styles.programCell,
+                        styles.programConceptualCell,
+                      ]}
+                      programTextStyle={styles.programText}
+                    />
+
+                    <ProgramContentCell
+                      isEvent={isEvent}
+                      content={semana.contenidosProcedimentales}
+                      cellStyle={[
+                        styles.programCell,
+                        styles.programProceduralCell,
+                      ]}
+                      programTextStyle={styles.programText}
+                    />
+
+                    <ProgramActivityCell
+                      isEvent={isEvent}
+                      semana={semana}
+                      cellStyle={[
+                        styles.programCell,
+                        styles.programActivityCell,
+                      ]}
+                      programTextStyle={styles.programText}
+                    />
+
+                    <ProgramHourCell
+                      value={isEvent ? 0 : (semana.horasLectivasTeoria ?? 0)}
+                      cellStyle={[styles.programCell, styles.programHourCell]}
+                      hourTextStyle={styles.hourText}
+                    />
+
+                    <ProgramHourCell
+                      value={isEvent ? 0 : (semana.horasLectivasPractica ?? 0)}
+                      cellStyle={[styles.programCell, styles.programHourCell]}
+                      hourTextStyle={styles.hourText}
+                    />
+
+                    <ProgramHourCell
+                      value={isEvent ? 0 : (semana.horasNoLectivasTeoria ?? 0)}
+                      cellStyle={[styles.programCell, styles.programHourCell]}
+                      hourTextStyle={styles.hourText}
+                    />
+
+                    <ProgramHourCell
+                      value={
+                        isEvent ? 0 : (semana.horasNoLectivasPractica ?? 0)
+                      }
+                      cellStyle={[
+                        styles.programCellLast,
+                        styles.programHourCell,
+                      ]}
+                      hourTextStyle={styles.hourText}
+                    />
                   </View>
                 );
               })}
             </View>
-          ))}
+          );
+        })}
+
+        <PdfUsmpPageFooter landscape />
       </Page>
 
-      {/* Página 3: Resto de secciones */}
       <Page size="A4" style={styles.page}>
-        {/* V. ESTRATEGIAS METODOLÓGICAS */}
-        {data.estrategiasMetodologicas &&
-          data.estrategiasMetodologicas.length > 0 && (
-            <View style={{ marginBottom: 12 }}>
-              <Text style={styles.sectionTitle}>
-                V. ESTRATEGIAS METODOLÓGICAS
-              </Text>
-              {data.estrategiasMetodologicas.map((estrategia, idx) => (
-                <View key={idx} style={{ marginBottom: 8 }}>
-                  <Text style={{ ...styles.text, fontWeight: "bold" }}>
-                    {estrategia.nombre}
-                  </Text>
-                  <Text style={styles.text}>{estrategia.descripcion}</Text>
-                </View>
-              ))}
-            </View>
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            V. ESTRATEGIAS DIDÁCTICAS
+          </SectionTitle>
+          {renderBulletList(
+            (data.estrategiasMetodologicas ?? []).map(strategyText),
+            styles.bulletText,
+            styles.emptyText,
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            VI. RECURSOS DIDÁCTICOS
+          </SectionTitle>
+          {renderBulletList(
+            [
+              ...(data.recursosDidacticos?.notas ?? []).map(resourceNoteText),
+              ...(data.recursosDidacticos?.recursos ?? []).map(resourceText),
+            ],
+            styles.bulletText,
+            styles.emptyText,
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            VII. EVALUACIÓN DEL APRENDIZAJE
+          </SectionTitle>
+
+          <EvaluationSection
+            evaluacion={data.evaluacionAprendizaje}
+            styles={evaluationPdfStyles}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            VIII. FUENTES DE INFORMACIÓN.
+          </SectionTitle>
+
+          {bibliograficas?.length > 0 && (
+            <>
+              <Text style={styles.subsectionTitle}>8.1 Bibliográficas</Text>
+              {renderBulletList(
+                bibliograficas.map(fuenteText),
+                styles.bulletText,
+                styles.emptyText,
+              )}
+            </>
           )}
 
-        {/* VI. RECURSOS DIDÁCTICOS */}
-        {data.recursosDidacticos && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.sectionTitle}>VI. RECURSOS DIDÁCTICOS</Text>
-
-            {/* Notas */}
-            {data.recursosDidacticos.notas &&
-              data.recursosDidacticos.notas.length > 0 && (
-                <View style={{ marginBottom: 8 }}>
-                  <Text style={{ ...styles.text, fontWeight: "bold" }}>
-                    Notas:
-                  </Text>
-                  {data.recursosDidacticos.notas.map((nota, idx) => (
-                    <Text key={idx} style={styles.listItem}>
-                      - {nota.nombre}: {nota.descripcion}
-                    </Text>
-                  ))}
-                </View>
+          {electronicas?.length > 0 && (
+            <>
+              <Text style={styles.subsectionTitle}>8.2 Electrónicas</Text>
+              {renderBulletList(
+                electronicas.map(fuenteText),
+                styles.bulletText,
+                styles.emptyText,
               )}
-
-            {/* Recursos */}
-            {data.recursosDidacticos.recursos &&
-              data.recursosDidacticos.recursos.length > 0 && (
-                <View>
-                  <Text style={{ ...styles.text, fontWeight: "bold" }}>
-                    Recursos:
-                  </Text>
-                  {data.recursosDidacticos.recursos.map((recurso, idx) => (
-                    <Text key={idx} style={styles.listItem}>
-                      - {recurso.recursoNombre} ({recurso.destino})
-                      {recurso.observaciones && ` - ${recurso.observaciones}`}
-                    </Text>
-                  ))}
-                </View>
-              )}
-          </View>
-        )}
-
-        {/* VII. EVALUACIÓN DEL APRENDIZAJE */}
-        {data.evaluacionAprendizaje && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.sectionTitle}>
-              VII. EVALUACIÓN DEL APRENDIZAJE
-            </Text>
-
-            {/* Nueva estructura con formulaEvaluacion */}
-            {data.evaluacionAprendizaje.formulaEvaluacion && (
-              <View>
-                {/* Texto introductorio */}
-                <Text style={[styles.text, { marginTop: 6, marginBottom: 8 }]}>
-                  El promedio final (PF) de la asignatura se obtiene con la
-                  siguiente fórmula:
-                </Text>
-
-                {/* Fórmula principal */}
-                <Text
-                  style={[
-                    styles.text,
-                    {
-                      textAlign: "center",
-                      fontFamily: "Helvetica-Bold",
-                      marginBottom: 8,
-                      fontSize: 10,
-                    },
-                  ]}
-                >
-                  {
-                    data.evaluacionAprendizaje.formulaEvaluacion
-                      .variableFinalCodigo
-                  }{" "}
-                  ={" "}
-                  {data.evaluacionAprendizaje.formulaEvaluacion.expresionFinal}
-                </Text>
-
-                {/* Donde: */}
-                <Text style={[styles.text, { marginBottom: 4 }]}>Donde:</Text>
-
-                {/* Variables */}
-                {data.evaluacionAprendizaje.formulaEvaluacion.variables &&
-                  data.evaluacionAprendizaje.formulaEvaluacion.variables
-                    .length > 0 && (
-                    <View style={{ marginLeft: 10, marginBottom: 8 }}>
-                      {data.evaluacionAprendizaje.formulaEvaluacion.variables.map(
-                        (variable, idx) => (
-                          <Text
-                            key={idx}
-                            style={[styles.text, { marginBottom: 2 }]}
-                          >
-                            {variable.codigo} = {variable.descripcion}
-                          </Text>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Subfórmulas */}
-                {data.evaluacionAprendizaje.formulaEvaluacion.subformulas &&
-                  data.evaluacionAprendizaje.formulaEvaluacion.subformulas
-                    .length > 0 && (
-                    <View style={{ marginLeft: 10, marginBottom: 8 }}>
-                      {data.evaluacionAprendizaje.formulaEvaluacion.subformulas.map(
-                        (subformula, idx) => (
-                          <Text
-                            key={idx}
-                            style={[styles.text, { marginBottom: 2 }]}
-                          >
-                            {subformula.variableCodigo} = {subformula.expresion}
-                          </Text>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Texto adicional para PE */}
-                <Text style={[styles.text, { marginTop: 8, marginBottom: 8 }]}>
-                  El promedio de evaluaciones (PE) se obtiene de la siguiente
-                  manera:
-                </Text>
-
-                {/* Plan de evaluación como tabla */}
-                {data.evaluacionAprendizaje.planEvaluacion &&
-                  data.evaluacionAprendizaje.planEvaluacion.length > 0 && (
-                    <View
-                      style={{
-                        border: "1pt solid black",
-                        marginTop: 8,
-                        marginBottom: 8,
-                      }}
-                    >
-                      {/* Encabezado de tabla */}
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          borderBottom: "1pt solid black",
-                          backgroundColor: "#f0f0f0",
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: "25%",
-                            padding: "4pt",
-                            borderRight: "1pt solid black",
-                          }}
-                        >
-                          <Text style={[styles.textBold, { fontSize: 8 }]}>
-                            Componente
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            width: "25%",
-                            padding: "4pt",
-                            borderRight: "1pt solid black",
-                          }}
-                        >
-                          <Text style={[styles.textBold, { fontSize: 8 }]}>
-                            Instrumento
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            width: "15%",
-                            padding: "4pt",
-                            borderRight: "1pt solid black",
-                          }}
-                        >
-                          <Text style={[styles.textBold, { fontSize: 8 }]}>
-                            Semana
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            width: "35%",
-                            padding: "4pt",
-                          }}
-                        >
-                          <Text style={[styles.textBold, { fontSize: 8 }]}>
-                            Instrucciones
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Filas de datos */}
-                      {data.evaluacionAprendizaje.planEvaluacion.map(
-                        (item, idx) => (
-                          <View
-                            key={idx}
-                            style={{
-                              flexDirection: "row",
-                              borderBottom:
-                                idx <
-                                data.evaluacionAprendizaje.planEvaluacion!
-                                  .length -
-                                  1
-                                  ? "1pt solid black"
-                                  : "none",
-                            }}
-                          >
-                            <View
-                              style={{
-                                width: "25%",
-                                padding: "4pt",
-                                borderRight: "1pt solid black",
-                              }}
-                            >
-                              <Text style={{ fontSize: 8 }}>
-                                {item.componenteNombre}
-                              </Text>
-                            </View>
-                            <View
-                              style={{
-                                width: "25%",
-                                padding: "4pt",
-                                borderRight: "1pt solid black",
-                              }}
-                            >
-                              <Text style={{ fontSize: 8 }}>
-                                {item.instrumentoNombre}
-                              </Text>
-                            </View>
-                            <View
-                              style={{
-                                width: "15%",
-                                padding: "4pt",
-                                borderRight: "1pt solid black",
-                              }}
-                            >
-                              <Text style={{ fontSize: 8 }}>{item.semana}</Text>
-                            </View>
-                            <View
-                              style={{
-                                width: "35%",
-                                padding: "4pt",
-                              }}
-                            >
-                              <Text style={{ fontSize: 8 }}>
-                                {item.instrucciones || "-"}
-                              </Text>
-                            </View>
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  )}
-              </View>
-            )}
-
-            {/* Mantener compatibilidad con estructura antigua (si no hay formulaEvaluacion) */}
-            {!data.evaluacionAprendizaje.formulaEvaluacion && (
-              <View>
-                {/* Descripción del promedio final */}
-                {data.evaluacionAprendizaje.descripcion && (
-                  <Text
-                    style={[styles.text, { marginTop: 6, marginBottom: 4 }]}
-                  >
-                    {data.evaluacionAprendizaje.descripcion}
-                  </Text>
-                )}
-
-                {/* Fórmula PF */}
-                {data.evaluacionAprendizaje.formulaPF && (
-                  <Text
-                    style={[
-                      styles.text,
-                      {
-                        textAlign: "center",
-                        fontFamily: "Helvetica-Bold",
-                        marginBottom: 6,
-                      },
-                    ]}
-                  >
-                    {data.evaluacionAprendizaje.formulaPF}
-                  </Text>
-                )}
-
-                {/* Componentes PF (Donde:) */}
-                {data.evaluacionAprendizaje.componentesPF &&
-                  data.evaluacionAprendizaje.componentesPF.length > 0 && (
-                    <View style={{ marginBottom: 8 }}>
-                      <Text style={styles.text}>Donde:</Text>
-                      {data.evaluacionAprendizaje.componentesPF.map(
-                        (comp, idx) => (
-                          <Text
-                            key={idx}
-                            style={[styles.text, { marginLeft: 10 }]}
-                          >
-                            {comp.codigo} = {comp.descripcion}
-                          </Text>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Descripción PE */}
-                {data.evaluacionAprendizaje.descripcionPE && (
-                  <Text style={[styles.text, { marginBottom: 4 }]}>
-                    {data.evaluacionAprendizaje.descripcionPE}
-                  </Text>
-                )}
-
-                {/* Fórmula PE */}
-                {data.evaluacionAprendizaje.formulaPE && (
-                  <Text
-                    style={[
-                      styles.text,
-                      {
-                        textAlign: "center",
-                        fontFamily: "Helvetica-Bold",
-                        marginBottom: 6,
-                      },
-                    ]}
-                  >
-                    {data.evaluacionAprendizaje.formulaPE}
-                  </Text>
-                )}
-
-                {/* Componentes PE (Donde:) */}
-                {data.evaluacionAprendizaje.componentesPE &&
-                  data.evaluacionAprendizaje.componentesPE.length > 0 && (
-                    <View style={{ marginBottom: 4 }}>
-                      <Text style={styles.text}>Donde:</Text>
-                      {data.evaluacionAprendizaje.componentesPE.map(
-                        (comp, idx) => (
-                          <Text
-                            key={idx}
-                            style={[styles.text, { marginLeft: 10 }]}
-                          >
-                            {comp.codigo} = {comp.descripcion}
-                          </Text>
-                        ),
-                      )}
-                    </View>
-                  )}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* VIII. FUENTES DE CONSULTA */}
-        {data.fuentes && data.fuentes.length > 0 && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.sectionTitle}>VIII. FUENTES DE CONSULTA</Text>
-
-            {/* Agrupar por tipo */}
-            {["LIBRO", "ARTICULO", "WEB", "OTRO"].map((tipo) => {
-              const fuentesPorTipo = data.fuentes.filter(
-                (f) => f.tipo === tipo,
-              );
-              if (fuentesPorTipo.length === 0) return null;
-
-              return (
-                <View key={tipo} style={{ marginTop: 4 }}>
-                  <Text style={styles.textBold}>
-                    {tipo === "LIBRO"
-                      ? "Bibliograficas"
-                      : tipo === "ARTICULO"
-                        ? "Artículos"
-                        : tipo === "WEB"
-                          ? "Electronicas"
-                          : "Otros"}
-                  </Text>
-                  {fuentesPorTipo.map((fuente, idx) => (
-                    <Text key={idx} style={styles.listItem}>
-                      • {fuente.autores} ({fuente.anio || "s.f."}).{" "}
-                      {fuente.titulo}. {fuente.editorial || ""}
-                    </Text>
-                  ))}
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* IX. APORTE DE LA ASIGNATURA AL LOGRO DE RESULTADOS */}
-        {data.aportesResultadosPrograma &&
-          data.aportesResultadosPrograma.length > 0 && (
-            <View style={{ marginTop: 12 }}>
-              <Text style={styles.sectionTitle}>
-                IX. APORTE DE LA ASIGNATURA AL LOGRO DE RESULTADOS
-              </Text>
-
-              <Text style={[styles.text, { marginTop: 6, marginBottom: 8 }]}>
-                El aporte de la asignatura al logro de los Resultados del
-                Estudiante (
-                <Text style={styles.textItalic}>Student Outcomes</Text>) en la
-                formación del graduado en Ingeniería de Computación y Sistemas,
-                se establece en la tabla siguiente:
-              </Text>
-
-              <Text style={[styles.text, { marginBottom: 6 }]}>
-                <Text style={styles.textBold}>K</Text> = clave{" "}
-                <Text style={styles.textBold}>R</Text> = relacionado{" "}
-                <Text style={styles.textBold}>Recuadro vacío</Text> = no aplica
-              </Text>
-
-              {/* Tabla de aportes */}
-              <View
-                style={{
-                  border: "1pt solid black",
-                  marginTop: 4,
-                }}
-              >
-                {/* Fila de encabezado */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    borderBottom: "1pt solid black",
-                    backgroundColor: "#f0f0f0",
-                  }}
-                >
-                  <View
-                    style={{
-                      width: "8%",
-                      padding: "4pt",
-                      borderRight: "1pt solid black",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={[styles.textBold, { fontSize: 8 }]}>#</Text>
-                  </View>
-                  <View
-                    style={{
-                      width: "77%",
-                      padding: "4pt",
-                      borderRight: "1pt solid black",
-                    }}
-                  >
-                    <Text style={[styles.textBold, { fontSize: 8 }]}>
-                      RESULTADO DEL ESTUDIANTE
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      width: "15%",
-                      padding: "4pt",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={[styles.textBold, { fontSize: 8 }]}>
-                      APORTE
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Filas de datos */}
-                {data.aportesResultadosPrograma.map((aporte, idx) => (
-                  <View
-                    key={idx}
-                    style={{
-                      flexDirection: "row",
-                      borderBottom:
-                        idx < data.aportesResultadosPrograma.length - 1
-                          ? "1pt solid black"
-                          : "none",
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: "8%",
-                        padding: "6pt 4pt",
-                        borderRight: "1pt solid black",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Text style={{ fontSize: 8 }}>
-                        {aporte.resultadoCodigo}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: "77%",
-                        padding: "6pt 8pt",
-                        borderRight: "1pt solid black",
-                      }}
-                    >
-                      <Text style={{ fontSize: 8, lineHeight: 1.4 }}>
-                        {aporte.resultadoDescripcion}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: "15%",
-                        padding: "6pt 4pt",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Text
-                        style={[
-                          aporte.aporteValor ? styles.textBold : {},
-                          { fontSize: 8 },
-                        ]}
-                      >
-                        {aporte.aporteValor || ""}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
+            </>
           )}
+
+          {(bibliograficas?.length ?? 0) === 0 &&
+            (electronicas?.length ?? 0) === 0 && (
+              <Text style={styles.emptyText}>Sin información registrada.</Text>
+            )}
+        </View>
+
+        <View style={styles.section}>
+          <SectionTitle style={styles.sectionTitle}>
+            IX. APORTE DE LA ASIGNATURA AL LOGRO DE RESULTADOS
+          </SectionTitle>
+
+          <Text style={styles.paragraph}>
+            El aporte de la asignatura al logro de los Resultados del Estudiante
+            (<Text style={styles.textItalic}>Student Outcomes</Text>) en la
+            formación del graduado en Ingeniería de Computación y Sistemas, se
+            establece en la tabla siguiente:
+          </Text>
+
+          <Text style={styles.paragraph}>
+            <Text style={styles.textBold}>K</Text> = clave{" "}
+            <Text style={styles.textBold}>R</Text> = relacionado{" "}
+            <Text style={styles.textBold}>Recuadro vacío</Text> = no aplica
+          </Text>
+
+          <OutcomesTablePdf rows={outcomeRows} styles={outcomesTableStyles} />
+        </View>
+
+        <PdfUsmpPageFooter />
       </Page>
     </Document>
   );
