@@ -118,8 +118,15 @@ const getSafeFileName = (name: string): string => {
   return cleaned || "adjunto";
 };
 
-const getFileExtension = (name: string) =>
-  name.split(".").pop()?.toLowerCase().trim() ?? "";
+const getFileExtension = (name: string) => {
+  const lastDotIndex = name.lastIndexOf(".");
+
+  if (lastDotIndex <= 0 || lastDotIndex === name.length - 1) {
+    return "";
+  }
+
+  return name.slice(lastDotIndex + 1).toLowerCase().trim();
+};
 
 const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   const { to, subject, body, files = [] } = opts;

@@ -301,7 +301,11 @@ class SyllabusPDFService {
     });
 
     if (!res.ok) {
-      throw new Error(`Error al obtener sílabo completo: ${res.status}`);
+      const errorText = await res.text();
+
+      throw new Error(
+        `Error al obtener sílabo completo: ${res.status} ${errorText}`,
+      );
     }
 
     const response = await res.json();
@@ -458,7 +462,9 @@ class SyllabusPDFService {
       todosRecursosHtml || "No se han definido recursos",
     );
 
-    const planEvaluacionHtml = (data.evaluacionAprendizaje.planEvaluacion || [])
+    const planEvaluacionHtml = (
+      data.evaluacionAprendizaje.planEvaluacion || []
+    )
       .map(
         (item) => `
         <tr>

@@ -31,6 +31,17 @@ import { toast } from "sonner";
 type SendResult = "idle" | "success" | "error";
 type ReviewNotificationType = "APPROVED" | "REJECTED";
 
+type AuditEventPayload = {
+  tabla: string;
+  registroPk: string;
+  accion: string;
+  descripcion?: string;
+  docenteId?: number | null;
+  silaboId?: number | null;
+  oldValues?: unknown;
+  newValues?: unknown;
+};
+
 function buildApprovedNotificationMessage({
   teacherName,
   courseName,
@@ -135,6 +146,23 @@ function plainTextToHtml(value: string) {
   ).replaceAll("\n", "<br/>")}</div>`;
 }
 
+async function registerAuditEvent(payload: AuditEventPayload) {
+  const apiUrl = import.meta.env.VITE_API_URL || "";
+
+  const response = await fetch(`${apiUrl}/api/audit-events`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || "No se pudo registrar auditoría");
+  }
+}
+
 export default function SendEmail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -177,6 +205,7 @@ export default function SendEmail() {
     useState<ReviewNotificationType>("REJECTED");
   const [message, setMessage] = useState(DEFAULT_REVIEW_MESSAGE);
   const [charCount, setCharCount] = useState(DEFAULT_REVIEW_MESSAGE.length);
+
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sendResult, setSendResult] = useState<SendResult>("idle");
   const [resultMessage, setResultMessage] = useState("");
@@ -589,6 +618,52 @@ Comité Curricular EPICS`;
     return true;
   };
 
+  const registerEmailAuditSuccess = async () => {
+    if (!fromPermissions) return;
+
+    await registerAuditEvent({
+      tabla: "correo_habilitacion",
+      registroPk: `${silaboId}-${docenteId}-${Date.now()}`,
+      accion: "HU06_CORREO_HABILITACION_EXITOSO",
+      descripcion: "Correo de habilitación enviado correctamente al docente.",
+      docenteId,
+      silaboId,
+      newValues: {
+        correoDestino: recipientEmail,
+        asunto: subject,
+        estadoEnvio: "EXITOSO",
+        tipoAcceso: accessLabel,
+        accessType: accessTypeParam,
+        seccionesHabilitadas: enabledSections,
+        fechaEnvio: new Date().toISOString(),
+      },
+    });
+  };
+
+  const registerEmailAuditFailure = async (error: unknown) => {
+    if (!fromPermissions) return;
+
+    await registerAuditEvent({
+      tabla: "correo_habilitacion",
+      registroPk: `${silaboId}-${docenteId}-${Date.now()}`,
+      accion: "HU06_CORREO_HABILITACION_FALLIDO",
+      descripcion: "Falló el envío del correo de habilitación.",
+      docenteId,
+      silaboId,
+      newValues: {
+        correoDestino: recipientEmail,
+        asunto: subject,
+        estadoEnvio: "FALLIDO",
+        mensajeError:
+          error instanceof Error ? error.message : "Error desconocido",
+        tipoAcceso: accessLabel,
+        accessType: accessTypeParam,
+        seccionesHabilitadas: enabledSections,
+        fechaEnvio: new Date().toISOString(),
+      },
+    });
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
@@ -601,6 +676,10 @@ Comité Curricular EPICS`;
         subject,
         body: bodyToSend,
         files: attachments,
+      });
+
+      await registerEmailAuditSuccess().catch((auditError) => {
+        console.error("No se pudo registrar auditoría del envío:", auditError);
       });
 
       setSendResult("success");
@@ -626,7 +705,13 @@ Comité Curricular EPICS`;
       }
 
       setAttachments([]);
-    } catch {
+    } catch (error) {
+      console.error("Error al enviar correo:", error);
+
+      await registerEmailAuditFailure(error).catch((auditError) => {
+        console.error("No se pudo registrar auditoría del fallo:", auditError);
+      });
+
       setSendResult("error");
       setResultMessage(
         "No se pudo enviar el correo. Verifica la sesión de Microsoft Graph o vuelve a iniciar sesión.",
