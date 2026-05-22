@@ -4,9 +4,25 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import { ArrowLeft, Check, X, MessageSquare } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useApproveSyllabus } from "../hooks/syllabus-review-query";
+import {
+  ArrowLeft,
+  Check,
+  X,
+  MessageSquare,
+  ClipboardCheck,
+  CheckCircle,
+  XCircle,
+  MessageCircle,
+  FileText,
+  Loader2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getPendingSectionNumbers,
+  SECTION_NAME_MAP,
+  useApproveSyllabus,
+  useSaveReviewData,
+} from "../hooks/syllabus-review-query";
 import { toast } from "sonner";
 import { ReviewConfirmationModal } from "../components/review-confirmation-modal";
 import { Button } from "../../../common/components/ui/button";
@@ -22,6 +38,7 @@ interface SectionSummary {
   hasApproved: boolean;
   hasRejected: boolean;
   hasComments: boolean;
+  comments: string[];
 }
 
 const sectionDefinitions = [
@@ -36,11 +53,111 @@ const sectionDefinitions = [
   { id: "9", name: "Resultados (outcomes)" },
 ];
 
+const SECTION_TO_FIELD_MAP: Record<string, string> = {
+  "1": "step-1",
+  "2": "step-2",
+  "3": "step-3",
+  "4": "step-4",
+  "5": "step-5",
+  "6": "step-5",
+  "7": "step-6",
+  "8": "step-7",
+  "9": "step-8",
+};
+
+function getSectionsByFieldId(fieldId: string): string[] {
+  if (fieldId === "step-1") return ["1"];
+  if (fieldId === "step-2") return ["2"];
+  if (fieldId === "step-3") return ["3"];
+  if (fieldId === "step-4") return ["4"];
+  if (fieldId === "step-5") return ["5", "6"];
+  if (fieldId === "step-6") return ["7"];
+  if (fieldId === "step-7") return ["8"];
+  if (fieldId === "step-8") return ["9"];
+
+  if (
+    fieldId === "nombreAsignatura" ||
+    fieldId.startsWith("codigo-") ||
+    fieldId.startsWith("ciclo-") ||
+    fieldId.startsWith("creditos-") ||
+    fieldId.startsWith("horas-") ||
+    fieldId.startsWith("prerequisitos-") ||
+    fieldId.startsWith("docente-")
+  ) {
+    return ["1"];
+  }
+
+  if (fieldId === "sumilla") return ["2"];
+
+  if (
+    fieldId.startsWith("competencia-") ||
+    fieldId.startsWith("componente-") ||
+    fieldId.startsWith("contenido-actitudinal-")
+  ) {
+    return ["3"];
+  }
+
+  if (fieldId.startsWith("unit-") && fieldId.includes("-week-")) {
+    return ["4"];
+  }
+
+  if (fieldId.startsWith("strategy-")) return ["5"];
+
+  if (fieldId.startsWith("resource-")) return ["6"];
+
+  if (
+    fieldId === "evaluation-main-formula" ||
+    fieldId.startsWith("evaluation-")
+  ) {
+    return ["7"];
+  }
+
+  if (
+    fieldId.startsWith("bibliography-") ||
+    fieldId.startsWith("electronic-resource-")
+  ) {
+    return ["8"];
+  }
+
+  if (fieldId.startsWith("outcome-")) return ["9"];
+
+  return [];
+}
+
+function getCommentsForSection(
+  sectionId: string,
+  reviewData: Record<string, ReviewItem>,
+): string[] {
+  const comments = new Set<string>();
+
+  Object.entries(reviewData).forEach(([fieldId, data]) => {
+    const relatedSections = getSectionsByFieldId(fieldId);
+
+    if (!relatedSections.includes(sectionId)) return;
+
+    const comment = String(data.comment ?? "").trim();
+
+    if (comment) {
+      comments.add(comment);
+    }
+  });
+
+  const directFieldId = SECTION_TO_FIELD_MAP[sectionId];
+  const directComment = String(reviewData[directFieldId]?.comment ?? "").trim();
+
+  if (directComment) {
+    comments.add(directComment);
+  }
+
+  return Array.from(comments);
+}
+
 export default function ReviewSyllabusSummary() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
   const [sections, setSections] = useState<SectionSummary[]>([]);
   const [reviewData, setReviewData] = useState<Record<string, ReviewItem>>({});
   const [showModal, setShowModal] = useState(false);
@@ -49,6 +166,8 @@ export default function ReviewSyllabusSummary() {
   );
 
   const approveMutation = useApproveSyllabus();
+  const saveReviewData = useSaveReviewData();
+  const isFinalizing = approveMutation.isPending || saveReviewData.isPending;
 
   const courseName = searchParams.get("courseName") || "Curso sin nombre";
   const courseCode = searchParams.get("courseCode") || "Código no disponible";
@@ -57,145 +176,107 @@ export default function ReviewSyllabusSummary() {
   const syllabusId = searchParams.get("syllabusId");
 
   useEffect(() => {
-    // Cargar datos de revisión del sessionStorage
     const savedData = sessionStorage.getItem(`reviewData_${id}`);
-    if (savedData) {
-      try {
-        const parsedData: Record<string, ReviewItem> = JSON.parse(savedData);
-        setReviewData(parsedData);
 
-        // Mapeo de fieldId a número de sección (puede devolver array para manejar casos donde un step mapea a múltiples secciones)
-        // Ahora se usan IDs de paso: step-1, step-2, etc.
-        // Nota: step-5 se usa para ambas secciones 5 y 6
-        const getSections = (fieldId: string): string[] => {
-          // Nuevo formato: step-X
-          if (fieldId === "step-1") return ["1"];
-          if (fieldId === "step-2") return ["2"];
-          if (fieldId === "step-3") return ["3"];
-          if (fieldId === "step-4") return ["4"];
-          if (fieldId === "step-5") return ["5", "6"]; // Cubre ambas secciones
-          if (fieldId === "step-6") return ["7"];
-          if (fieldId === "step-7") return ["8"];
-          if (fieldId === "step-8") return ["9"];
+    if (!savedData) {
+      setReviewData({});
 
-          // Mantener compatibilidad con formato antiguo (por si hay datos guardados)
-          // Sección 1: Datos generales
-          if (
-            fieldId === "nombreAsignatura" ||
-            fieldId.startsWith("codigo-") ||
-            fieldId.startsWith("ciclo-") ||
-            fieldId.startsWith("creditos-") ||
-            fieldId.startsWith("horas-") ||
-            fieldId.startsWith("prerequisitos-") ||
-            fieldId.startsWith("docente-")
-          )
-            return ["1"];
-
-          // Sección 2: Sumilla
-          if (fieldId === "sumilla") return ["2"];
-
-          // Sección 3: Competencias y componentes
-          if (
-            fieldId.startsWith("competencia-") ||
-            fieldId.startsWith("componente-") ||
-            fieldId.startsWith("contenido-actitudinal-")
-          )
-            return ["3"];
-
-          // Sección 4: Programación del contenido
-          if (fieldId.startsWith("unit-") && fieldId.includes("-week-"))
-            return ["4"];
-
-          // Sección 5: Estrategias metodológicas
-          if (fieldId.startsWith("strategy-")) return ["5"];
-
-          // Sección 6: Recursos didácticos
-          if (fieldId.startsWith("resource-")) return ["6"];
-
-          // Sección 7: Evaluación de aprendizaje
-          if (
-            fieldId === "evaluation-main-formula" ||
-            fieldId.startsWith("evaluation-")
-          )
-            return ["7"];
-
-          // Sección 8: Fuentes de consulta
-          if (
-            fieldId.startsWith("bibliography-") ||
-            fieldId.startsWith("electronic-resource-")
-          )
-            return ["8"];
-
-          // Sección 9: Resultados (outcomes)
-          if (fieldId.startsWith("outcome-")) return ["9"];
-
-          return []; // fieldId no reconocido
-        };
-
-        // Procesar cada sección para determinar si tiene aprobaciones y comentarios
-        const processedSections = sectionDefinitions.map((section) => {
-          // Filtrar solo los campos que pertenecen a esta sección
-          const sectionFields = Object.entries(parsedData).filter(([fieldId]) =>
-            getSections(fieldId).includes(section.id),
-          );
-
-          // Si no hay campos en esta sección, no mostrar nada
-          if (sectionFields.length === 0) {
-            return {
-              ...section,
-              hasApproved: false,
-              hasRejected: false,
-              hasComments: false,
-            };
-          }
-
-          // Verificar si TODOS los campos de esta sección están aprobados
-          const allApproved = sectionFields.every(
-            ([, data]) => data.status === "approved",
-          );
-
-          // Verificar si ALGÚN campo de esta sección está rechazado
-          const hasRejected = sectionFields.some(
-            ([, data]) => data.status === "rejected",
-          );
-
-          // Verificar si hay comentarios en esta sección
-          const hasComments = sectionFields.some(
-            ([, data]) => data.comment && data.comment.trim() !== "",
-          );
-
-          return {
-            ...section,
-            hasApproved: allApproved && !hasRejected, // Solo verde si todos aprobados y ninguno rechazado
-            hasRejected,
-            hasComments,
-          };
-        });
-
-        setSections(processedSections);
-      } catch (error) {
-        console.error("Error al cargar datos de revisión:", error);
-        setSections(
-          sectionDefinitions.map((s) => ({
-            ...s,
-            hasApproved: false,
-            hasRejected: false,
-            hasComments: false,
-          })),
-        );
-      }
-    } else {
-      // Si no hay datos guardados, mostrar todas las secciones sin marcas
       setSections(
-        sectionDefinitions.map((s) => ({
-          ...s,
+        sectionDefinitions.map((section) => ({
+          ...section,
           hasApproved: false,
           hasRejected: false,
           hasComments: false,
+          comments: [],
+        })),
+      );
+
+      return;
+    }
+
+    try {
+      const parsedData: Record<string, ReviewItem> = JSON.parse(savedData);
+
+      setReviewData(parsedData);
+
+      const processedSections = sectionDefinitions.map((section) => {
+        const sectionFields = Object.entries(parsedData).filter(([fieldId]) =>
+          getSectionsByFieldId(fieldId).includes(section.id),
+        );
+
+        const directFieldId = SECTION_TO_FIELD_MAP[section.id];
+        const directData = parsedData[directFieldId];
+
+        const allRelatedFields = [...sectionFields];
+
+        if (
+          directData &&
+          !allRelatedFields.some(([fieldId]) => fieldId === directFieldId)
+        ) {
+          allRelatedFields.push([directFieldId, directData]);
+        }
+
+        if (allRelatedFields.length === 0) {
+          return {
+            ...section,
+            hasApproved: false,
+            hasRejected: false,
+            hasComments: false,
+            comments: [],
+          };
+        }
+
+        const allApproved = allRelatedFields.every(
+          ([, data]) => data.status === "approved",
+        );
+
+        const hasRejected = allRelatedFields.some(
+          ([, data]) => data.status === "rejected",
+        );
+
+        const comments = getCommentsForSection(section.id, parsedData);
+
+        return {
+          ...section,
+          hasApproved: allApproved && !hasRejected,
+          hasRejected,
+          hasComments: comments.length > 0,
+          comments,
+        };
+      });
+
+      setSections(processedSections);
+    } catch {
+      setReviewData({});
+
+      setSections(
+        sectionDefinitions.map((section) => ({
+          ...section,
+          hasApproved: false,
+          hasRejected: false,
+          hasComments: false,
+          comments: [],
         })),
       );
     }
-  }, [id, location.key]); // Agregar location.key para detectar navegaciones
+  }, [id, location.key]);
+
+  const summaryStats = useMemo(() => {
+    const approved = sections.filter((section) => section.hasApproved).length;
+    const rejected = sections.filter((section) => section.hasRejected).length;
+    const comments = sections.filter((section) => section.hasComments).length;
+    const pending = sections.length - approved - rejected;
+
+    return {
+      approved,
+      rejected,
+      comments,
+      pending,
+      total: sections.length,
+    };
+  }, [sections]);
+
+  const hasRejections = sections.some((section) => section.hasRejected);
 
   const handleGoBack = () => {
     navigate(-1);
@@ -207,154 +288,349 @@ export default function ReviewSyllabusSummary() {
       return;
     }
 
-    // Determinar si el sílabo debe ser aprobado o desaprobado
-    // Si hay alguna sección rechazada, se desaprueba
-    const hasRejections = sections.some((section) => section.hasRejected);
-    const estado = hasRejections ? "DESAPROBADO" : "VALIDADO";
+    const parsedSyllabusId = parseInt(syllabusId, 10);
 
-    // Si hay rechazos, asegurarse de que cada campo rechazado tenga comentario.
-    if (hasRejections) {
-      const rejectedFields = Object.entries(reviewData).filter(
-        ([, v]) => v.status === "rejected",
+    if (!Number.isFinite(parsedSyllabusId) || parsedSyllabusId <= 0) {
+      toast.error("ID de sílabo inválido");
+      return;
+    }
+
+    const hasRejectedSections = sections.some((section) => section.hasRejected);
+    const estado = hasRejectedSections ? "DESAPROBADO" : "VALIDADO";
+
+    const pendingSections = sections.filter(
+      (section) => !section.hasApproved && !section.hasRejected,
+    );
+
+    if (pendingSections.length > 0) {
+      toast.error(
+        `Faltan secciones por revisar: ${pendingSections.map((section) => section.name).join(", ")}.`,
+      );
+      return;
+    }
+
+    const pendingFromReviewData = getPendingSectionNumbers(reviewData);
+
+    if (pendingFromReviewData.length > 0) {
+      toast.error(
+        `Faltan secciones por revisar: ${pendingFromReviewData
+          .map(
+            (sectionNumber) =>
+              SECTION_NAME_MAP[sectionNumber] ?? `Sección ${sectionNumber}`,
+          )
+          .join(", ")}.`,
+      );
+      return;
+    }
+
+    if (hasRejectedSections) {
+      const rejectedSectionsWithoutComment = sections.filter(
+        (section) => section.hasRejected && section.comments.length === 0,
       );
 
-      const missingComments = rejectedFields.some(([, v]) => {
-        return !(v.comment && v.comment.trim().length > 0);
-      });
-
-      if (missingComments) {
+      if (rejectedSectionsWithoutComment.length > 0) {
         toast.error(
-          "Por favor ingrese comentarios para los puntos marcados con 'X' antes de finalizar la desaprobación.",
+          "Para desaprobar, debe existir al menos una sección rechazada con comentario.",
         );
         return;
       }
+    } else if (summaryStats.approved !== summaryStats.total) {
+      toast.error("Para aprobar, todas las secciones deben estar aprobadas.");
+      return;
     }
 
     try {
+      await saveReviewData.mutateAsync({
+        syllabusId: parsedSyllabusId,
+        reviewData,
+      });
+
       await approveMutation.mutateAsync({
-        syllabusId: parseInt(syllabusId),
+        syllabusId: parsedSyllabusId,
         estado,
         reviewData,
       });
 
-      // Mostrar modal con el resultado
-      setModalType(hasRejections ? "rejected" : "approved");
+      setModalType(hasRejectedSections ? "rejected" : "approved");
       setShowModal(true);
-      // Informar por UI que se envió la notificación al docente (si aplica)
-      if (hasRejections) {
+
+      if (hasRejectedSections) {
         toast.success("Revisión registrada. Se envió notificación al docente.");
       } else {
-        toast.success("Revisión registrada. Sí­labo aprobado.");
+        toast.success("Revisión registrada. Sílabo aprobado.");
       }
     } catch (error) {
-      console.error("Error al finalizar revisión:", error);
-      toast.error("Error al finalizar la revisión. Intente nuevamente.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al finalizar la revisión. Intente nuevamente.";
+
+      toast.error("No se pudo finalizar la revisión", {
+        description: message,
+        duration: 10000,
+      });
     }
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
-    // Limpiar sessionStorage
     sessionStorage.removeItem(`reviewData_${id}`);
-    // Navegar a la lista de sílabos con timestamp para forzar refresh
     navigate("/coordinator/review-syllabus?refresh=" + Date.now());
   };
 
   return (
-    <div className="p-6 w-full mx-auto" style={{ maxWidth: "1000px" }}>
-      <div className="bg-white border border-gray-300 rounded-lg p-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-black mb-4">
+    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-7">
+          <button
+            type="button"
+            onClick={handleGoBack}
+            className="mb-5 h-10 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm font-semibold shadow-sm"
+          >
+            <ArrowLeft size={17} />
+            Volver a revisión
+          </button>
+
+          <h1 className="text-3xl font-bold text-gray-900">
             Resumen de Sílabo en Revisión
           </h1>
-          <div className="space-y-1 text-sm text-gray-600">
-            <p>
-              <span className="font-medium">Curso:</span> {courseName}
-            </p>
-            <p>
-              <span className="font-medium">Código:</span> {courseCode}
-            </p>
-            <p>
-              <span className="font-medium">Docente:</span> {teacherName}
-            </p>
-          </div>
+
+          <p className="text-sm text-gray-500 mt-1">
+            Revisa el resultado final por secciones antes de finalizar.
+          </p>
         </div>
 
-        {/* Resumen visual por secciones (estilo cajas como en el diseño) */}
-        <div className="mb-8 space-y-3">
-          {sections.map((section) => (
-            <div
-              key={section.id}
-              className="flex items-center border border-gray-300 rounded-md overflow-hidden"
-            >
-              {/* Sección */}
-              <div className="flex-1 px-6 py-4 text-sm text-gray-700">
-                {section.id}. {section.name}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+                  <ClipboardCheck size={30} />
+                </div>
+
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {courseName}
+                  </h2>
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-600">
+                    <span>
+                      <span className="font-semibold text-gray-900">
+                        Código:
+                      </span>{" "}
+                      {courseCode}
+                    </span>
+
+                    <span>
+                      <span className="font-semibold text-gray-900">
+                        Docente:
+                      </span>{" "}
+                      {teacherName}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {/* Estado (check o cross) */}
-              <div className="w-40 flex items-center justify-center px-4 py-4">
-                {section.hasRejected ? (
-                  <div className="w-8 h-8 bg-red-500 rounded flex items-center justify-center">
-                    <X className="w-5 h-5 text-white" />
-                  </div>
-                ) : section.hasApproved ? (
-                  <div className="w-8 h-8 bg-green-500 rounded flex items-center justify-center">
-                    <Check className="w-5 h-5 text-white" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded flex items-center justify-center opacity-0">
-                    {/* placeholder to keep layout */}
-                  </div>
-                )}
-              </div>
-
-              {/* Comentarios */}
-              <div className="w-24 flex items-center justify-center px-4 py-4">
-                {section.hasComments ? (
-                  <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-white" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded flex items-center justify-center opacity-0">
-                    {/* placeholder */}
-                  </div>
-                )}
+              <div
+                className={`rounded-xl px-4 py-3 border text-sm font-bold ${
+                  hasRejections
+                    ? "bg-red-50 text-red-700 border-red-100"
+                    : "bg-green-50 text-green-700 border-green-100"
+                }`}
+              >
+                {hasRejections
+                  ? "Resultado: Desaprobado"
+                  : "Resultado: Validado"}
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="p-8">
+            <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-7">
+              <div className="bg-green-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium opacity-90">Aprobadas</p>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {summaryStats.approved}
+                  </h2>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <CheckCircle size={26} />
+                </div>
+              </div>
+
+              <div className="bg-red-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium opacity-90">Rechazadas</p>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {summaryStats.rejected}
+                  </h2>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <XCircle size={26} />
+                </div>
+              </div>
+
+              <div className="bg-blue-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium opacity-90">Comentarios</p>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {summaryStats.comments}
+                  </h2>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <MessageCircle size={26} />
+                </div>
+              </div>
+
+              <div className="bg-gray-800 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium opacity-90">Secciones</p>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {summaryStats.total}
+                  </h2>
+                </div>
+
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <FileText size={26} />
+                </div>
+              </div>
+            </section>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                <h3 className="text-lg font-bold text-gray-900">
+                  Resultado por secciones
+                </h3>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Estado final de cada apartado revisado del sílabo.
+                </p>
+              </div>
+
+              <div className="divide-y divide-gray-100">
+                {sections.map((section) => {
+                  const sectionState = section.hasRejected
+                    ? "rejected"
+                    : section.hasApproved
+                      ? "approved"
+                      : "pending";
+
+                  return (
+                    <div
+                      key={section.id}
+                      className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm ${
+                              sectionState === "approved"
+                                ? "bg-green-50 text-green-700 border border-green-100"
+                                : sectionState === "rejected"
+                                  ? "bg-red-50 text-red-700 border border-red-100"
+                                  : "bg-gray-100 text-gray-600 border border-gray-200"
+                            }`}
+                          >
+                            {section.id}
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold text-gray-900">
+                              {section.name}
+                            </h4>
+
+                            <p className="text-xs text-gray-500 mt-1">
+                              Sección {section.id} del sílabo académico
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 md:min-w-[260px] md:justify-end">
+                          {section.hasRejected ? (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-100">
+                              <X size={15} />
+                              Rechazada
+                            </span>
+                          ) : section.hasApproved ? (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                              <Check size={15} />
+                              Aprobada
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                              Sin marcar
+                            </span>
+                          )}
+
+                          {section.hasComments && (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                              <MessageSquare size={15} />
+                              Comentario
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {section.comments.length > 0 && (
+                        <div className="mt-4 ml-0 md:ml-[60px] space-y-2">
+                          {section.comments.map((comment, index) => (
+                            <div
+                              key={`${section.id}-comment-${index}`}
+                              className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800"
+                            >
+                              <p className="font-bold mb-1">Comentario:</p>
+                              <p className="whitespace-pre-wrap">{comment}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-6 mt-8 border-t border-gray-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGoBack}
+                className="h-11 px-6 rounded-xl gap-2 font-semibold"
+              >
+                <ArrowLeft size={18} />
+                <span>Atrás</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleFinalize}
+                disabled={isFinalizing}
+                size="lg"
+                className="h-11 px-8 rounded-xl font-semibold"
+              >
+                {isFinalizing ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin mr-2" />
+                    Finalizando...
+                  </>
+                ) : (
+                  "Finalizar"
+                )}
+              </Button>
+            </div>
+
+            <ReviewConfirmationModal
+              isOpen={showModal}
+              type={modalType}
+              onClose={handleCloseModal}
+            />
+          </div>
         </div>
-
-        {/* Botones de acción */}
-        <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGoBack}
-            className="gap-2"
-          >
-            <ArrowLeft size={20} />
-            <span>Atrás</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleFinalize}
-            disabled={approveMutation.isPending}
-            size="lg"
-          >
-            {approveMutation.isPending ? "Finalizando..." : "Finalizar"}
-          </Button>
-        </div>
-
-        {/* Modal de confirmación */}
-        <ReviewConfirmationModal
-          isOpen={showModal}
-          type={modalType}
-          onClose={handleCloseModal}
-        />
       </div>
     </div>
   );

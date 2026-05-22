@@ -22,39 +22,62 @@ export const ReviewFieldWrapper: React.FC<ReviewFieldWrapperProps> = ({
     return <>{children}</>;
   }
 
-  // Obtener datos de revisión previos para este campo
   const fieldReviewData = reviewData?.[fieldId];
   const initialStatus = fieldReviewData?.status || null;
   const initialComment = fieldReviewData?.comment || "";
 
+  const reviewButtons = (
+    <ReviewButtons
+      fieldId={fieldId}
+      onStatusChange={onFieldReview}
+      onCommentChange={onFieldComment}
+      initialStatus={initialStatus}
+      initialComment={initialComment}
+    />
+  );
+
   if (orientation === "vertical") {
     return (
-      <div className={`space-y-2 ${className}`}>
-        <div className="flex-1">{children}</div>
-        <div className="flex justify-end">
-          <ReviewButtons
-            fieldId={fieldId}
-            onStatusChange={onFieldReview}
-            onCommentChange={onFieldComment}
-            initialStatus={initialStatus}
-            initialComment={initialComment}
-          />
+      <div className={`space-y-3 ${className}`}>
+        <div className="w-full">{children}</div>
+
+        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                Revisión del campo
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Aprueba, rechaza o agrega una observación.
+              </p>
+            </div>
+
+            {reviewButtons}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`flex gap-4 ${className}`}>
-      <div className="flex-1">{children}</div>
-      <div className="flex items-end">
-        <ReviewButtons
-          fieldId={fieldId}
-          onStatusChange={onFieldReview}
-          onCommentChange={onFieldComment}
-          initialStatus={initialStatus}
-          initialComment={initialComment}
-        />
+    <div
+      className={`grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4 items-start ${className}`}
+    >
+      <div className="min-w-0">{children}</div>
+
+      <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
+              Revisión
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Marca el estado del campo.
+            </p>
+          </div>
+
+          {reviewButtons}
+        </div>
       </div>
     </div>
   );

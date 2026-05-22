@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 const API_BASE_URL = "/api";
-
-// Interfaces para los diferentes tipos de datos de secciones
 
 // Sección 1: Datos Generales
 export interface DatosGenerales {
@@ -27,7 +26,6 @@ export interface DatosGenerales {
   horasPracticaLectivaPresencial?: number;
   horasPracticaLectivaDistancia?: number;
   horasPracticaNoLectivaPresencial?: number;
-  horasPracticaNoLectivaDistancia?: number;
   creditosTeoria?: number;
   creditosPractica?: number;
   docentes?: string;
@@ -78,12 +76,17 @@ export type SectionData =
   | DatosGenerales
   | SumillaResponse
   | Section3Data
-  | Record<string, unknown>;
+  | Record<string, unknown>
+  | null;
+
+const emptySectionData: Record<string, unknown> = {
+  empty: true,
+};
 
 /**
- * Hook para obtener los datos de una sección específica del sílabo
- * @param syllabusId - ID del sílabo
- * @param sectionNumber - Número de la sección (1-9)
+ * Hook para obtener los datos de una sección específica del sílabo.
+ * Si el backend responde 404, se interpreta como sección sin datos guardados,
+ * no como error crítico de pantalla.
  */
 export function useSyllabusSectionData(
   syllabusId: number | null,
@@ -91,7 +94,7 @@ export function useSyllabusSectionData(
 ) {
   return useQuery({
     queryKey: ["syllabusSection", syllabusId, sectionNumber],
-    queryFn: async () => {
+    queryFn: async (): Promise<SectionData> => {
       if (!syllabusId || !sectionNumber) {
         return null;
       }
@@ -99,9 +102,18 @@ export function useSyllabusSectionData(
       // Sección 3 requiere múltiples peticiones
       if (sectionNumber === "3") {
         const [competenciesRes, attitudesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/syllabus/${syllabusId}/competencies`),
-          fetch(`${API_BASE_URL}/syllabus/${syllabusId}/attitudes`),
+          authFetch(`${API_BASE_URL}/syllabus/${syllabusId}/competencies`),
+          authFetch(`${API_BASE_URL}/syllabus/${syllabusId}/attitudes`),
         ]);
+
+        // Si aún no existen datos, no rompemos la pantalla
+        if (competenciesRes.status === 404 || attitudesRes.status === 404) {
+          return {
+            competencies: [],
+            components: "",
+            attitudes: [],
+          } as Section3Data;
+        }
 
         if (!competenciesRes.ok || !attitudesRes.ok) {
           throw new Error("Error al obtener datos de la sección 3");
@@ -112,16 +124,13 @@ export function useSyllabusSectionData(
           attitudesRes.json() as Promise<AttitudesResponse>,
         ]);
 
-        // datos de sección 3 cargados
-
         return {
           competencies: competenciesData?.items || [],
-          components: "", // Texto plano vacío por defecto
+          components: "",
           attitudes: attitudesData?.items || [],
         } as Section3Data;
       }
 
-      // Mapear el número de sección al endpoint correspondiente
       const endpointMap: Record<string, string> = {
         "1": "datos-generales",
         "2": "sumilla",
@@ -134,6 +143,7 @@ export function useSyllabusSectionData(
       };
 
       const endpoint = endpointMap[sectionNumber];
+
       if (!endpoint) {
         throw new Error(
           `Endpoint no definido para la sección ${sectionNumber}`,
@@ -142,15 +152,23 @@ export function useSyllabusSectionData(
 
       const url = `${API_BASE_URL}/syllabus/${syllabusId}/${endpoint}`;
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
       });
 
+      // Importante:
+      // 404 significa que la sección todavía no tiene datos guardados.
+      // No lo tratamos como error crítico.
+      if (response.status === 404) {
+        return emptySectionData;
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
+
         throw new Error(
           `Error al obtener datos de la sección: ${response.status} - ${errorText}`,
         );
@@ -158,17 +176,14 @@ export function useSyllabusSectionData(
 
       const result = await response.json();
 
-      // Sección 1: retorna datos directamente (sin wrapper)
       if (sectionNumber === "1") {
         return result as DatosGenerales;
       }
 
-      // Sección 2: retorna toda la respuesta con estructura { success, content }
       if (sectionNumber === "2") {
         return result as SumillaResponse;
       }
 
-      // Para otras secciones, si la respuesta tiene estructura { success, data }, extraer data
       if (result && typeof result === "object" && "data" in result) {
         return result.data;
       }
@@ -176,7 +191,15 @@ export function useSyllabusSectionData(
       return result;
     },
     enabled: !!syllabusId && !!sectionNumber,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    retry: 2,
+    staleTime: 1000 * 60 * 5,
+    retry: (failureCount, error) => {
+      const message = error instanceof Error ? error.message : "";
+
+      if (message.includes("404")) {
+        return false;
+      }
+
+      return failureCount < 1;
+    },
   });
 }
