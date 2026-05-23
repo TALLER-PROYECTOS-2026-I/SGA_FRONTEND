@@ -59,8 +59,7 @@ export function SyllabusGeneratePDF({
       URL.revokeObjectURL(url);
 
       toast.success("PDF descargado exitosamente");
-    } catch (error) {
-      console.error("Error al generar PDF:", error);
+    } catch {
       toast.error("Error al generar el PDF");
     } finally {
       setIsDownloading(false);
@@ -209,9 +208,7 @@ export function SyllabusGeneratePDF({
             </div>
 
             <div>
-              <h3 className="font-bold text-blue-900">
-                Documento académico
-              </h3>
+              <h3 className="font-bold text-blue-900">Documento académico</h3>
 
               <p className="text-sm text-blue-700 mt-1 leading-relaxed">
                 El PDF se genera como documento nativo usando{" "}

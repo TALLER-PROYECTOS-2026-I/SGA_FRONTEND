@@ -26,7 +26,9 @@ type SyllabusStatus = "ASIGNADO" | "EN_PROCESO" | "VALIDADO" | "PENDIENTE";
 type FilterStatus = "ALL" | SyllabusStatus;
 
 function normalizeStatus(status?: string | null): SyllabusStatus {
-  const value = String(status || "").trim().toUpperCase();
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
 
   if (value === "VALIDADO" || value === "APROBADO") {
     return "VALIDADO";
@@ -55,8 +57,20 @@ function normalizeStatus(status?: string | null): SyllabusStatus {
   return "ASIGNADO";
 }
 
-function getSyllabusKey(syllabus: SyllabusReview) {
-  return String(syllabus.syllabusId || syllabus.id || "");
+function getSyllabusKey(syllabus: SyllabusReview, index?: number) {
+  const parts = [
+    syllabus.syllabusId ?? syllabus.id ?? "sin-silabo",
+    syllabus.docenteId ?? "sin-docente",
+    syllabus.courseCode ?? "sin-codigo",
+    syllabus.teacherName ?? "sin-docente-nombre",
+    syllabus.submittedDate ?? "sin-fecha",
+  ];
+
+  if (typeof index === "number") {
+    parts.push(index);
+  }
+
+  return parts.map((part) => String(part).trim()).join("-");
 }
 
 function getSyllabusIdForExport(syllabus: SyllabusReview): number | null {
@@ -188,7 +202,7 @@ export default function ReviewSyllabusList() {
   const visibleKeys = useMemo(
     () =>
       filteredSyllabi
-        .map((syllabus) => getSyllabusKey(syllabus))
+        .map((syllabus, index) => getSyllabusKey(syllabus, index))
         .filter(Boolean),
     [filteredSyllabi],
   );
@@ -214,15 +228,13 @@ export default function ReviewSyllabusList() {
     (syllabus) => normalizeStatus(syllabus?.status) === "PENDIENTE",
   ).length;
 
-  const toggleSyllabusSelection = (syllabus: SyllabusReview) => {
-    const key = getSyllabusKey(syllabus);
+  const toggleSyllabusSelection = (syllabus: SyllabusReview, index: number) => {
+    const key = getSyllabusKey(syllabus, index);
 
     if (!key) return;
 
     setSelectedSyllabusKeys((prev) =>
-      prev.includes(key)
-        ? prev.filter((item) => item !== key)
-        : [...prev, key],
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
     );
   };
 
@@ -312,7 +324,6 @@ export default function ReviewSyllabusList() {
         }
       }
     } catch (error) {
-      console.error("Error al exportar sílabos:", error);
       alert(
         error instanceof Error
           ? error.message
@@ -331,8 +342,8 @@ export default function ReviewSyllabusList() {
   };
 
   const handleExportSelectedSyllabi = async () => {
-    const selectedSyllabi = syllabusList.filter((syllabus) =>
-      selectedSyllabusKeys.includes(getSyllabusKey(syllabus)),
+    const selectedSyllabi = filteredSyllabi.filter((syllabus, index) =>
+      selectedSyllabusKeys.includes(getSyllabusKey(syllabus, index)),
     );
 
     await exportSyllabi(
@@ -474,9 +485,7 @@ export default function ReviewSyllabusList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">En proceso</p>
 
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalEnProceso}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalEnProceso}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -488,9 +497,7 @@ export default function ReviewSyllabusList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">Pendientes</p>
 
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalPendiente}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalPendiente}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -583,7 +590,7 @@ export default function ReviewSyllabusList() {
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
               <div className="overflow-hidden">
-               <table className="w-full table-fixed text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
                       <th className="px-4 py-4 text-center font-bold w-[6%]">
@@ -598,7 +605,11 @@ export default function ReviewSyllabusList() {
                               : "Seleccionar visibles"
                           }
                         >
-                          {allVisibleSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                          {allVisibleSelected ? (
+                            <CheckSquare size={18} />
+                          ) : (
+                            <Square size={18} />
+                          )}
                         </button>
                       </th>
 
@@ -629,15 +640,15 @@ export default function ReviewSyllabusList() {
                   </thead>
 
                   <tbody>
-                    {filteredSyllabi.map((syllabus) => {
+                    {filteredSyllabi.map((syllabus, index) => {
                       const normalizedStatus = normalizeStatus(syllabus.status);
                       const cfg = statusConfig[normalizedStatus];
-                      const key = getSyllabusKey(syllabus);
-                      const isSelected = selectedSyllabusKeys.includes(key);
+                      const rowKey = getSyllabusKey(syllabus, index);
+                      const isSelected = selectedSyllabusKeys.includes(rowKey);
 
                       return (
                         <tr
-                          key={`${syllabus.id}-${syllabus.syllabusId}`}
+                          key={rowKey}
                           className={`border-b border-gray-100 last:border-b-0 transition-colors ${
                             isSelected ? "bg-red-50/40" : "hover:bg-gray-50"
                           }`}
@@ -645,7 +656,9 @@ export default function ReviewSyllabusList() {
                           <td className="px-4 py-5 text-center">
                             <button
                               type="button"
-                              onClick={() => toggleSyllabusSelection(syllabus)}
+                              onClick={() =>
+                                toggleSyllabusSelection(syllabus, index)
+                              }
                               className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
                                 isSelected
                                   ? "bg-red-600 text-white hover:bg-red-700"
@@ -736,7 +749,8 @@ export default function ReviewSyllabusList() {
             </div>
 
             <p className="mt-4 text-xs text-gray-500">
-              Selecciona uno o más sílabos para exportarlos, o usa la opción de exportar todos.
+              Selecciona uno o más sílabos para exportarlos, o usa la opción de
+              exportar todos.
             </p>
           </div>
         </div>

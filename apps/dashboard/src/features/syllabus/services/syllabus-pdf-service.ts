@@ -1,4 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import type { CompleteSyllabus } from "../types/complete-syllabus";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 class SyllabusPDFService {
   private readonly baseUrl: string;
@@ -51,7 +54,8 @@ class SyllabusPDFService {
               unidad.silaboId ?? unidad.syllabusId ?? datosGenerales.id ?? 0,
             ),
             numero: Number(unidad.numero ?? unidadIndex + 1),
-            titulo: unidad.titulo ?? unidad.nombre ?? `Unidad ${unidadIndex + 1}`,
+            titulo:
+              unidad.titulo ?? unidad.nombre ?? `Unidad ${unidadIndex + 1}`,
             capacidadesText:
               unidad.capacidadesText ??
               unidad.capacidad ??
@@ -97,9 +101,7 @@ class SyllabusPDFService {
                     semana.actividadAprendizaje ??
                     semana.actividades ??
                     "",
-                  horasLectivasTeoria: Number(
-                    semana.horasLectivasTeoria ?? 0,
-                  ),
+                  horasLectivasTeoria: Number(semana.horasLectivasTeoria ?? 0),
                   horasLectivasPractica: Number(
                     semana.horasLectivasPractica ?? 0,
                   ),
@@ -120,7 +122,10 @@ class SyllabusPDFService {
     const recursosRaw = data.recursosDidacticos || data.recursos || {};
 
     const evaluacionRaw =
-      data.evaluacionAprendizaje || data.evaluacion || data.evaluacionDelAprendizaje || {};
+      data.evaluacionAprendizaje ||
+      data.evaluacion ||
+      data.evaluacionDelAprendizaje ||
+      {};
 
     return {
       datosGenerales: {
@@ -146,13 +151,9 @@ class SyllabusPDFService {
           datosGenerales.semestre_academico ||
           "",
         tipoAsignatura:
-          datosGenerales.tipoAsignatura ||
-          datosGenerales.tipo_asignatura ||
-          "",
+          datosGenerales.tipoAsignatura || datosGenerales.tipo_asignatura || "",
         tipoEstudios:
-          datosGenerales.tipoEstudios ||
-          datosGenerales.tipo_de_estudios ||
-          "",
+          datosGenerales.tipoEstudios || datosGenerales.tipo_de_estudios || "",
         modalidad:
           datosGenerales.modalidad ||
           datosGenerales.modalidadAsignatura ||
@@ -166,9 +167,7 @@ class SyllabusPDFService {
         ciclo: datosGenerales.ciclo || "",
         requisitos: datosGenerales.requisitos || "",
         creditosTeoria: Number(
-          datosGenerales.creditosTeoria ??
-            datosGenerales.creditos_teoria ??
-            0,
+          datosGenerales.creditosTeoria ?? datosGenerales.creditos_teoria ?? 0,
         ),
         creditosPractica: Number(
           datosGenerales.creditosPractica ??
@@ -194,7 +193,9 @@ class SyllabusPDFService {
         horasTotales: Number(
           datosGenerales.horasTotales ??
             datosGenerales.horas_totales ??
-            Number(datosGenerales.horasTeoria ?? datosGenerales.horas_teoria ?? 0) +
+            Number(
+              datosGenerales.horasTeoria ?? datosGenerales.horas_teoria ?? 0,
+            ) +
               Number(
                 datosGenerales.horasPractica ??
                   datosGenerales.horas_practica ??
@@ -288,27 +289,19 @@ class SyllabusPDFService {
   async fetchCompleteSyllabus(syllabusId: number): Promise<CompleteSyllabus> {
     const url = `${this.baseUrl}/syllabus/${syllabusId}/complete`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "GET",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
     });
 
     if (!res.ok) {
-      const errorText = await res.text();
-
-      throw new Error(
-        `Error al obtener sílabo completo: ${res.status} ${errorText}`,
-      );
+      throw new Error(`Error al obtener sílabo completo: ${res.status}`);
     }
 
     const response = await res.json();
     const normalized = this.normalizeCompleteSyllabus(response);
-
-    console.log("PDF syllabus raw response:", response);
-    console.log("PDF syllabus normalized:", normalized);
 
     return normalized;
   }
@@ -461,9 +454,7 @@ class SyllabusPDFService {
       todosRecursosHtml || "No se han definido recursos",
     );
 
-    const planEvaluacionHtml = (
-      data.evaluacionAprendizaje.planEvaluacion || []
-    )
+    const planEvaluacionHtml = (data.evaluacionAprendizaje.planEvaluacion || [])
       .map(
         (item) => `
         <tr>

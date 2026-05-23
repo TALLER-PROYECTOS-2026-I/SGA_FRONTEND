@@ -17,7 +17,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useApproveSyllabus } from "../hooks/syllabus-review-query";
+import {
+  getPendingSectionNumbers,
+  SECTION_NAME_MAP,
+  useApproveSyllabus,
+  useSaveReviewData,
+} from "../hooks/syllabus-review-query";
 import { toast } from "sonner";
 import { ReviewConfirmationModal } from "../components/review-confirmation-modal";
 import { Button } from "../../../common/components/ui/button";
@@ -33,6 +38,7 @@ interface SectionSummary {
   hasApproved: boolean;
   hasRejected: boolean;
   hasComments: boolean;
+  comments: string[];
 }
 
 const sectionDefinitions = [
@@ -47,11 +53,111 @@ const sectionDefinitions = [
   { id: "9", name: "Resultados (outcomes)" },
 ];
 
+const SECTION_TO_FIELD_MAP: Record<string, string> = {
+  "1": "step-1",
+  "2": "step-2",
+  "3": "step-3",
+  "4": "step-4",
+  "5": "step-5",
+  "6": "step-5",
+  "7": "step-6",
+  "8": "step-7",
+  "9": "step-8",
+};
+
+function getSectionsByFieldId(fieldId: string): string[] {
+  if (fieldId === "step-1") return ["1"];
+  if (fieldId === "step-2") return ["2"];
+  if (fieldId === "step-3") return ["3"];
+  if (fieldId === "step-4") return ["4"];
+  if (fieldId === "step-5") return ["5", "6"];
+  if (fieldId === "step-6") return ["7"];
+  if (fieldId === "step-7") return ["8"];
+  if (fieldId === "step-8") return ["9"];
+
+  if (
+    fieldId === "nombreAsignatura" ||
+    fieldId.startsWith("codigo-") ||
+    fieldId.startsWith("ciclo-") ||
+    fieldId.startsWith("creditos-") ||
+    fieldId.startsWith("horas-") ||
+    fieldId.startsWith("prerequisitos-") ||
+    fieldId.startsWith("docente-")
+  ) {
+    return ["1"];
+  }
+
+  if (fieldId === "sumilla") return ["2"];
+
+  if (
+    fieldId.startsWith("competencia-") ||
+    fieldId.startsWith("componente-") ||
+    fieldId.startsWith("contenido-actitudinal-")
+  ) {
+    return ["3"];
+  }
+
+  if (fieldId.startsWith("unit-") && fieldId.includes("-week-")) {
+    return ["4"];
+  }
+
+  if (fieldId.startsWith("strategy-")) return ["5"];
+
+  if (fieldId.startsWith("resource-")) return ["6"];
+
+  if (
+    fieldId === "evaluation-main-formula" ||
+    fieldId.startsWith("evaluation-")
+  ) {
+    return ["7"];
+  }
+
+  if (
+    fieldId.startsWith("bibliography-") ||
+    fieldId.startsWith("electronic-resource-")
+  ) {
+    return ["8"];
+  }
+
+  if (fieldId.startsWith("outcome-")) return ["9"];
+
+  return [];
+}
+
+function getCommentsForSection(
+  sectionId: string,
+  reviewData: Record<string, ReviewItem>,
+): string[] {
+  const comments = new Set<string>();
+
+  Object.entries(reviewData).forEach(([fieldId, data]) => {
+    const relatedSections = getSectionsByFieldId(fieldId);
+
+    if (!relatedSections.includes(sectionId)) return;
+
+    const comment = String(data.comment ?? "").trim();
+
+    if (comment) {
+      comments.add(comment);
+    }
+  });
+
+  const directFieldId = SECTION_TO_FIELD_MAP[sectionId];
+  const directComment = String(reviewData[directFieldId]?.comment ?? "").trim();
+
+  if (directComment) {
+    comments.add(directComment);
+  }
+
+  return Array.from(comments);
+}
+
 export default function ReviewSyllabusSummary() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
   const [sections, setSections] = useState<SectionSummary[]>([]);
   const [reviewData, setReviewData] = useState<Record<string, ReviewItem>>({});
   const [showModal, setShowModal] = useState(false);
@@ -60,6 +166,8 @@ export default function ReviewSyllabusSummary() {
   );
 
   const approveMutation = useApproveSyllabus();
+  const saveReviewData = useSaveReviewData();
+  const isFinalizing = approveMutation.isPending || saveReviewData.isPending;
 
   const courseName = searchParams.get("courseName") || "Curso sin nombre";
   const courseCode = searchParams.get("courseCode") || "Código no disponible";
@@ -70,124 +178,84 @@ export default function ReviewSyllabusSummary() {
   useEffect(() => {
     const savedData = sessionStorage.getItem(`reviewData_${id}`);
 
-    if (savedData) {
-      try {
-        const parsedData: Record<string, ReviewItem> = JSON.parse(savedData);
-        setReviewData(parsedData);
+    if (!savedData) {
+      setReviewData({});
 
-        const getSections = (fieldId: string): string[] => {
-          if (fieldId === "step-1") return ["1"];
-          if (fieldId === "step-2") return ["2"];
-          if (fieldId === "step-3") return ["3"];
-          if (fieldId === "step-4") return ["4"];
-          if (fieldId === "step-5") return ["5", "6"];
-          if (fieldId === "step-6") return ["7"];
-          if (fieldId === "step-7") return ["8"];
-          if (fieldId === "step-8") return ["9"];
-
-          if (
-            fieldId === "nombreAsignatura" ||
-            fieldId.startsWith("codigo-") ||
-            fieldId.startsWith("ciclo-") ||
-            fieldId.startsWith("creditos-") ||
-            fieldId.startsWith("horas-") ||
-            fieldId.startsWith("prerequisitos-") ||
-            fieldId.startsWith("docente-")
-          ) {
-            return ["1"];
-          }
-
-          if (fieldId === "sumilla") return ["2"];
-
-          if (
-            fieldId.startsWith("competencia-") ||
-            fieldId.startsWith("componente-") ||
-            fieldId.startsWith("contenido-actitudinal-")
-          ) {
-            return ["3"];
-          }
-
-          if (fieldId.startsWith("unit-") && fieldId.includes("-week-")) {
-            return ["4"];
-          }
-
-          if (fieldId.startsWith("strategy-")) return ["5"];
-
-          if (fieldId.startsWith("resource-")) return ["6"];
-
-          if (
-            fieldId === "evaluation-main-formula" ||
-            fieldId.startsWith("evaluation-")
-          ) {
-            return ["7"];
-          }
-
-          if (
-            fieldId.startsWith("bibliography-") ||
-            fieldId.startsWith("electronic-resource-")
-          ) {
-            return ["8"];
-          }
-
-          if (fieldId.startsWith("outcome-")) return ["9"];
-
-          return [];
-        };
-
-        const processedSections = sectionDefinitions.map((section) => {
-          const sectionFields = Object.entries(parsedData).filter(([fieldId]) =>
-            getSections(fieldId).includes(section.id),
-          );
-
-          if (sectionFields.length === 0) {
-            return {
-              ...section,
-              hasApproved: false,
-              hasRejected: false,
-              hasComments: false,
-            };
-          }
-
-          const allApproved = sectionFields.every(
-            ([, data]) => data.status === "approved",
-          );
-
-          const hasRejected = sectionFields.some(
-            ([, data]) => data.status === "rejected",
-          );
-
-          const hasComments = sectionFields.some(
-            ([, data]) => data.comment && data.comment.trim() !== "",
-          );
-
-          return {
-            ...section,
-            hasApproved: allApproved && !hasRejected,
-            hasRejected,
-            hasComments,
-          };
-        });
-
-        setSections(processedSections);
-      } catch (error) {
-        console.error("Error al cargar datos de revisión:", error);
-
-        setSections(
-          sectionDefinitions.map((s) => ({
-            ...s,
-            hasApproved: false,
-            hasRejected: false,
-            hasComments: false,
-          })),
-        );
-      }
-    } else {
       setSections(
-        sectionDefinitions.map((s) => ({
-          ...s,
+        sectionDefinitions.map((section) => ({
+          ...section,
           hasApproved: false,
           hasRejected: false,
           hasComments: false,
+          comments: [],
+        })),
+      );
+
+      return;
+    }
+
+    try {
+      const parsedData: Record<string, ReviewItem> = JSON.parse(savedData);
+
+      setReviewData(parsedData);
+
+      const processedSections = sectionDefinitions.map((section) => {
+        const sectionFields = Object.entries(parsedData).filter(([fieldId]) =>
+          getSectionsByFieldId(fieldId).includes(section.id),
+        );
+
+        const directFieldId = SECTION_TO_FIELD_MAP[section.id];
+        const directData = parsedData[directFieldId];
+
+        const allRelatedFields = [...sectionFields];
+
+        if (
+          directData &&
+          !allRelatedFields.some(([fieldId]) => fieldId === directFieldId)
+        ) {
+          allRelatedFields.push([directFieldId, directData]);
+        }
+
+        if (allRelatedFields.length === 0) {
+          return {
+            ...section,
+            hasApproved: false,
+            hasRejected: false,
+            hasComments: false,
+            comments: [],
+          };
+        }
+
+        const allApproved = allRelatedFields.every(
+          ([, data]) => data.status === "approved",
+        );
+
+        const hasRejected = allRelatedFields.some(
+          ([, data]) => data.status === "rejected",
+        );
+
+        const comments = getCommentsForSection(section.id, parsedData);
+
+        return {
+          ...section,
+          hasApproved: allApproved && !hasRejected,
+          hasRejected,
+          hasComments: comments.length > 0,
+          comments,
+        };
+      });
+
+      setSections(processedSections);
+    } catch {
+      setReviewData({});
+
+      setSections(
+        sectionDefinitions.map((section) => ({
+          ...section,
+          hasApproved: false,
+          hasRejected: false,
+          hasComments: false,
+          comments: [],
         })),
       );
     }
@@ -220,44 +288,87 @@ export default function ReviewSyllabusSummary() {
       return;
     }
 
-    const hasRejections = sections.some((section) => section.hasRejected);
-    const estado = hasRejections ? "DESAPROBADO" : "VALIDADO";
+    const parsedSyllabusId = parseInt(syllabusId, 10);
 
-    if (hasRejections) {
-      const rejectedFields = Object.entries(reviewData).filter(
-        ([, v]) => v.status === "rejected",
+    if (!Number.isFinite(parsedSyllabusId) || parsedSyllabusId <= 0) {
+      toast.error("ID de sílabo inválido");
+      return;
+    }
+
+    const hasRejectedSections = sections.some((section) => section.hasRejected);
+    const estado = hasRejectedSections ? "DESAPROBADO" : "VALIDADO";
+
+    const pendingSections = sections.filter(
+      (section) => !section.hasApproved && !section.hasRejected,
+    );
+
+    if (pendingSections.length > 0) {
+      toast.error(
+        `Faltan secciones por revisar: ${pendingSections.map((section) => section.name).join(", ")}.`,
+      );
+      return;
+    }
+
+    const pendingFromReviewData = getPendingSectionNumbers(reviewData);
+
+    if (pendingFromReviewData.length > 0) {
+      toast.error(
+        `Faltan secciones por revisar: ${pendingFromReviewData
+          .map(
+            (sectionNumber) =>
+              SECTION_NAME_MAP[sectionNumber] ?? `Sección ${sectionNumber}`,
+          )
+          .join(", ")}.`,
+      );
+      return;
+    }
+
+    if (hasRejectedSections) {
+      const rejectedSectionsWithoutComment = sections.filter(
+        (section) => section.hasRejected && section.comments.length === 0,
       );
 
-      const missingComments = rejectedFields.some(([, v]) => {
-        return !(v.comment && v.comment.trim().length > 0);
-      });
-
-      if (missingComments) {
+      if (rejectedSectionsWithoutComment.length > 0) {
         toast.error(
-          "Por favor ingrese comentarios para los puntos marcados con 'X' antes de finalizar la desaprobación.",
+          "Para desaprobar, debe existir al menos una sección rechazada con comentario.",
         );
         return;
       }
+    } else if (summaryStats.approved !== summaryStats.total) {
+      toast.error("Para aprobar, todas las secciones deben estar aprobadas.");
+      return;
     }
 
     try {
+      await saveReviewData.mutateAsync({
+        syllabusId: parsedSyllabusId,
+        reviewData,
+      });
+
       await approveMutation.mutateAsync({
-        syllabusId: parseInt(syllabusId),
+        syllabusId: parsedSyllabusId,
         estado,
         reviewData,
       });
 
-      setModalType(hasRejections ? "rejected" : "approved");
+      setModalType(hasRejectedSections ? "rejected" : "approved");
       setShowModal(true);
 
-      if (hasRejections) {
+      if (hasRejectedSections) {
         toast.success("Revisión registrada. Se envió notificación al docente.");
       } else {
         toast.success("Revisión registrada. Sílabo aprobado.");
       }
     } catch (error) {
-      console.error("Error al finalizar revisión:", error);
-      toast.error("Error al finalizar la revisión. Intente nuevamente.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al finalizar la revisión. Intente nuevamente.";
+
+      toast.error("No se pudo finalizar la revisión", {
+        description: message,
+        duration: 10000,
+      });
     }
   };
 
@@ -283,6 +394,7 @@ export default function ReviewSyllabusSummary() {
           <h1 className="text-3xl font-bold text-gray-900">
             Resumen de Sílabo en Revisión
           </h1>
+
           <p className="text-sm text-gray-500 mt-1">
             Revisa el resultado final por secciones antes de finalizar.
           </p>
@@ -308,6 +420,7 @@ export default function ReviewSyllabusSummary() {
                       </span>{" "}
                       {courseCode}
                     </span>
+
                     <span>
                       <span className="font-semibold text-gray-900">
                         Docente:
@@ -392,6 +505,7 @@ export default function ReviewSyllabusSummary() {
                 <h3 className="text-lg font-bold text-gray-900">
                   Resultado por secciones
                 </h3>
+
                 <p className="text-sm text-gray-500 mt-1">
                   Estado final de cada apartado revisado del sílabo.
                 </p>
@@ -408,55 +522,72 @@ export default function ReviewSyllabusSummary() {
                   return (
                     <div
                       key={section.id}
-                      className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-gray-50 transition-colors"
+                      className="px-6 py-4 hover:bg-gray-50 transition-colors"
                     >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm ${
-                            sectionState === "approved"
-                              ? "bg-green-50 text-green-700 border border-green-100"
-                              : sectionState === "rejected"
-                                ? "bg-red-50 text-red-700 border border-red-100"
-                                : "bg-gray-100 text-gray-600 border border-gray-200"
-                          }`}
-                        >
-                          {section.id}
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm ${
+                              sectionState === "approved"
+                                ? "bg-green-50 text-green-700 border border-green-100"
+                                : sectionState === "rejected"
+                                  ? "bg-red-50 text-red-700 border border-red-100"
+                                  : "bg-gray-100 text-gray-600 border border-gray-200"
+                            }`}
+                          >
+                            {section.id}
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold text-gray-900">
+                              {section.name}
+                            </h4>
+
+                            <p className="text-xs text-gray-500 mt-1">
+                              Sección {section.id} del sílabo académico
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <h4 className="font-bold text-gray-900">
-                            {section.name}
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Sección {section.id} del sílabo académico
-                          </p>
+                        <div className="flex items-center gap-3 md:min-w-[260px] md:justify-end">
+                          {section.hasRejected ? (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-100">
+                              <X size={15} />
+                              Rechazada
+                            </span>
+                          ) : section.hasApproved ? (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                              <Check size={15} />
+                              Aprobada
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                              Sin marcar
+                            </span>
+                          )}
+
+                          {section.hasComments && (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                              <MessageSquare size={15} />
+                              Comentario
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 md:min-w-[260px] md:justify-end">
-                        {section.hasRejected ? (
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-100">
-                            <X size={15} />
-                            Rechazada
-                          </span>
-                        ) : section.hasApproved ? (
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-100">
-                            <Check size={15} />
-                            Aprobada
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                            Sin marcar
-                          </span>
-                        )}
-
-                        {section.hasComments && (
-                          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                            <MessageSquare size={15} />
-                            Comentario
-                          </span>
-                        )}
-                      </div>
+                      {section.comments.length > 0 && (
+                        <div className="mt-4 ml-0 md:ml-[60px] space-y-2">
+                          {section.comments.map((comment, index) => (
+                            <div
+                              key={`${section.id}-comment-${index}`}
+                              className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800"
+                            >
+                              <p className="font-bold mb-1">Comentario:</p>
+                              <p className="whitespace-pre-wrap">{comment}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -478,11 +609,11 @@ export default function ReviewSyllabusSummary() {
                 type="button"
                 variant="destructive"
                 onClick={handleFinalize}
-                disabled={approveMutation.isPending}
+                disabled={isFinalizing}
                 size="lg"
                 className="h-11 px-8 rounded-xl font-semibold"
               >
-                {approveMutation.isPending ? (
+                {isFinalizing ? (
                   <>
                     <Loader2 size={18} className="animate-spin mr-2" />
                     Finalizando...

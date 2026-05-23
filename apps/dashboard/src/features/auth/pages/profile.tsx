@@ -30,6 +30,37 @@ const roleDisplayNames = {
   indeterminado: "Usuario",
 } as const;
 
+const EMPTY_PROFILE: ProfileData = {
+  firstName: "",
+  lastName: "",
+  profession: "",
+  email: "",
+  phone: "",
+  photo: null,
+};
+
+function normalizeProfile(profile?: ProfileData | null): ProfileData {
+  return {
+    firstName: profile?.firstName ?? "",
+    lastName: profile?.lastName ?? "",
+    profession: profile?.profession ?? "",
+    email: profile?.email ?? "",
+    phone: profile?.phone ?? "",
+    photo: profile?.photo ?? null,
+  };
+}
+
+function areProfilesEqual(a: ProfileData, b: ProfileData): boolean {
+  return (
+    a.firstName === b.firstName &&
+    a.lastName === b.lastName &&
+    a.profession === b.profession &&
+    a.email === b.email &&
+    a.phone === b.phone &&
+    a.photo === b.photo
+  );
+}
+
 export default function Profile() {
   const location = useLocation();
   const { user: sessionUser } = useSession();
@@ -39,14 +70,7 @@ export default function Profile() {
     useProfile();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileData>({
-    firstName: "",
-    lastName: "",
-    profession: "",
-    email: "",
-    phone: "",
-    photo: null,
-  });
+  const [profileData, setProfileData] = useState<ProfileData>(EMPTY_PROFILE);
 
   const roleName = getRoleName(sessionUser?.role);
   const roleDisplayName =
@@ -57,10 +81,26 @@ export default function Profile() {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (profile && !isEditing) {
-      setProfileData(profile);
-    }
-  }, [profile, isEditing]);
+    if (!profile || isEditing) return;
+
+    const normalizedProfile = normalizeProfile(profile);
+
+    setProfileData((currentProfileData) => {
+      if (areProfilesEqual(currentProfileData, normalizedProfile)) {
+        return currentProfileData;
+      }
+
+      return normalizedProfile;
+    });
+  }, [
+    profile?.firstName,
+    profile?.lastName,
+    profile?.profession,
+    profile?.email,
+    profile?.phone,
+    profile?.photo,
+    isEditing,
+  ]);
 
   const handleInputChange = (field: keyof ProfileData, value: string) => {
     setProfileData((prev) => ({ ...prev, [field]: value }));
@@ -76,8 +116,6 @@ export default function Profile() {
         setIsEditing(false);
       },
       onError: (error: Error) => {
-        console.error("❌ Error al guardar perfil:", error);
-
         if (error.message.includes("No hay cambios")) {
           toast.info("Sin cambios", "No se detectaron cambios para guardar");
           setIsEditing(false);
@@ -93,7 +131,7 @@ export default function Profile() {
 
   const handleCancel = () => {
     if (profile) {
-      setProfileData(profile);
+      setProfileData(normalizeProfile(profile));
     }
 
     setIsEditing(false);
@@ -150,9 +188,7 @@ export default function Profile() {
           </div>
 
           <div>
-            <p className="text-base font-bold text-gray-900">
-              Cargando perfil
-            </p>
+            <p className="text-base font-bold text-gray-900">Cargando perfil</p>
             <p className="text-sm text-gray-500 mt-1">
               Obteniendo información de tu cuenta...
             </p>

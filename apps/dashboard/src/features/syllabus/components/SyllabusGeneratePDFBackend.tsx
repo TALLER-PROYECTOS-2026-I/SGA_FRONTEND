@@ -78,13 +78,9 @@ export function SyllabusGeneratePDFBackend({
     setError(null);
 
     try {
-      console.log(`Cargando sílabo ID: ${syllabusId} desde el backend...`);
-
       const data = await syllabusPDFService.fetchCompleteSyllabus(syllabusId);
 
       setSyllabusData(data);
-
-      console.log("Datos cargados:", data);
     } catch (err) {
       const errorMsg =
         err instanceof Error
@@ -93,8 +89,6 @@ export function SyllabusGeneratePDFBackend({
 
       setError(errorMsg);
       setSyllabusData(null);
-
-      console.error("Error:", errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -113,8 +107,6 @@ export function SyllabusGeneratePDFBackend({
     setIsGenerating(true);
 
     try {
-      console.log("Generando PDF oficial...");
-
       const blob = await pdf(
         <SyllabusPDFDocument data={syllabusData} />,
       ).toBlob();
@@ -127,11 +119,7 @@ export function SyllabusGeneratePDFBackend({
       link.click();
 
       URL.revokeObjectURL(url);
-
-      console.log("PDF descargado exitosamente");
     } catch (err) {
-      console.error("Error al generar PDF:", err);
-
       alert(
         "Error al generar PDF: " + (err instanceof Error ? err.message : ""),
       );

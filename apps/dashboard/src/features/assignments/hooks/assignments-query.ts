@@ -5,7 +5,7 @@ export interface Assignment {
   cursoCodigo: string;
   cursoNombre: string;
   estadoRevision: string;
-  docenteId: number;
+  docenteId: number | null;
   syllabusId?: number;
   nombreDocente: string;
   docenteEmail?: string;

@@ -1,10 +1,54 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 const getApiBase = (baseUrl?: string): string => {
   return (
-    baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api"
-  );
+    baseUrl ??
+    import.meta.env.VITE_API_BASE_URL ??
+    "http://localhost:7071/api"
+  ).replace(/\/+$/, "");
 };
+
+export type SemanaProgramacion = {
+  id?: number | string;
+  semana: number;
+  contenidosConceptuales: string;
+  contenidosProcedimentales: string;
+  actividadesAprendizaje: string;
+  horasLectivasTeoria: number;
+  horasLectivasPractica: number;
+  horasNoLectivasTeoria: number;
+  horasNoLectivasPractica: number;
+  esEvento?: boolean;
+  eventoDescripcion?: string;
+};
+
+export type SemanaProgramacionApi = {
+  semana: number;
+  contenidosConceptuales: string;
+  contenidosProcedimentales: string;
+  actividadesAprendizaje: string;
+  horasLectivasTeoria: number;
+  horasLectivasPractica: number;
+  horasNoLectivasTeoria: number;
+  horasNoLectivasPractica: number;
+};
+
+export type UnidadProgramacion = {
+  id?: number | string;
+  numero: number;
+  titulo: string;
+  capacidadesText: string;
+  semanaInicio?: number | null;
+  semanaFin?: number | null;
+  semanas: SemanaProgramacion[];
+};
+
+export {
+  getProgramacionStatus,
+  isSemanaProgramacionCompleta,
+  type ProgramacionStatus,
+} from "../utils/programacion-status";
 
 export interface CreateProgramacionBody {
   silaboId: number;
@@ -20,29 +64,27 @@ export interface CreateProgramacionBody {
   horasLectivasPractica?: number;
   horasNoLectivasTeoria?: number;
   horasNoLectivasPractica?: number;
+  semanas?: SemanaProgramacionApi[];
 }
 
-export interface UpdateProgramacionBody {
-  silaboId?: number;
-  numero?: number;
-  titulo?: string;
-  capacidadesText?: string;
-  semanaInicio?: number;
-  semanaFin?: number;
-  contenidosConceptuales?: string;
-  contenidosProcedimentales?: string;
-  actividadesAprendizaje?: string;
-  horasLectivasTeoria?: number;
-  horasLectivasPractica?: number;
-  horasNoLectivasTeoria?: number;
-  horasNoLectivasPractica?: number;
-  [key: string]: unknown;
-}
+export type UpdateProgramacionBody = CreateProgramacionBody;
 
 export interface ProgramacionResponse {
   id?: string | number;
   silaboId?: number;
-  asignaturaId?: string | number;
+  numero?: number;
+  titulo?: string;
+  capacidadesText?: string;
+  semanaInicio?: number | null;
+  semanaFin?: number | null;
+  contenidosConceptuales?: string | null;
+  contenidosProcedimentales?: string | null;
+  actividadesAprendizaje?: string | null;
+  horasLectivasTeoria?: number | null;
+  horasLectivasPractica?: number | null;
+  horasNoLectivasTeoria?: number | null;
+  horasNoLectivasPractica?: number | null;
+  semanas?: SemanaProgramacion[];
   [key: string]: unknown;
 }
 
@@ -51,7 +93,6 @@ async function buildError(res: Response): Promise<Error> {
 
   try {
     const body = JSON.parse(text);
-    console.error("ERROR BACKEND:", body);
 
     return new Error(
       body?.message ||
@@ -60,19 +101,18 @@ async function buildError(res: Response): Promise<Error> {
         `Error ${res.status}`,
     );
   } catch {
-    console.error("ERROR BACKEND:", text);
     return new Error(text || `Error ${res.status}`);
   }
 }
 
-export const useGetProgramacion = (syllabusId: string) => {
+export const useGetProgramacion = (syllabusId: string | null) => {
   return useQuery<ProgramacionResponse[]>({
     queryKey: ["syllabus", syllabusId, "unidades"],
     queryFn: async () => {
       const apiBase = getApiBase();
 
-      const res = await fetch(
-        `${apiBase}/syllabus/${encodeURIComponent(syllabusId)}/unidades`,
+      const res = await authFetch(
+        `${apiBase}/syllabus/${encodeURIComponent(syllabusId!)}/unidades`,
       );
 
       if (res.status === 404) {
@@ -92,55 +132,67 @@ export const useGetProgramacion = (syllabusId: string) => {
       return Array.isArray(response) ? response : [];
     },
     enabled: !!syllabusId && syllabusId !== "0",
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
     retry: false,
     throwOnError: false,
   });
 };
 
+export async function postProgramacionUnit(
+  payload: CreateProgramacionBody,
+): Promise<ProgramacionResponse> {
+  const apiBase = getApiBase();
+  const silaboId = Number(payload.silaboId);
+
+  const cleanPayload: CreateProgramacionBody = {
+    ...payload,
+    silaboId,
+    numero: Number(payload.numero),
+    titulo: payload.titulo.trim(),
+    capacidadesText: payload.capacidadesText || "",
+    semanaInicio: payload.semanaInicio,
+    semanaFin: payload.semanaFin,
+    contenidosConceptuales: payload.contenidosConceptuales || "",
+    contenidosProcedimentales: payload.contenidosProcedimentales || "",
+    actividadesAprendizaje: payload.actividadesAprendizaje || "",
+    horasLectivasTeoria: Number(payload.horasLectivasTeoria ?? 0),
+    horasLectivasPractica: Number(payload.horasLectivasPractica ?? 0),
+    horasNoLectivasTeoria: Number(payload.horasNoLectivasTeoria ?? 0),
+    horasNoLectivasPractica: Number(payload.horasNoLectivasPractica ?? 0),
+    semanas: payload.semanas ?? [],
+  };
+
+  const res = await authFetch(`${apiBase}/syllabus/${silaboId}/unidades`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cleanPayload),
+  });
+
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+
+  return (await res.json()) as ProgramacionResponse;
+}
+
 export const useCreateProgramacion = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: CreateProgramacionBody) => {
-      const apiBase = getApiBase();
+    mutationFn: postProgramacionUnit,
+    onSuccess: async (_, variables) => {
+      const key = String(variables.silaboId);
 
-      const cleanPayload: CreateProgramacionBody = {
-        silaboId: Number(payload.silaboId),
-        numero: Number(payload.numero),
-        titulo: payload.titulo || `Unidad ${payload.numero}`,
-        capacidadesText: payload.capacidadesText || "",
-        semanaInicio: Number(payload.semanaInicio ?? 1),
-        semanaFin: Number(payload.semanaFin ?? 16),
-        contenidosConceptuales: payload.contenidosConceptuales || "",
-        contenidosProcedimentales: payload.contenidosProcedimentales || "",
-        actividadesAprendizaje: payload.actividadesAprendizaje || "",
-        horasLectivasTeoria: Number(payload.horasLectivasTeoria ?? 0),
-        horasLectivasPractica: Number(payload.horasLectivasPractica ?? 0),
-        horasNoLectivasTeoria: Number(payload.horasNoLectivasTeoria ?? 0),
-        horasNoLectivasPractica: Number(payload.horasNoLectivasPractica ?? 0),
-      };
+      await queryClient.invalidateQueries({
+        queryKey: ["syllabus", key, "unidades"],
+      });
 
-      console.log("POST unidad payload:", cleanPayload);
-
-      const res = await fetch(
-        `${apiBase}/syllabus/${cleanPayload.silaboId}/unidades`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cleanPayload),
-        },
-      );
-
-      if (!res.ok) {
-        throw await buildError(res);
-      }
-
-      return (await res.json()) as ProgramacionResponse;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", String(variables.silaboId), "unidades"],
+      await queryClient.refetchQueries({
+        queryKey: ["syllabus", key, "unidades"],
+        type: "all",
       });
     },
   });
@@ -155,10 +207,9 @@ export const useUpdateProgramacion = () => {
       payload,
     }: {
       id: string;
-      payload: Partial<UpdateProgramacionBody>;
+      payload: UpdateProgramacionBody;
     }) => {
       const apiBase = getApiBase();
-
       const syllabusId = Number(payload.silaboId);
 
       if (!syllabusId || Number.isNaN(syllabusId)) {
@@ -166,27 +217,15 @@ export const useUpdateProgramacion = () => {
       }
 
       const cleanPayload: UpdateProgramacionBody = {
+        ...payload,
         silaboId: syllabusId,
-        numero: Number(payload.numero ?? 1),
-        titulo: String(payload.titulo || `Unidad ${payload.numero ?? 1}`),
+        numero: Number(payload.numero),
+        titulo: String(payload.titulo).trim(),
         capacidadesText: String(payload.capacidadesText || ""),
-        semanaInicio: Number(payload.semanaInicio ?? 1),
-        semanaFin: Number(payload.semanaFin ?? 16),
-        contenidosConceptuales: String(payload.contenidosConceptuales || ""),
-        contenidosProcedimentales: String(
-          payload.contenidosProcedimentales || "",
-        ),
-        actividadesAprendizaje: String(payload.actividadesAprendizaje || ""),
-        horasLectivasTeoria: Number(payload.horasLectivasTeoria ?? 0),
-        horasLectivasPractica: Number(payload.horasLectivasPractica ?? 0),
-        horasNoLectivasTeoria: Number(payload.horasNoLectivasTeoria ?? 0),
-        horasNoLectivasPractica: Number(payload.horasNoLectivasPractica ?? 0),
+        semanas: payload.semanas ?? [],
       };
 
-      console.log("PUT unidad id:", id);
-      console.log("PUT unidad payload:", cleanPayload);
-
-      const res = await fetch(
+      const res = await authFetch(
         `${apiBase}/syllabus/${syllabusId}/unidades/${encodeURIComponent(id)}`,
         {
           method: "PUT",
@@ -201,16 +240,53 @@ export const useUpdateProgramacion = () => {
 
       return (await res.json()) as ProgramacionResponse;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       if (variables.payload.silaboId) {
-        queryClient.invalidateQueries({
-          queryKey: [
-            "syllabus",
-            String(variables.payload.silaboId),
-            "unidades",
-          ],
+        const key = String(variables.payload.silaboId);
+
+        await queryClient.invalidateQueries({
+          queryKey: ["syllabus", key, "unidades"],
+        });
+
+        await queryClient.refetchQueries({
+          queryKey: ["syllabus", key, "unidades"],
+          type: "all",
         });
       }
+    },
+  });
+};
+
+export const useDeleteProgramacion = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      silaboId,
+      unidadId,
+    }: {
+      silaboId: number;
+      unidadId: string | number;
+    }) => {
+      const apiBase = getApiBase();
+
+      const res = await authFetch(
+        `${apiBase}/syllabus/${silaboId}/unidades/${encodeURIComponent(String(unidadId))}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!res.ok) {
+        throw await buildError(res);
+      }
+    },
+    onSuccess: async (_, variables) => {
+      const key = String(variables.silaboId);
+
+      await queryClient.invalidateQueries({
+        queryKey: ["syllabus", key, "unidades"],
+      });
     },
   });
 };

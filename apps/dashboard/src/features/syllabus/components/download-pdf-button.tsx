@@ -15,7 +15,7 @@ export function DownloadPDFButton({
   showPreview = false,
   className = "",
 }: DownloadPDFButtonProps) {
-  const { generatePDF, previewPDF, isGenerating, error } = useSyllabusPDF({
+  const { generatePDF, previewPDF, isGenerating } = useSyllabusPDF({
     onSuccess: () => {
       toast.success("PDF generado exitosamente", {
         description: "El archivo se ha descargado correctamente.",
@@ -49,10 +49,6 @@ export function DownloadPDFButton({
   };
 
   const buttonClasses = `${baseClasses} ${variantClasses[variant]} ${className}`;
-
-  if (error) {
-    console.error("Error en DownloadPDFButton:", error);
-  }
 
   return (
     <div className="flex flex-wrap items-center gap-3">

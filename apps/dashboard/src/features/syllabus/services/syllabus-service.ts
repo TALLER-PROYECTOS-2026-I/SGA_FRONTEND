@@ -1,3 +1,5 @@
+import { authFetch } from "../../../common/utils/auth-fetch";
+
 export interface SyllabusData {
   id: number;
   codigo: string;
@@ -7,13 +9,8 @@ export interface SyllabusData {
 
 export const syllabusService = {
   async fetchSyllabus(syllabusId: number): Promise<SyllabusData> {
-    const response = await fetch(
+    const response = await authFetch(
       `${import.meta.env.VITE_API_URL}/api/syllabus/${syllabusId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
 
     if (!response.ok) {
@@ -25,13 +22,8 @@ export const syllabusService = {
   },
 
   async checkDraftByCodigo(codigo: string): Promise<SyllabusData | null> {
-    const response = await fetch(
+    const response = await authFetch(
       `${import.meta.env.VITE_API_URL}/api/syllabus/draft?codigo=${codigo}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      },
     );
 
     if (!response.ok) {

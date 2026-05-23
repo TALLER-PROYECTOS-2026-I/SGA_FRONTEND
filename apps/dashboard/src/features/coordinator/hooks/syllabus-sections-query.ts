@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 export interface SyllabusSection {
   seccion: number;
@@ -17,16 +18,14 @@ export const useSyllabusSections = (
       }
 
       // Endpoint: /api/syllabus/revision/{silaboId}?docenteId={docenteId}
-      // Endpoint dinámico para Local y Nube
-      const baseURL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "/api";
-      const base = `${baseURL}/syllabus/revision`;
+      const base = "/api/syllabus/revision";
       const url = docenteId
         ? `${base}/${encodeURIComponent(syllabusId)}?docenteId=${encodeURIComponent(
             String(docenteId),
           )}`
         : `${base}/${encodeURIComponent(syllabusId)}`;
 
-      const response = await fetch(url);
+      const response = await authFetch(url);
 
       if (!response.ok) {
         throw new Error("Error al obtener las secciones del sílabo");
@@ -38,7 +37,6 @@ export const useSyllabusSections = (
 
       // Validar que la respuesta tenga la estructura esperada
       if (!result || typeof result !== "object") {
-        console.warn("Formato de respuesta inesperado:", result);
         return [];
       }
 
@@ -56,7 +54,6 @@ export const useSyllabusSections = (
         return result.data.permissions;
       }
 
-      console.warn("No se encontraron permisos en la respuesta:", result);
       return [];
     },
     enabled: !!syllabusId && syllabusId > 0,

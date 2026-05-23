@@ -1,11 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Document,
   Page,
   Text,
   View,
   StyleSheet,
+  Image,
 } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
+import LogoUsmpSilabo from "@/assets/logo_usmp_silabo.jpeg";
 import type {
   CompleteSyllabus,
   SemanaUnidad,
@@ -16,17 +19,17 @@ import type {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 28,
-    paddingBottom: 28,
-    paddingHorizontal: 32,
+    paddingHorizontal: 34,
+    paddingBottom: 34,
     fontFamily: "Helvetica",
-    fontSize: 8.5,
+    fontSize: 8,
     lineHeight: 1.25,
-    color: "#000000",
+    color: "#111111",
   },
 
   pageLandscape: {
     paddingTop: 24,
-    paddingBottom: 24,
+    paddingBottom: 28,
     paddingHorizontal: 26,
     fontFamily: "Helvetica",
     fontSize: 6.4,
@@ -35,55 +38,66 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginBottom: 14,
+    width: "100%",
+    marginBottom: 10,
+    alignItems: "flex-start",
   },
 
-  logoText: {
-    fontSize: 18,
-    fontFamily: "Helvetica-Bold",
-    color: "#c00000",
-    marginBottom: 2,
+  logo: {
+    width: 190,
+    height: 50,
+    objectFit: "contain",
   },
 
-  facultyText: {
-    fontSize: 7.5,
-    color: "#c00000",
-    marginBottom: 18,
+  titleBlock: {
+    textAlign: "center",
+    marginBottom: 12,
   },
 
   title: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
-    marginBottom: 2,
+    marginBottom: 4,
   },
 
   courseTitle: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-
-  areaTitle: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
-    marginBottom: 18,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+
+  areaTitle: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+    textTransform: "uppercase",
   },
 
   section: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   sectionTitle: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
+    marginTop: 7,
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
 
   text: {
     fontSize: 8.5,
+    lineHeight: 1.2,
+    marginBottom: 4,
+    textAlign: "justify",
+  },
+
+  paragraph: {
+    fontSize: 8,
+    lineHeight: 1.22,
     marginBottom: 4,
     textAlign: "justify",
   },
@@ -104,42 +118,62 @@ const styles = StyleSheet.create({
   },
 
   subsectionTitle: {
-    fontSize: 8.8,
+    fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
     marginTop: 4,
+    marginBottom: 3,
+  },
+
+  bulletText: {
+    fontSize: 8,
+    lineHeight: 1.2,
+    marginBottom: 2,
+    textAlign: "justify",
+  },
+
+  emptyText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Oblique",
+    color: "#555",
   },
 
   generalTable: {
     width: "100%",
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: "#000000",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginBottom: 8,
   },
 
   generalRow: {
     flexDirection: "row",
-    minHeight: 17,
+    minHeight: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+
+  generalRowLast: {
+    flexDirection: "row",
+    minHeight: 16,
   },
 
   generalLabel: {
-    width: "40%",
+    width: "38%",
+    borderRightWidth: 1,
+    borderRightColor: "#000",
     paddingVertical: 3,
     paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
-    justifyContent: "center",
+    fontSize: 7.5,
   },
 
   generalValue: {
-    width: "60%",
+    width: "62%",
     paddingVertical: 3,
     paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
-    justifyContent: "center",
+    fontSize: 7.5,
+  },
+
+  generalValueText: {
+    fontSize: 7.5,
   },
 
   splitRow: {
@@ -167,141 +201,104 @@ const styles = StyleSheet.create({
   },
 
   hoursBlock: {
-    width: "60%",
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
+    width: "100%",
   },
 
   hoursLine: {
-    fontSize: 8,
+    fontSize: 7.5,
     marginBottom: 2,
   },
 
-  unitBox: {
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: "#000000",
-    marginBottom: 12,
+  programUnitTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginBottom: 10,
   },
 
-  unitTitle: {
-    padding: 5,
-    borderRightWidth: 1,
+  programUnitTitle: {
+    padding: 4,
     borderBottomWidth: 1,
-    borderColor: "#000000",
+    borderBottomColor: "#000",
+    textAlign: "center",
   },
 
-  unitTitleText: {
-    fontSize: 8.2,
+  programUnitTitleText: {
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
   },
 
-  capacityBox: {
-    padding: 5,
-    borderRightWidth: 1,
+  programCapacity: {
+    padding: 4,
     borderBottomWidth: 1,
-    borderColor: "#000000",
+    borderBottomColor: "#000",
+    fontSize: 7,
   },
 
   programHeaderRow: {
     flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    minHeight: 18,
   },
 
   programRow: {
     flexDirection: "row",
-    minHeight: 74,
-  },
-
-  th: {
-    padding: 3,
-    borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
+    borderBottomColor: "#000",
   },
 
-  td: {
-    padding: 3,
+  programCell: {
+    padding: 2.5,
     borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
+    borderRightColor: "#000",
+    fontSize: 6.2,
   },
 
-  thText: {
-    fontSize: 5.8,
+  programCellLast: {
+    padding: 2.5,
+    fontSize: 6.2,
+  },
+
+  programHeaderText: {
+    fontSize: 6,
     fontFamily: "Helvetica-Bold",
     textAlign: "center",
   },
 
-  tdText: {
+  programText: {
     fontSize: 6.2,
-    lineHeight: 1.18,
+    lineHeight: 1.15,
   },
 
-  weekCol: {
-    width: "5.5%",
+  hourText: {
+    fontSize: 6.5,
+    textAlign: "center",
+  },
+
+  programWeekCell: {
+    width: "5%",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  conceptualCol: {
-    width: "25%",
+  programConceptualCell: {
+    width: "24%",
   },
 
-  proceduralCol: {
-    width: "25%",
+  programProceduralCell: {
+    width: "24%",
   },
 
-  activityCol: {
-    width: "19%",
+  programActivityCell: {
+    width: "23%",
   },
 
-  hourCol: {
-    width: "6.375%",
+  programHourCell: {
+    width: "6%",
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  hourGroup: {
-    width: "12.75%",
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
-  },
-
-  hourGroupTitle: {
-    height: 18,
-    borderBottomWidth: 1,
-    borderColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 2,
-  },
-
-  hourGroupSubRow: {
-    flexDirection: "row",
-    flex: 1,
-  },
-
-  hourSubCell: {
-    width: "50%",
-    borderRightWidth: 1,
-    borderColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 1,
-  },
-
-  hourSubCellLast: {
-    width: "50%",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 1,
   },
 
   compactTable: {
@@ -332,22 +329,92 @@ const styles = StyleSheet.create({
     fontSize: 7.3,
   },
 
+  outcomesTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginTop: 6,
+  },
+
+  outcomeHeaderRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    minHeight: 16,
+  },
+
+  outcomeRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+  },
+
+  outcomeRowLast: {
+    flexDirection: "row",
+  },
+
+  outcomeCodeCell: {
+    width: "10%",
+    padding: 3,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    fontSize: 7,
+    textAlign: "center",
+  },
+
+  outcomeDescriptionCell: {
+    width: "78%",
+    padding: 3,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
+    fontSize: 7,
+  },
+
+  outcomeValueCell: {
+    width: "12%",
+    padding: 3,
+    fontSize: 7,
+    textAlign: "center",
+    fontFamily: "Helvetica-Bold",
+  },
+
+  outcomeHeaderText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+  },
+
+  outcomeText: {
+    fontSize: 7,
+    lineHeight: 1.2,
+  },
+
+  outcomeCenteredText: {
+    fontSize: 7,
+    lineHeight: 1.2,
+    textAlign: "center",
+  },
+
+  outcomeValueText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+  },
+
   formulaText: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
 
-  footer: {
+  pageNumber: {
     position: "absolute",
+    fontSize: 8,
     bottom: 12,
-    left: 32,
-    right: 32,
+    left: 0,
+    right: 0,
     textAlign: "center",
-  },
-
-  footerText: {
-    fontSize: 7,
+    color: "#444444",
   },
 });
 
@@ -360,10 +427,28 @@ function cleanText(value?: string | number | null) {
   return String(value);
 }
 
-function pad2(value?: number | string | null) {
+function normalizeText(value?: string | number | null) {
+  return cleanText(value)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function markOption(current: string | undefined | null, option: string) {
+  return normalizeText(current) === normalizeText(option) ? "X" : " ";
+}
+
+function formatTwoDigits(value?: number | string | null) {
   const num = Number(value ?? 0);
-  if (Number.isNaN(num)) return "00";
+  if (!Number.isFinite(num) || num <= 0) return " ";
   return String(num).padStart(2, "0");
+}
+
+function toNumber(value?: number | string | null) {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num : 0;
 }
 
 function roman(value?: number) {
@@ -383,88 +468,134 @@ function roman(value?: number) {
   return map[value || 0] || String(value || "");
 }
 
-function checked(current?: string, expected?: string) {
-  return cleanText(current).toLowerCase() === cleanText(expected).toLowerCase()
-    ? "X"
-    : " ";
-}
-
 function GeneralRow({
   label,
   children,
+  last = false,
 }: {
   label: string;
   children: ReactNode;
+  last?: boolean;
 }) {
   return (
-    <View style={styles.generalRow}>
+    <View style={last ? styles.generalRowLast : styles.generalRow}>
       <View style={styles.generalLabel}>
         <Text>{label}</Text>
       </View>
 
-      <View style={styles.generalValue}>{children}</View>
-    </View>
-  );
-}
-
-function GeneralSplitRow({
-  label,
-  items,
-}: {
-  label: string;
-  items: string[];
-}) {
-  return (
-    <View style={styles.generalRow}>
-      <View style={styles.generalLabel}>
-        <Text>{label}</Text>
-      </View>
-
-      <View style={styles.splitRow}>
-        {items.map((item, index) => (
-          <View
-            key={item}
-            style={
-              index === items.length - 1 ? styles.splitCellLast : styles.splitCell
-            }
-          >
-            <Text>{item}</Text>
-          </View>
-        ))}
+      <View style={styles.generalValue}>
+        {typeof children === "string" || typeof children === "number" ? (
+          <Text style={styles.generalValueText}>{children}</Text>
+        ) : (
+          children
+        )}
       </View>
     </View>
   );
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
+  return (
+    <Text style={styles.sectionTitle} wrap={false}>
+      {children}
+    </Text>
+  );
 }
 
 function Footer() {
   return (
-    <View style={styles.footer} fixed>
-      <Text
-        style={styles.footerText}
-        render={({ pageNumber }) => String(pageNumber)}
-      />
-    </View>
+    <Text
+      style={styles.pageNumber}
+      render={({ pageNumber }) => `${pageNumber}`}
+      fixed
+    />
   );
 }
 
-function BulletList({ items }: { items?: Array<{ descripcion?: string; codigo?: string }> }) {
-  if (!items || items.length === 0) {
-    return <Text style={styles.listItem}>-</Text>;
-  }
+const isNonEmpty = (value: unknown) => String(value ?? "").trim().length > 0;
+
+const renderBullet = (text: string, key?: string | number) => {
+  if (!isNonEmpty(text)) return null;
 
   return (
-    <View>
-      {items.map((item, index) => (
-        <Text key={index} style={styles.listItem}>
-          • {item.descripcion || ""} {item.codigo ? `(${item.codigo})` : ""}
-        </Text>
-      ))}
-    </View>
+    <Text key={key} style={styles.bulletText}>
+      - {text}
+    </Text>
   );
+};
+
+const renderCodedBullet = (item: any, key?: string | number) => {
+  const code = String(item.codigo ?? item.code ?? "").trim();
+  const text = String(item.descripcion ?? item.text ?? "").trim();
+
+  if (!text) return null;
+
+  return (
+    <Text key={key} style={styles.bulletText}>
+      - {code ? `${code} - ` : ""}
+      {text}
+    </Text>
+  );
+};
+
+function BulletList({
+  items,
+}: {
+  items?: Array<{ descripcion?: string; codigo?: string }>;
+}) {
+  const bullets = (items ?? [])
+    .map((item, index) => renderCodedBullet(item, index))
+    .filter(Boolean);
+
+  if (bullets.length === 0) {
+    return <Text style={styles.emptyText}>Sin información registrada.</Text>;
+  }
+
+  return <View>{bullets}</View>;
+}
+
+function renderBulletList(items: Array<string | null | undefined>) {
+  const bullets = items
+    .map((item, index) => renderBullet(cleanText(item).trim(), index))
+    .filter(Boolean);
+
+  if (bullets.length === 0) {
+    return <Text style={styles.emptyText}>Sin información registrada.</Text>;
+  }
+
+  return <View>{bullets}</View>;
+}
+
+function joinLabelValue(label?: string | null, value?: string | null) {
+  const cleanLabel = cleanText(label).trim();
+  const cleanValue = cleanText(value).trim();
+
+  if (cleanLabel && cleanValue) return `${cleanLabel}: ${cleanValue}`;
+  return cleanLabel || cleanValue;
+}
+
+function strategyText(estrategia: { nombre?: string; descripcion?: string }) {
+  const nombre = cleanText(estrategia.nombre).trim();
+  const descripcion = cleanText(estrategia.descripcion).trim();
+
+  if (nombre && descripcion) return `${nombre}: ${descripcion}`;
+  return nombre || descripcion;
+}
+
+function resourceNoteText(nota: { nombre?: string; descripcion?: string }) {
+  return joinLabelValue(nota.nombre, nota.descripcion);
+}
+
+function resourceText(recurso: {
+  destino?: string;
+  recursoNombre?: string;
+  observaciones?: string;
+}) {
+  const main = joinLabelValue(recurso.destino, recurso.recursoNombre);
+  const observaciones = cleanText(recurso.observaciones).trim();
+
+  if (main && observaciones) return `${main} - ${observaciones}`;
+  return main || observaciones;
 }
 
 function textToBullets(value?: string | null) {
@@ -487,13 +618,43 @@ function textToBullets(value?: string | null) {
     .join("\n");
 }
 
-function activityText(semana: SemanaUnidad) {
-  const value = cleanText(semana.actividadesAprendizaje).trim();
-
-  if (value) return value;
-
-  return "Lectivas\n- Desarrollo del tema\n\nDe trabajo Independiente\n- No Aplica";
+function formatBulletText(value?: string | null) {
+  return textToBullets(value);
 }
+
+function renderProgramLines(value?: string | null) {
+  return formatBulletText(value)
+    .split("\n")
+    .map((line, index) => (
+      <Text key={index} style={styles.programText}>
+        {line}
+      </Text>
+    ));
+}
+
+function isEventWeek(semana: SemanaUnidad) {
+  return cleanText(semana.actividadesAprendizaje)
+    .trim()
+    .toUpperCase()
+    .startsWith("[EVENTO]");
+}
+
+const cleanFormulaExpression = (label: string, expression?: string | null) => {
+  const value = String(expression ?? "").trim();
+
+  if (!value) return "";
+
+  const normalized = value
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .replace(/\s*=\s*/, " = ");
+
+  if (normalized.startsWith(`${label.toUpperCase()} =`)) {
+    return value;
+  }
+
+  return `${label} = ${value}`;
+};
 
 function getWeeks(unidad: UnidadDidactica) {
   if (unidad.semanas && unidad.semanas.length > 0) {
@@ -516,46 +677,134 @@ function getWeeks(unidad: UnidadDidactica) {
   ];
 }
 
-function fuenteText(fuente: FuenteInformacion) {
-  const autores = fuente.autores || "";
-  const anio = fuente.anio || "s.f.";
-  const titulo = fuente.titulo || "";
-  const editorial = fuente.editorial ? `, ${fuente.editorial}` : "";
-  const ciudad = fuente.ciudad ? `, ${fuente.ciudad}` : "";
-  const isbn = fuente.isbn ? `, ISBN: ${fuente.isbn}` : "";
-  const url = fuente.url ? `, ${fuente.url}` : "";
+function getStringField(source: unknown, keys: string[]) {
+  if (!source) return "";
 
-  return `${autores} (${anio}). ${titulo}${editorial}${ciudad}${isbn}${url}`;
+  const record = source as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (isNonEmpty(value)) return String(value).trim();
+  }
+
+  return "";
+}
+
+function shouldAppendUrl(title: string, url: string) {
+  if (!url) return false;
+  return !title.toLowerCase().includes(url.toLowerCase());
+}
+
+function fuenteText(fuente: FuenteInformacion) {
+  const autores = cleanText(fuente.autores).trim();
+  const anio = cleanText(fuente.anio).trim();
+  const titulo = cleanText(fuente.titulo).trim();
+  const editorial = cleanText(fuente.editorial).trim();
+  const ciudad = cleanText(fuente.ciudad).trim();
+  const isbn = cleanText(fuente.isbn).trim();
+  const notas = cleanText(fuente.notas).trim();
+  const url = getStringField(fuente, ["url", "doiUrl"]);
+  const autorAnio = autores
+    ? `${autores}${anio ? ` (${anio})` : ""}`
+    : anio
+      ? `(${anio})`
+      : "";
+  const parts = [
+    autorAnio,
+    titulo,
+    editorial,
+    ciudad,
+    isbn ? `ISBN: ${isbn}` : "",
+    notas,
+    shouldAppendUrl(titulo, url) ? url : "",
+  ].filter(isNonEmpty);
+
+  return parts.join(". ");
+}
+
+function outcomeNumber(value: string) {
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
+}
+
+function getOutcomeCode(aporte: unknown, index: number) {
+  return (
+    getStringField(aporte, [
+      "resultadoCodigo",
+      "resultadoProgramaCodigo",
+      "codigo",
+      "code",
+    ]) || `RP${index + 1}`
+  );
+}
+
+function getOutcomeDescription(aporte: unknown) {
+  return getStringField(aporte, [
+    "resultadoDescripcion",
+    "resultadoProgramaDescripcion",
+    "descripcion",
+    "description",
+  ]);
+}
+
+function getOutcomeValue(aporte: unknown) {
+  return getStringField(aporte, ["aporteValor", "aporte", "valor", "level"]);
+}
+
+function getOutcomeRows(aportes?: unknown[]) {
+  return (aportes ?? [])
+    .map((aporte, index) => ({
+      code: getOutcomeCode(aporte, index),
+      description: getOutcomeDescription(aporte),
+      value: getOutcomeValue(aporte),
+      originalIndex: index,
+    }))
+    .filter(
+      (aporte) => isNonEmpty(aporte.code) || isNonEmpty(aporte.description),
+    )
+    .sort((a, b) => {
+      const numberDiff = outcomeNumber(a.code) - outcomeNumber(b.code);
+      if (Number.isFinite(numberDiff) && numberDiff !== 0) return numberDiff;
+      return a.code.localeCompare(b.code) || a.originalIndex - b.originalIndex;
+    });
 }
 
 export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
   const datos = data.datosGenerales;
 
   const bibliograficas = data.fuentes?.filter(
-    (fuente) => fuente.tipo === "LIBRO" || fuente.tipo === "ART",
+    (fuente) => fuente.tipo !== "WEB",
   );
 
   const electronicas = data.fuentes?.filter((fuente) => fuente.tipo === "WEB");
 
-  const otros = data.fuentes?.filter((fuente) => fuente.tipo === "OTRO");
+  const horasTeoria = toNumber(datos.horasTeoria);
+  const horasPractica = toNumber(datos.horasPractica);
+  const totalHoras =
+    toNumber(datos.horasTotales) || horasTeoria + horasPractica;
+  const creditosTeoria = toNumber(datos.creditosTeoria);
+  const creditosPractica = toNumber(datos.creditosPractica);
+  const totalCreditos =
+    toNumber(datos.creditosTotales) || creditosTeoria + creditosPractica;
+  const outcomeRows = getOutcomeRows(data.aportesResultadosPrograma);
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.logoText}>USMP</Text>
-          <Text style={styles.facultyText}>
-            Facultad de Ingeniería y Arquitectura
-          </Text>
+          <Image src={LogoUsmpSilabo} style={styles.logo} />
+        </View>
 
+        <View style={styles.titleBlock}>
           <Text style={styles.title}>SÍLABO</Text>
           <Text style={styles.courseTitle}>
             {cleanText(datos.nombreAsignatura).toUpperCase()}
           </Text>
           <Text style={styles.areaTitle}>
             ÁREA CURRICULAR:{" "}
-            {cleanText(datos.areaCurricular || "TECNOLOGÍA DE INFORMACIÓN")
-              .toUpperCase()}
+            {cleanText(
+              datos.areaCurricular || "TECNOLOGÍA DE INFORMACIÓN",
+            ).toUpperCase()}
           </Text>
         </View>
 
@@ -564,71 +813,52 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
 
           <View style={styles.generalTable}>
             <GeneralRow label="Departamento Académico">
-              <Text>{datos.departamentoAcademico}</Text>
+              {datos.departamentoAcademico || ""}
             </GeneralRow>
 
             <GeneralRow label="Escuela Profesional">
-              <Text>{datos.escuelaProfesional}</Text>
+              {datos.escuelaProfesional || ""}
             </GeneralRow>
 
             <GeneralRow label="Programa académico">
-              <Text>{datos.programaAcademico}</Text>
+              {datos.programaAcademico || ""}
             </GeneralRow>
 
             <GeneralRow label="Semestre Académico">
-              <Text>{datos.semestreAcademico}</Text>
+              {datos.semestreAcademico || ""}
             </GeneralRow>
 
             <GeneralRow label="Tipo de asignatura">
-              <Text>{datos.tipoAsignatura}</Text>
+              {datos.tipoAsignatura || ""}
             </GeneralRow>
 
-            <GeneralSplitRow
-              label="Tipo de estudios"
-              items={[
-                `General (${checked(datos.tipoEstudios, "general")})`,
-                `Específica (${checked(datos.tipoEstudios, "especifica") || checked(datos.tipoEstudios, "específica")})`,
-                `Especialidad (${checked(datos.tipoEstudios, "especialidad")})`,
-              ]}
-            />
+            <GeneralRow label="Tipo de estudios">
+              {`General (${markOption(datos.tipoEstudios, "general")})    Específica (${markOption(datos.tipoEstudios, "específica")})    Especialidad (${markOption(datos.tipoEstudios, "especialidad")})`}
+            </GeneralRow>
 
-            <GeneralSplitRow
-              label="Modalidad de la asignatura"
-              items={[
-                `Presencial (${checked(datos.modalidad, "presencial")})`,
-                `Semipresencial (${checked(datos.modalidad, "semipresencial")})`,
-                `A distancia (${
-                  checked(datos.modalidad, "a distancia") ||
-                  checked(datos.modalidad, "aDistancia")
-                })`,
-              ]}
-            />
+            <GeneralRow label="Modalidad de la asignatura">
+              {`Presencial (${markOption(datos.modalidad, "presencial")})    Semipresencial (${markOption(datos.modalidad, "semipresencial")})    A distancia (${markOption(datos.modalidad, "a distancia")})`}
+            </GeneralRow>
 
             <GeneralRow label="Código de la asignatura">
-              <Text>{datos.codigoAsignatura}</Text>
+              {datos.codigoAsignatura || ""}
             </GeneralRow>
 
-            <GeneralRow label="Ciclo">
-              <Text>{datos.ciclo}</Text>
-            </GeneralRow>
+            <GeneralRow label="Ciclo">{datos.ciclo || ""}</GeneralRow>
 
             <GeneralRow label="Requisitos">
-              <Text>{datos.requisitos}</Text>
+              {datos.requisitos || "Ninguno"}
             </GeneralRow>
 
-            <View style={styles.generalRow}>
-              <View style={styles.generalLabel}>
-                <Text>Cantidad de horas</Text>
-              </View>
-
+            <GeneralRow label="Cantidad de horas">
               <View style={styles.hoursBlock}>
                 <Text style={styles.hoursLine}>
-                  Teoría ({pad2(datos.horasTeoria)}) Práctica (
-                  {pad2(datos.horasPractica)}) Total horas (
-                  {pad2(datos.horasTotales)})
+                  Teoría ({formatTwoDigits(horasTeoria)}) Práctica (
+                  {formatTwoDigits(horasPractica)}) Total horas (
+                  {formatTwoDigits(totalHoras)})
                 </Text>
                 <Text style={styles.hoursLine}>
-                  Teoría lectiva presencial ({pad2(datos.horasTeoria)})
+                  Teoría lectiva presencial ({formatTwoDigits(horasTeoria)})
                 </Text>
                 <Text style={styles.hoursLine}>
                   Teoría lectiva a distancia ( )
@@ -640,7 +870,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                   Teoría no lectiva a distancia ( )
                 </Text>
                 <Text style={styles.hoursLine}>
-                  Práctica lectiva presencial ({pad2(datos.horasPractica)})
+                  Práctica lectiva presencial ({formatTwoDigits(horasPractica)})
                 </Text>
                 <Text style={styles.hoursLine}>
                   Práctica lectiva a distancia ( )
@@ -652,25 +882,27 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                   Práctica no lectiva a distancia ( )
                 </Text>
               </View>
-            </View>
-
-            <GeneralRow label="Cantidad de Créditos">
-              <Text>
-                Teoría ({pad2(datos.creditosTeoria)}) Práctica (
-                {pad2(datos.creditosPractica)}) Total créditos (
-                {pad2(datos.creditosTotales)})
-              </Text>
             </GeneralRow>
 
-            <GeneralRow label="Docente(s)">
-              <Text>{datos.docentes}</Text>
+            <GeneralRow label="Cantidad de Créditos">
+              {`Teoría (${formatTwoDigits(creditosTeoria)})    Práctica (${formatTwoDigits(creditosPractica)})    Total créditos (${formatTwoDigits(totalCreditos)})`}
+            </GeneralRow>
+
+            <GeneralRow label="Docente(s)" last>
+              {datos.docentes || "Pendiente de asignación"}
             </GeneralRow>
           </View>
         </View>
 
         <View style={styles.section}>
           <SectionTitle>II. SUMILLA</SectionTitle>
-          <Text style={styles.text}>{data.sumilla || ""}</Text>
+          {isNonEmpty(data.sumilla) ? (
+            <Text style={styles.paragraph}>
+              {cleanText(data.sumilla).trim()}
+            </Text>
+          ) : (
+            <Text style={styles.emptyText}>Sin información registrada.</Text>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -707,139 +939,137 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
           const semanas = getWeeks(unidad);
 
           return (
-            <View key={unidad.id} style={styles.unitBox}>
-              <View style={styles.unitTitle}>
-                <Text style={styles.unitTitleText}>
+            <View key={unidad.id} style={styles.programUnitTable}>
+              <View style={styles.programUnitTitle} wrap={false}>
+                <Text style={styles.programUnitTitleText}>
                   UNIDAD {roman(unidad.numero)} :{" "}
                   {cleanText(unidad.titulo).toUpperCase()}
                 </Text>
               </View>
 
-              <View style={styles.capacityBox}>
-                <Text style={styles.tdText}>
+              <View style={styles.programCapacity}>
+                <Text style={styles.programText}>
                   <Text style={styles.textBold}>CAPACIDAD:</Text>
                 </Text>
-
-                {textToBullets(unidad.capacidadesText)
-                  .split("\n")
-                  .map((line, index) => (
-                    <Text key={index} style={styles.tdText}>
-                      {line}
-                    </Text>
-                  ))}
+                {renderProgramLines(unidad.capacidadesText)}
               </View>
 
-              <View style={styles.programHeaderRow}>
-                <View style={[styles.th, styles.weekCol]}>
-                  <Text style={styles.thText}>SEMANA</Text>
+              <View style={styles.programHeaderRow} wrap={false}>
+                <View style={[styles.programCell, styles.programWeekCell]}>
+                  <Text style={styles.programHeaderText}>SEMANA</Text>
                 </View>
 
-                <View style={[styles.th, styles.conceptualCol]}>
-                  <Text style={styles.thText}>CONTENIDOS CONCEPTUALES</Text>
+                <View
+                  style={[styles.programCell, styles.programConceptualCell]}
+                >
+                  <Text style={styles.programHeaderText}>
+                    CONTENIDOS CONCEPTUALES
+                  </Text>
                 </View>
 
-                <View style={[styles.th, styles.proceduralCol]}>
-                  <Text style={styles.thText}>
+                <View
+                  style={[styles.programCell, styles.programProceduralCell]}
+                >
+                  <Text style={styles.programHeaderText}>
                     CONTENIDOS PROCEDIMENTALES
                   </Text>
                 </View>
 
-                <View style={[styles.th, styles.activityCol]}>
-                  <Text style={styles.thText}>ACTIVIDADES DE APRENDIZAJE</Text>
+                <View style={[styles.programCell, styles.programActivityCell]}>
+                  <Text style={styles.programHeaderText}>
+                    ACTIVIDADES DE APRENDIZAJE
+                  </Text>
                 </View>
 
-                <View style={styles.hourGroup}>
-                  <View style={styles.hourGroupTitle}>
-                    <Text style={styles.thText}>HORAS LECTIVAS</Text>
-                  </View>
-
-                  <View style={styles.hourGroupSubRow}>
-                    <View style={styles.hourSubCell}>
-                      <Text style={styles.thText}>TEORÍA</Text>
-                    </View>
-                    <View style={styles.hourSubCellLast}>
-                      <Text style={styles.thText}>PRÁCTICA</Text>
-                    </View>
-                  </View>
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HL TEORÍA</Text>
                 </View>
 
-                <View style={styles.hourGroup}>
-                  <View style={styles.hourGroupTitle}>
-                    <Text style={styles.thText}>HORAS NO LECTIVAS</Text>
-                  </View>
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HL PRÁCTICA</Text>
+                </View>
 
-                  <View style={styles.hourGroupSubRow}>
-                    <View style={styles.hourSubCell}>
-                      <Text style={styles.thText}>TEORÍA</Text>
-                    </View>
-                    <View style={styles.hourSubCellLast}>
-                      <Text style={styles.thText}>PRÁCTICA</Text>
-                    </View>
-                  </View>
+                <View style={[styles.programCell, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HNL TEORÍA</Text>
+                </View>
+
+                <View style={[styles.programCellLast, styles.programHourCell]}>
+                  <Text style={styles.programHeaderText}>HNL PRÁCTICA</Text>
                 </View>
               </View>
 
-              {semanas.map((semana) => (
-                <View key={semana.id || semana.semana} style={styles.programRow}>
-                  <View style={[styles.td, styles.weekCol]}>
-                    <Text style={styles.tdText}>{semana.semana}</Text>
-                  </View>
+              {semanas.map((semana) => {
+                const isEvent = isEventWeek(semana);
 
-                  <View style={[styles.td, styles.conceptualCol]}>
-                    {textToBullets(semana.contenidosConceptuales)
-                      .split("\n")
-                      .map((line, index) => (
-                        <Text key={index} style={styles.tdText}>
-                          {line}
+                return (
+                  <View
+                    key={semana.id || semana.semana}
+                    style={styles.programRow}
+                  >
+                    <View style={[styles.programCell, styles.programWeekCell]}>
+                      <Text style={styles.hourText}>{semana.semana}</Text>
+                    </View>
+
+                    <View
+                      style={[styles.programCell, styles.programConceptualCell]}
+                    >
+                      {isEvent ? (
+                        <Text style={styles.programText}>-</Text>
+                      ) : (
+                        renderProgramLines(semana.contenidosConceptuales)
+                      )}
+                    </View>
+
+                    <View
+                      style={[styles.programCell, styles.programProceduralCell]}
+                    >
+                      {isEvent ? (
+                        <Text style={styles.programText}>-</Text>
+                      ) : (
+                        renderProgramLines(semana.contenidosProcedimentales)
+                      )}
+                    </View>
+
+                    <View
+                      style={[styles.programCell, styles.programActivityCell]}
+                    >
+                      {isEvent ? (
+                        <Text style={styles.programText}>
+                          {cleanText(semana.actividadesAprendizaje)}
                         </Text>
-                      ))}
-                  </View>
+                      ) : (
+                        renderProgramLines(semana.actividadesAprendizaje)
+                      )}
+                    </View>
 
-                  <View style={[styles.td, styles.proceduralCol]}>
-                    {textToBullets(semana.contenidosProcedimentales)
-                      .split("\n")
-                      .map((line, index) => (
-                        <Text key={index} style={styles.tdText}>
-                          {line}
-                        </Text>
-                      ))}
-                  </View>
+                    <View style={[styles.programCell, styles.programHourCell]}>
+                      <Text style={styles.hourText}>
+                        {isEvent ? 0 : (semana.horasLectivasTeoria ?? 0)}
+                      </Text>
+                    </View>
 
-                  <View style={[styles.td, styles.activityCol]}>
-                    {activityText(semana)
-                      .split("\n")
-                      .map((line, index) => (
-                        <Text key={index} style={styles.tdText}>
-                          {line}
-                        </Text>
-                      ))}
-                  </View>
+                    <View style={[styles.programCell, styles.programHourCell]}>
+                      <Text style={styles.hourText}>
+                        {isEvent ? 0 : (semana.horasLectivasPractica ?? 0)}
+                      </Text>
+                    </View>
 
-                  <View style={[styles.td, styles.hourCol]}>
-                    <Text style={styles.tdText}>
-                      {semana.horasLectivasTeoria ?? 0}
-                    </Text>
-                  </View>
+                    <View style={[styles.programCell, styles.programHourCell]}>
+                      <Text style={styles.hourText}>
+                        {isEvent ? 0 : (semana.horasNoLectivasTeoria ?? 0)}
+                      </Text>
+                    </View>
 
-                  <View style={[styles.td, styles.hourCol]}>
-                    <Text style={styles.tdText}>
-                      {semana.horasLectivasPractica ?? 0}
-                    </Text>
+                    <View
+                      style={[styles.programCellLast, styles.programHourCell]}
+                    >
+                      <Text style={styles.hourText}>
+                        {isEvent ? 0 : (semana.horasNoLectivasPractica ?? 0)}
+                      </Text>
+                    </View>
                   </View>
-
-                  <View style={[styles.td, styles.hourCol]}>
-                    <Text style={styles.tdText}>
-                      {semana.horasNoLectivasTeoria ?? 0}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.td, styles.hourCol]}>
-                    <Text style={styles.tdText}>
-                      {semana.horasNoLectivasPractica ?? 0}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           );
         })}
@@ -850,36 +1080,17 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
       <Page size="A4" style={styles.page}>
         <View style={styles.section}>
           <SectionTitle>V. ESTRATEGIAS DIDÁCTICAS</SectionTitle>
-
-          {data.estrategiasMetodologicas?.length > 0 ? (
-            data.estrategiasMetodologicas.map((estrategia, index) => (
-              <Text key={index} style={styles.listItem}>
-                - {estrategia.nombre}
-                {estrategia.descripcion ? `. ${estrategia.descripcion}` : ""}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.text}>-</Text>
+          {renderBulletList(
+            (data.estrategiasMetodologicas ?? []).map(strategyText),
           )}
         </View>
 
         <View style={styles.section}>
           <SectionTitle>VI. RECURSOS DIDÁCTICOS</SectionTitle>
-
-          {data.recursosDidacticos?.notas?.map((nota, index) => (
-            <Text key={`nota-${index}`} style={styles.text}>
-              <Text style={styles.textBold}>{nota.nombre}: </Text>
-              {nota.descripcion}
-            </Text>
-          ))}
-
-          {data.recursosDidacticos?.recursos?.map((recurso, index) => (
-            <Text key={`recurso-${index}`} style={styles.text}>
-              <Text style={styles.textBold}>{recurso.destino}: </Text>
-              {recurso.recursoNombre}
-              {recurso.observaciones ? ` - ${recurso.observaciones}` : ""}
-            </Text>
-          ))}
+          {renderBulletList([
+            ...(data.recursosDidacticos?.notas ?? []).map(resourceNoteText),
+            ...(data.recursosDidacticos?.recursos ?? []).map(resourceText),
+          ])}
         </View>
 
         <View style={styles.section}>
@@ -893,11 +1104,11 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               </Text>
 
               <Text style={styles.formulaText}>
-                {
+                {cleanFormulaExpression(
                   data.evaluacionAprendizaje.formulaEvaluacion
-                    .variableFinalCodigo
-                }{" "}
-                = {data.evaluacionAprendizaje.formulaEvaluacion.expresionFinal}
+                    .variableFinalCodigo || "PF",
+                  data.evaluacionAprendizaje.formulaEvaluacion.expresionFinal,
+                )}
               </Text>
 
               {data.evaluacionAprendizaje.formulaEvaluacion.variables?.map(
@@ -912,7 +1123,10 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               {data.evaluacionAprendizaje.formulaEvaluacion.subformulas?.map(
                 (subformula, index) => (
                   <Text key={index} style={styles.formulaText}>
-                    {subformula.variableCodigo} = {subformula.expresion}
+                    {cleanFormulaExpression(
+                      subformula.variableCodigo,
+                      subformula.expresion,
+                    )}
                   </Text>
                 ),
               )}
@@ -927,18 +1141,19 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
 
               {data.evaluacionAprendizaje?.formulaPF && (
                 <Text style={styles.formulaText}>
-                  {data.evaluacionAprendizaje.formulaPF}
+                  {cleanFormulaExpression(
+                    "PF",
+                    data.evaluacionAprendizaje.formulaPF,
+                  )}
                 </Text>
               )}
 
-              {data.evaluacionAprendizaje?.componentesPF?.map(
-                (item, index) => (
-                  <Text key={index} style={styles.text}>
-                    <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
-                    {item.descripcion}
-                  </Text>
-                ),
-              )}
+              {data.evaluacionAprendizaje?.componentesPF?.map((item, index) => (
+                <Text key={index} style={styles.text}>
+                  <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
+                  {item.descripcion}
+                </Text>
+              ))}
 
               {data.evaluacionAprendizaje?.descripcionPE && (
                 <Text style={styles.text}>
@@ -948,18 +1163,19 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
 
               {data.evaluacionAprendizaje?.formulaPE && (
                 <Text style={styles.formulaText}>
-                  {data.evaluacionAprendizaje.formulaPE}
+                  {cleanFormulaExpression(
+                    "PE",
+                    data.evaluacionAprendizaje.formulaPE,
+                  )}
                 </Text>
               )}
 
-              {data.evaluacionAprendizaje?.componentesPE?.map(
-                (item, index) => (
-                  <Text key={index} style={styles.text}>
-                    <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
-                    {item.descripcion}
-                  </Text>
-                ),
-              )}
+              {data.evaluacionAprendizaje?.componentesPE?.map((item, index) => (
+                <Text key={index} style={styles.text}>
+                  <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
+                  {item.descripcion}
+                </Text>
+              ))}
             </>
           )}
         </View>
@@ -970,35 +1186,21 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
           {bibliograficas?.length > 0 && (
             <>
               <Text style={styles.subsectionTitle}>8.1 Bibliográficas</Text>
-              {bibliograficas.map((fuente, index) => (
-                <Text key={index} style={styles.listItem}>
-                  - {fuenteText(fuente)}
-                </Text>
-              ))}
+              {renderBulletList(bibliograficas.map(fuenteText))}
             </>
           )}
 
           {electronicas?.length > 0 && (
             <>
               <Text style={styles.subsectionTitle}>8.2 Electrónicas</Text>
-              {electronicas.map((fuente, index) => (
-                <Text key={index} style={styles.listItem}>
-                  - {fuenteText(fuente)}
-                </Text>
-              ))}
+              {renderBulletList(electronicas.map(fuenteText))}
             </>
           )}
 
-          {otros?.length > 0 && (
-            <>
-              <Text style={styles.subsectionTitle}>8.3 Otras</Text>
-              {otros.map((fuente, index) => (
-                <Text key={index} style={styles.listItem}>
-                  - {fuenteText(fuente)}
-                </Text>
-              ))}
-            </>
-          )}
+          {(bibliograficas?.length ?? 0) === 0 &&
+            (electronicas?.length ?? 0) === 0 && (
+              <Text style={styles.emptyText}>Sin información registrada.</Text>
+            )}
         </View>
 
         <View style={styles.section}>
@@ -1006,36 +1208,65 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
             IX. APORTE DE LA ASIGNATURA AL LOGRO DE RESULTADOS
           </SectionTitle>
 
-          <Text style={styles.text}>
+          <Text style={styles.paragraph}>
             El aporte de la asignatura al logro de los Resultados del Estudiante
             (<Text style={styles.textItalic}>Student Outcomes</Text>) en la
             formación del graduado en Ingeniería de Computación y Sistemas, se
             establece en la tabla siguiente:
           </Text>
 
-          <Text style={styles.text}>
+          <Text style={styles.paragraph}>
             <Text style={styles.textBold}>K</Text> = clave{" "}
             <Text style={styles.textBold}>R</Text> = relacionado{" "}
             <Text style={styles.textBold}>Recuadro vacío</Text> = no aplica
           </Text>
 
-          <View style={styles.compactTable}>
-            {data.aportesResultadosPrograma?.map((aporte, index) => (
-              <View key={index} style={styles.compactRow}>
-                <View style={[styles.compactCell, { width: "8%" }]}>
-                  <Text>{aporte.resultadoCodigo || index + 1}</Text>
+          {outcomeRows.length > 0 ? (
+            <View style={styles.outcomesTable}>
+              <View style={styles.outcomeHeaderRow} wrap={false}>
+                <View style={styles.outcomeCodeCell}>
+                  <Text style={styles.outcomeHeaderText}>Código</Text>
                 </View>
 
-                <View style={[styles.compactCell, { width: "82%" }]}>
-                  <Text>{aporte.resultadoDescripcion}</Text>
+                <View style={styles.outcomeDescriptionCell}>
+                  <Text style={styles.outcomeHeaderText}>
+                    Resultado del estudiante
+                  </Text>
                 </View>
 
-                <View style={[styles.compactCell, { width: "10%" }]}>
-                  <Text>{aporte.aporteValor}</Text>
+                <View style={styles.outcomeValueCell}>
+                  <Text style={styles.outcomeHeaderText}>Aporte</Text>
                 </View>
               </View>
-            ))}
-          </View>
+
+              {outcomeRows.map((aporte, index) => (
+                <View
+                  key={`${aporte.code}-${index}`}
+                  style={
+                    index === outcomeRows.length - 1
+                      ? styles.outcomeRowLast
+                      : styles.outcomeRow
+                  }
+                >
+                  <View style={styles.outcomeCodeCell}>
+                    <Text style={styles.outcomeCenteredText}>
+                      {aporte.code}
+                    </Text>
+                  </View>
+
+                  <View style={styles.outcomeDescriptionCell}>
+                    <Text style={styles.outcomeText}>{aporte.description}</Text>
+                  </View>
+
+                  <View style={styles.outcomeValueCell}>
+                    <Text style={styles.outcomeValueText}>{aporte.value}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>Sin aportes registrados.</Text>
+          )}
         </View>
 
         <Footer />

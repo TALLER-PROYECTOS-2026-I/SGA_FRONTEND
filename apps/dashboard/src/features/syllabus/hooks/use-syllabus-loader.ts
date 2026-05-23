@@ -18,18 +18,13 @@ export const useSyllabusLoader = () => {
 
       try {
         if (syllabusId) {
-          console.log(`📥 Cargando sílabo ID: ${syllabusId}`);
           const data = await syllabusService.fetchSyllabus(syllabusId);
           setSyllabusData(data);
-          console.log("✅ Datos cargados");
-        } else {
-          console.log("✅ Modo crear nuevo - sin datos previos");
         }
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Error al cargar datos";
         setLoadError(errorMsg);
-        console.error("❌ Error:", errorMsg);
       } finally {
         setIsLoading(false);
       }

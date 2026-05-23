@@ -57,8 +57,10 @@ export const SyllabusProvider: React.FC<SyllabusProviderProps> = ({
   const cursoCodigo = useMemo(() => searchParams.get("codigo"), [searchParams]);
 
   const syllabusIdFromUrl = useMemo(() => {
-    const id = searchParams.get("id");
-    return id ? parseInt(id, 10) : null;
+    const raw = searchParams.get("syllabusId") ?? searchParams.get("id");
+    if (!raw) return null;
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
   const syllabusId = syllabusIdState ?? syllabusIdFromUrl;

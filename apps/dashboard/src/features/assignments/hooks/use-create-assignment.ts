@@ -75,9 +75,6 @@ async function createAssignment(
     throw new Error(response.message || "Error al crear asignación");
   }
   if (!response.success && isSuccessMessage) {
-    console.warn(
-      "⚠️ Backend respondió con success: false pero mensaje de éxito. Corrigiendo...",
-    );
     response.success = true;
   }
 

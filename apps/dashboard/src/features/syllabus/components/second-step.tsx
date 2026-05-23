@@ -3,7 +3,10 @@ import { useSaveSumilla, useSumilla } from "../hooks/second-step-query";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
 import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
 import { Step } from "./step";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import { toast } from "sonner";
 import {
   BookOpen,
@@ -11,7 +14,12 @@ import {
   Loader2,
   Info,
   X,
+  AlertTriangle,
 } from "lucide-react";
+import { useCreateDraft } from "../create-draft/create-draft-context";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
+
+const MIN_SUMMARY_WORDS = 80;
 
 type ReviewSumillaData = {
   sumilla?: string;
@@ -22,35 +30,90 @@ type ReviewSumillaData = {
   }>;
 };
 
+function validateSummaryText(value: string) {
+  const text = value.trim();
+
+  if (!text) {
+    return "La sumilla es obligatoria.";
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+
+  if (words.length < MIN_SUMMARY_WORDS) {
+    return `La sumilla debe tener al menos ${MIN_SUMMARY_WORDS} palabras. Actualmente tiene ${words.length}.`;
+  }
+
+  return "";
+}
+
 /**
  * Paso 2: Sumilla
  *
  * - Modo create/edit: guarda en BD usando POST o PUT.
  * - Modo review: solo muestra datos para revisión, no guarda.
+ * - Si no tiene permiso para sección 2, muestra la información pero bloquea edición.
  */
 export default function SecondStep() {
   const { nextStep } = useSteps();
-  const { syllabusId, courseName } = useSyllabusContext();
+  const { courseName } = useSyllabusContext();
+  const { isDraftCreateMode, resolvedSyllabusId } = useIsDraftCreateMode();
+  const { draft, updateCreateDraft } = useCreateDraft();
   const { isReviewMode, sectionData } = useReviewMode();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(2);
+
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
+
+  const canEdit =
+    !isReviewMode &&
+    hasEditPermissionForSection(2) &&
+    !isLockedByState &&
+    !isResolvingState;
 
   const [summary, setSummary] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState("");
+  const [hasHydrated, setHasHydrated] = useState(false);
 
-  const { data, isLoading, isError, error } = useSumilla(
-    isReviewMode ? null : syllabusId,
+  const { data, isLoading, isFetching, isError, error } = useSumilla(
+    isDraftCreateMode ? null : resolvedSyllabusId,
   );
 
   const saveSumilla = useSaveSumilla();
 
   const hasExistingSumilla = Boolean(
-    data?.id || data?.sumilla || data?.contenido,
+    data &&
+      ((data.sumilla || data.contenido || "").trim().length > 0 || data.id),
   );
 
   const isCreating = !hasExistingSumilla;
 
   useEffect(() => {
-    if (isReviewMode) return;
+    if (isDraftCreateMode) return;
+
+    setHasHydrated(false);
+    setSummary("");
+    setErrors({});
+    setApiError("");
+  }, [resolvedSyllabusId, isDraftCreateMode]);
+
+  useEffect(() => {
+    if (!isDraftCreateMode || hasHydrated) return;
+
+    if (draft.sumilla?.trim()) {
+      setSummary(draft.sumilla);
+    }
+
+    setHasHydrated(true);
+  }, [isDraftCreateMode, hasHydrated, draft.sumilla]);
+
+  useEffect(() => {
+    if (isDraftCreateMode) return;
 
     if (isError) {
       const errorMsg = error?.message ?? "Error cargando sumilla";
@@ -68,20 +131,19 @@ export default function SecondStep() {
 
     setApiError("");
 
-    if (!data) return;
+    if (!data || hasHydrated) return;
 
     const loadedSummary = data.sumilla || data.contenido || "";
 
-    if (loadedSummary) {
-      setSummary(loadedSummary);
+    setSummary(loadedSummary);
+    setHasHydrated(true);
 
-      try {
-        localStorage.setItem("datos_sumilla", loadedSummary);
-      } catch {
-        // ignore
-      }
+    try {
+      localStorage.setItem("datos_sumilla", loadedSummary);
+    } catch {
+      // ignore
     }
-  }, [data, isError, error, isReviewMode]);
+  }, [data, isError, error, hasHydrated, isDraftCreateMode]);
 
   useEffect(() => {
     if (!isReviewMode || !sectionData) return;
@@ -95,65 +157,92 @@ export default function SecondStep() {
       reviewData.content?.[0]?.contenido ||
       "";
 
-    setSummary(loadedSummary);
+    if (loadedSummary) {
+      setSummary(loadedSummary);
+      setHasHydrated(true);
+    }
   }, [isReviewMode, sectionData]);
 
+  const persistSumillaToServer = async () => {
+    if (!canEdit) {
+      throw new Error("No tienes permiso para editar la sumilla.");
+    }
+
+    if (!resolvedSyllabusId) {
+      throw new Error(
+        "ID del sílabo no encontrado. Completa el primer paso antes de continuar.",
+      );
+    }
+
+    await saveSumilla.mutateAsync({
+      syllabusId: resolvedSyllabusId,
+      data: {
+        sumilla: summary.trim(),
+      },
+      isCreating,
+    });
+
+    try {
+      localStorage.setItem("datos_sumilla", summary.trim());
+    } catch {
+      // ignore
+    }
+  };
+
+  const focusSummaryField = () => {
+    const el = document.querySelector(
+      'textarea[name="summary"]',
+    ) as HTMLElement | null;
+
+    if (el && typeof el.focus === "function") {
+      el.focus();
+    }
+  };
+
   const validateAndNext = async () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!summary.trim()) {
-      newErrors.summary = "Campo obligatorio";
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      const el = document.querySelector(
-        'textarea[name="summary"]',
-      ) as HTMLElement | null;
-
-      if (el && typeof el.focus === "function") {
-        el.focus();
-      }
-
-      return;
-    }
-
     if (isReviewMode) {
       nextStep();
       return;
     }
 
+    if (!canEdit) {
+      nextStep();
+      return;
+    }
+
+    const summaryError = validateSummaryText(summary);
+
+    if (summaryError) {
+      setErrors({ summary: summaryError });
+      focusSummaryField();
+      return;
+    }
+
+    setErrors({});
     setApiError("");
 
-    if (!syllabusId) {
+    if (isDraftCreateMode) {
+      updateCreateDraft({ sumilla: summary.trim() });
+      nextStep();
+      return;
+    }
+
+    if (!resolvedSyllabusId) {
       toast.error("Error", {
         description:
-          "Id del sílabo no encontrado. Completa el primer paso antes de continuar.",
+          "ID del sílabo no encontrado. Completa el primer paso antes de continuar.",
       });
       return;
     }
 
     try {
-      await saveSumilla.mutateAsync({
-        syllabusId,
-        data: {
-          sumilla: summary.trim(),
-        },
-        isCreating,
-      });
+      await persistSumillaToServer();
 
       toast.success(
         isCreating
           ? "Sumilla creada exitosamente"
           : "Sumilla actualizada exitosamente",
       );
-
-      try {
-        localStorage.setItem("datos_sumilla", summary.trim());
-      } catch {
-        // ignore
-      }
 
       nextStep();
     } catch (err: unknown) {
@@ -188,6 +277,8 @@ export default function SecondStep() {
   };
 
   const handleClearSummary = () => {
+    if (!canEdit) return;
+
     setSummary("");
     setErrors((prev) => ({ ...prev, summary: "" }));
   };
@@ -197,8 +288,17 @@ export default function SecondStep() {
     : 0;
 
   const charCount = summary.length;
+  const wordsRemaining = Math.max(0, MIN_SUMMARY_WORDS - wordCount);
+  const meetsMinWords = wordCount >= MIN_SUMMARY_WORDS;
 
-  const isTextareaDisabled = isLoading || saveSumilla.isPending || isReviewMode;
+  const isTextareaDisabled =
+    isLoading ||
+    isFetching ||
+    saveSumilla.isPending ||
+    isReviewMode ||
+    !canEdit ||
+    isLockedByState ||
+    isResolvingState;
 
   return (
     <Step step={2} onNextStep={validateAndNext}>
@@ -225,7 +325,36 @@ export default function SecondStep() {
         </div>
 
         <div className="p-8">
-          {isLoading && (
+          <CoordinatorCommentsBanner
+            stepNumber={2}
+            comments={coordinatorComments}
+          />
+
+          {!canEdit && (
+            <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-50 px-6 py-5 text-yellow-800">
+              <div className="flex items-start gap-4">
+                <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500 text-white">
+                  <AlertTriangle size={22} />
+                </div>
+
+                <div>
+                  <p className="font-bold">
+                    {isReviewMode ? "Modo revisión" : "Modo solo lectura"}
+                  </p>
+
+                  <p className="mt-1 text-sm">
+                    {isReviewMode
+                      ? "Estás revisando esta sección en modo coordinador. Puedes consultar la sumilla, pero no modificarla."
+                      : isDisapprovedCorrection
+                        ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                        : "No tienes permiso para editar esta sección. Puedes revisar la sumilla, pero no modificarla."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(isLoading || isFetching) && (
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
               <Loader2 size={18} className="animate-spin" />
               Cargando sumilla...
@@ -282,6 +411,8 @@ export default function SecondStep() {
                     name="summary"
                     value={summary}
                     onChange={(e) => {
+                      if (!canEdit) return;
+
                       setSummary(e.target.value);
                       setErrors((prev) => ({ ...prev, summary: "" }));
                     }}
@@ -344,13 +475,33 @@ export default function SecondStep() {
                   </div>
                 </div>
 
+                <p className="text-xs font-semibold text-gray-500 mb-3">
+                  Mínimo requerido: {MIN_SUMMARY_WORDS} palabras
+                </p>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                  <div
+                    className={`rounded-xl border p-4 ${
+                      meetsMinWords
+                        ? "bg-green-50 border-green-200"
+                        : wordCount > 0
+                          ? "bg-amber-50 border-amber-200"
+                          : "bg-gray-50 border-gray-100"
+                    }`}
+                  >
                     <p className="text-xs font-semibold text-gray-400 uppercase">
                       Palabras
                     </p>
 
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p
+                      className={`text-2xl font-bold mt-1 ${
+                        meetsMinWords
+                          ? "text-green-700"
+                          : wordCount > 0
+                            ? "text-amber-700"
+                            : "text-gray-900"
+                      }`}
+                    >
                       {wordCount}
                     </p>
                   </div>
@@ -365,6 +516,16 @@ export default function SecondStep() {
                     </p>
                   </div>
                 </div>
+
+                <p
+                  className={`text-xs font-medium mt-3 ${
+                    meetsMinWords ? "text-green-700" : "text-amber-700"
+                  }`}
+                >
+                  {meetsMinWords
+                    ? "Cumple el mínimo requerido."
+                    : `Faltan ${wordsRemaining} palabras para cumplir el mínimo.`}
+                </p>
               </div>
 
               <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5">
@@ -374,14 +535,13 @@ export default function SecondStep() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-blue-900">
-                      Recomendación
-                    </h3>
+                    <h3 className="font-bold text-blue-900">Recomendación</h3>
 
                     <p className="text-sm text-blue-700 leading-relaxed mt-1">
                       La sumilla debe explicar brevemente la naturaleza de la
                       asignatura, sus contenidos centrales y su aporte a la
-                      formación del estudiante.
+                      formación del estudiante. Debe tener al menos{" "}
+                      {MIN_SUMMARY_WORDS} palabras.
                     </p>
                   </div>
                 </div>
@@ -393,8 +553,9 @@ export default function SecondStep() {
                 </h3>
 
                 <p className="text-sm text-yellow-700 leading-relaxed">
-                  Verifica que la sumilla no esté vacía y que sea coherente con
-                  los datos generales registrados en el paso anterior.
+                  Verifica que la sumilla tenga al menos {MIN_SUMMARY_WORDS}{" "}
+                  palabras y que sea coherente con los datos generales
+                  registrados en el paso anterior.
                 </p>
               </div>
             </aside>

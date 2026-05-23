@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "/api";
+const API_BASE_URL = "/api";
 
 // Sección 1: Datos Generales
 export interface DatosGenerales {
@@ -101,8 +102,8 @@ export function useSyllabusSectionData(
       // Sección 3 requiere múltiples peticiones
       if (sectionNumber === "3") {
         const [competenciesRes, attitudesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/syllabus/${syllabusId}/competencies`),
-          fetch(`${API_BASE_URL}/syllabus/${syllabusId}/attitudes`),
+          authFetch(`${API_BASE_URL}/syllabus/${syllabusId}/competencies`),
+          authFetch(`${API_BASE_URL}/syllabus/${syllabusId}/attitudes`),
         ]);
 
         // Si aún no existen datos, no rompemos la pantalla
@@ -151,7 +152,7 @@ export function useSyllabusSectionData(
 
       const url = `${API_BASE_URL}/syllabus/${syllabusId}/${endpoint}`;
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

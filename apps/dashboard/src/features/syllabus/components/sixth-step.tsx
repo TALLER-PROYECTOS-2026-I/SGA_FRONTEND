@@ -1,9 +1,22 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { useState, useEffect } from "react";
 import { Step } from "./step";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
 import { toast } from "sonner";
-import { useFormulaQuery } from "../hooks/sixth-step-query";
+import {
+  useFormulaQuery,
+  useCreateFormula,
+  useUpdateFormula,
+  type FormulaEvaluacionCreate,
+} from "../hooks/sixth-step-query";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
+import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
+import { useCreateDraft } from "../create-draft/create-draft-context";
 import {
   Select,
   SelectContent,
@@ -19,6 +32,7 @@ import {
   Loader2,
   Sigma,
   BookOpen,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Legend {
@@ -138,40 +152,173 @@ const availableFormulas: MainFormula[] = [
   },
 ];
 
+export function buildFormulaPayload(
+  syllabusId: number,
+  formula: MainFormula,
+): FormulaEvaluacionCreate {
+  return {
+    silaboId: syllabusId,
+    nombreRegla: formula.name,
+    variableFinalCodigo: "PF",
+    expresionFinal: formula.formula,
+    activo: true,
+    variables: formula.legend.map((item, index) => ({
+      codigo: item.key,
+      nombre: item.description,
+      tipo: item.key === "PF" ? ("final" as const) : ("evaluacion" as const),
+      descripcion: item.description,
+      orden: index + 1,
+    })),
+    subformulas: formula.subFormulas.map((item) => ({
+      variableCodigo: item.variable,
+      expresion: item.formula,
+    })),
+    variablePlanMappings: [],
+  };
+}
+
 export default function SixthStep() {
   const { nextStep } = useSteps();
   const { syllabusId } = useSyllabusContext();
-  const [selectedFormula, setSelectedFormula] = useState<string>("1");
+  const { isDraftCreateMode } = useIsDraftCreateMode();
+  const { draft, setSixthStepData } = useCreateDraft();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(6);
+  const { isReviewMode } = useReviewMode();
 
-  const { data: formulaFromApi, isLoading } = useFormulaQuery(syllabusId);
+  const { isLockedByState, isResolvingState } = useSyllabusEditLock(syllabusId);
+
+  const [selectedFormula, setSelectedFormula] = useState<string>("");
+
+  const { data: formulaFromApi, isLoading } = useFormulaQuery(
+    isDraftCreateMode ? null : syllabusId,
+  );
+  const createFormulaMutation = useCreateFormula();
+  const updateFormulaMutation = useUpdateFormula();
+
+  const canEdit =
+    !isReviewMode &&
+    hasEditPermissionForSection(6) &&
+    !isLockedByState &&
+    !isResolvingState;
 
   useEffect(() => {
-    if (formulaFromApi) {
-      console.log("Fórmula cargada desde API:", formulaFromApi);
-      toast.success("Fórmula cargada desde el servidor");
+    if (!isDraftCreateMode || !draft.formulaEvaluacion) return;
+
+    const matchedFormula = availableFormulas.find((formula) => {
+      return (
+        formula.name === draft.formulaEvaluacion?.nombreRegla ||
+        formula.formula === draft.formulaEvaluacion?.expresionFinal
+      );
+    });
+
+    if (matchedFormula) {
+      setSelectedFormula(matchedFormula.id);
     }
-  }, [formulaFromApi]);
+  }, [isDraftCreateMode, draft.formulaEvaluacion]);
+
+  useEffect(() => {
+    if (isDraftCreateMode) return;
+    if (!formulaFromApi) return;
+
+    const matchedFormula = availableFormulas.find((formula) => {
+      return (
+        formula.name === formulaFromApi.nombreRegla ||
+        formula.formula === formulaFromApi.expresionFinal
+      );
+    });
+
+    if (matchedFormula) {
+      setSelectedFormula(matchedFormula.id);
+    }
+  }, [formulaFromApi, isDraftCreateMode]);
 
   const currentFormula = availableFormulas.find(
-    (f) => f.id === selectedFormula,
+    (formula) => formula.id === selectedFormula,
   );
 
-  const handleNextStep = () => {
-    console.log("Guardando fórmula seleccionada...", {
-      formula: currentFormula,
-      fromApi: formulaFromApi,
-    });
+  const handleFormulaChange = (value: string) => {
+    if (!canEdit) return;
+
+    setSelectedFormula(value);
+  };
+
+  const handleSaveFormula = async () => {
+    if (!canEdit) {
+      throw new Error("No tienes permiso para guardar esta sección.");
+    }
+
+    if (!syllabusId) {
+      throw new Error("No se pudo identificar el sílabo.");
+    }
+
+    if (!currentFormula) {
+      throw new Error("Selecciona un esquema de evaluación antes de guardar.");
+    }
+
+    const payload = buildFormulaPayload(Number(syllabusId), currentFormula);
+
+    if (formulaFromApi?.id) {
+      await updateFormulaMutation.mutateAsync({
+        silaboId: Number(syllabusId),
+        formula: {
+          nombreRegla: payload.nombreRegla,
+          variableFinalCodigo: payload.variableFinalCodigo,
+          expresionFinal: payload.expresionFinal,
+          activo: payload.activo,
+          variables: payload.variables,
+          subformulas: payload.subformulas,
+          variablePlanMappings: payload.variablePlanMappings,
+        },
+      });
+    } else {
+      await createFormulaMutation.mutateAsync(payload);
+    }
+
+    toast.success("Esquema de evaluación guardado correctamente");
+  };
+
+  const handleNextStep = async () => {
+    if (canEdit) {
+      if (isDraftCreateMode) {
+        if (!currentFormula) {
+          toast.error(
+            "Selecciona un esquema de evaluación antes de continuar.",
+          );
+          return;
+        }
+
+        setSixthStepData(buildFormulaPayload(0, currentFormula));
+        nextStep();
+        return;
+      }
+
+      try {
+        await handleSaveFormula();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "No se pudo guardar la evaluación",
+        );
+        return;
+      }
+    }
 
     nextStep();
   };
 
-  if (isLoading) {
+  if (!isDraftCreateMode && isLoading) {
     return (
       <Step step={6} onNextStep={handleNextStep}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
             <Loader2 size={18} className="animate-spin" />
-            Cargando fórmula de evaluación...
+            Cargando esquema de evaluación...
           </div>
         </div>
       </Step>
@@ -191,9 +338,10 @@ export default function SixthStep() {
               <h2 className="text-2xl font-bold text-gray-900">
                 Evaluación del Aprendizaje
               </h2>
+
               <p className="text-sm text-gray-500 mt-1">
-                Selecciona la fórmula que se utilizará para calcular el promedio
-                final de la asignatura.
+                Selecciona el esquema de evaluación que se utilizará para
+                calcular el promedio final de la asignatura.
               </p>
             </div>
 
@@ -204,6 +352,31 @@ export default function SixthStep() {
         </div>
 
         <div className="p-8">
+          <CoordinatorCommentsBanner
+            stepNumber={6}
+            comments={coordinatorComments}
+          />
+
+          {!canEdit && (
+            <div className="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-5 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500 text-white flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-yellow-800">
+                  Modo solo lectura
+                </p>
+
+                <p className="text-sm text-yellow-700 mt-1">
+                  {isDisapprovedCorrection
+                    ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                    : "No tienes permiso para editar esta sección. Puedes revisar el esquema de evaluación, pero no modificarlo."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -215,8 +388,9 @@ export default function SixthStep() {
                   <h3 className="font-bold text-gray-900">
                     Información del paso
                   </h3>
+
                   <p className="text-sm text-gray-600 mt-1">
-                    La fórmula seleccionada define cómo se calculará el promedio
+                    El esquema seleccionado define cómo se calculará el promedio
                     final del estudiante.
                   </p>
                 </div>
@@ -225,8 +399,9 @@ export default function SixthStep() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
                   <p className="text-xs font-semibold text-gray-400 uppercase">
-                    Fórmulas
+                    Esquemas
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
                     {availableFormulas.length}
                   </p>
@@ -236,8 +411,9 @@ export default function SixthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Selección
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
-                    {selectedFormula}
+                    {currentFormula?.name ?? "—"}
                   </p>
                 </div>
 
@@ -245,6 +421,7 @@ export default function SixthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Desgloses
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
                     {currentFormula?.subFormulas.length ?? 0}
                   </p>
@@ -264,10 +441,11 @@ export default function SixthStep() {
 
                     <div>
                       <h3 className="text-lg font-bold text-gray-900">
-                        Fórmula del Promedio Final
+                        Esquema del Promedio Final
                       </h3>
+
                       <p className="text-sm text-gray-500 mt-1">
-                        Selecciona una fórmula disponible.
+                        Selecciona un esquema de evaluación disponible.
                       </p>
                     </div>
                   </div>
@@ -275,15 +453,16 @@ export default function SixthStep() {
 
                 <div className="p-6">
                   <label className="block text-sm font-bold text-gray-900 mb-2">
-                    Fórmula
+                    Esquema de evaluación
                   </label>
 
                   <Select
-                    value={selectedFormula}
-                    onValueChange={setSelectedFormula}
+                    value={selectedFormula || undefined}
+                    onValueChange={handleFormulaChange}
+                    disabled={!canEdit}
                   >
-                    <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500">
-                      <SelectValue placeholder="Selecciona una fórmula" />
+                    <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed disabled:opacity-70">
+                      <SelectValue placeholder="Selecciona un esquema de evaluación" />
                     </SelectTrigger>
 
                     <SelectContent>
@@ -298,8 +477,9 @@ export default function SixthStep() {
                   {currentFormula && (
                     <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
                       <p className="text-xs font-bold text-red-700 uppercase">
-                        Fórmula seleccionada
+                        Esquema seleccionado
                       </p>
+
                       <p className="text-sm font-semibold text-gray-900 mt-1">
                         {currentFormula.name}
                       </p>
@@ -315,9 +495,8 @@ export default function SixthStep() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-blue-900">
-                      Recomendación
-                    </h3>
+                    <h3 className="font-bold text-blue-900">Recomendación</h3>
+
                     <p className="text-sm text-blue-700 leading-relaxed mt-1">
                       Revisa la leyenda y las fórmulas desglosadas antes de
                       continuar para asegurar que correspondan al sistema de
@@ -342,6 +521,7 @@ export default function SixthStep() {
                           <h3 className="text-lg font-bold text-gray-900">
                             Fórmula Principal
                           </h3>
+
                           <p className="text-sm text-gray-500 mt-1">
                             Cálculo del promedio final de la asignatura.
                           </p>
@@ -393,6 +573,7 @@ export default function SixthStep() {
                             <h3 className="text-lg font-bold text-gray-900">
                               Fórmulas Desglosadas
                             </h3>
+
                             <p className="text-sm text-gray-500 mt-1">
                               Detalle de los componentes usados en la fórmula
                               principal.
@@ -412,6 +593,7 @@ export default function SixthStep() {
                                 <h4 className="font-bold text-gray-900">
                                   {subFormula.name}
                                 </h4>
+
                                 <p className="text-xs text-gray-500 mt-1">
                                   Variable: {subFormula.variable}
                                 </p>
@@ -434,22 +616,20 @@ export default function SixthStep() {
                               </h5>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {subFormula.legend.map(
-                                  (item, legendIndex) => (
-                                    <div
-                                      key={legendIndex}
-                                      className="rounded-xl border border-gray-100 bg-white px-4 py-3"
-                                    >
-                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
-                                        {item.key}
-                                      </span>
+                                {subFormula.legend.map((item, legendIndex) => (
+                                  <div
+                                    key={legendIndex}
+                                    className="rounded-xl border border-gray-100 bg-white px-4 py-3"
+                                  >
+                                    <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
+                                      {item.key}
+                                    </span>
 
-                                      <span className="text-sm text-gray-700">
-                                        {item.description}
-                                      </span>
-                                    </div>
-                                  ),
-                                )}
+                                    <span className="text-sm text-gray-700">
+                                      {item.description}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           </div>
@@ -467,7 +647,7 @@ export default function SixthStep() {
                   </div>
 
                   <p className="text-sm font-semibold text-gray-700">
-                    No se encontró una fórmula seleccionada.
+                    No se ha seleccionado un esquema de evaluación.
                   </p>
                 </div>
               )}

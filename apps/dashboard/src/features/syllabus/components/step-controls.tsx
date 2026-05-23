@@ -1,12 +1,15 @@
 import type React from "react";
-import { ArrowLeft, ArrowRight, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileCheck, Send } from "lucide-react";
 import { useSteps } from "../contexts/steps-context-provider";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
 
 const StepControls: React.FC<{
   onNextStep: () => void;
   hideControls?: boolean;
-}> = ({ onNextStep, hideControls = false }) => {
+  disableNext?: boolean;
+}> = ({ onNextStep, hideControls = false, disableNext = false }) => {
   const { prevStep, isFirst, isLast, currentStep, allowedSteps } = useSteps();
+  const { isDraftCreateMode } = useIsDraftCreateMode();
 
   if (hideControls) {
     return null;
@@ -19,7 +22,7 @@ const StepControls: React.FC<{
 
   const isLastAllowedStep = currentStep === lastAllowedStep;
 
-  const isNextDisabled = !isLastAllowedStep && isLast;
+  const isNextDisabled = disableNext || (!isLastAllowedStep && isLast);
 
   return (
     <div className="mt-8 border-t border-gray-100 pt-6">
@@ -45,10 +48,17 @@ const StepControls: React.FC<{
           }`}
         >
           {isLastAllowedStep ? (
-            <>
-              <Send size={18} />
-              Finalizar y Enviar a Revisión
-            </>
+            isDraftCreateMode ? (
+              <>
+                <FileCheck size={18} />
+                Crear sílabo
+              </>
+            ) : (
+              <>
+                <Send size={18} />
+                Finalizar y Enviar a Revisión
+              </>
+            )
           ) : (
             <>
               Siguiente

@@ -17,6 +17,7 @@ import {
   SumillasCatalogPDFDocument,
   type SumillaPDFItem,
 } from "../components/SumillasCatalogPDFDocument";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 const EMPTY_SUMILLA = "Este sílabo aún no tiene sumilla registrada.";
 
@@ -48,21 +49,19 @@ interface SyllabusCatalogItem {
 }
 
 async function fetchJson(url: string) {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || "";
-  const cleanBaseURL = baseURL.replace(/\/$/, "");
-  const fullUrl = `${cleanBaseURL}${url}`;
-
-  const response = await fetch(fullUrl);
+  const response = await authFetch(url);
 
   if (!response.ok) {
-    throw new Error(await response.text().catch(() => "Error al consultar API"));
+    throw new Error(
+      await response.text().catch(() => "Error al consultar API"),
+    );
   }
 
   return response.json();
 }
 
 async function fetchSyllabusCatalog() {
-  const json = await fetchJson("/syllabus/catalog");
+  const json = await fetchJson("/api/syllabus/catalog");
 
   const data = Array.isArray(json)
     ? json
@@ -80,7 +79,9 @@ async function fetchCompleteSyllabus(syllabusId: string | number) {
 }
 
 function getStatusLabel(status: string | null) {
-  const value = String(status ?? "").trim().toUpperCase();
+  const value = String(status ?? "")
+    .trim()
+    .toUpperCase();
 
   if (value === "APROBADO") return "Aprobado";
 
@@ -107,7 +108,9 @@ function getStatusLabel(status: string | null) {
 }
 
 function getStatusStyles(status: string | null) {
-  const value = String(status ?? "").trim().toUpperCase();
+  const value = String(status ?? "")
+    .trim()
+    .toUpperCase();
 
   if (value === "APROBADO") {
     return "border-green-100 bg-green-50 text-green-700";
@@ -265,25 +268,13 @@ function buildPDFItem(
 
   const title = firstText(
     datosGenerales,
-    [
-      "nombreAsignatura",
-      "cursoNombre",
-      "nombre",
-      "asignatura",
-      "courseName",
-    ],
+    ["nombreAsignatura", "cursoNombre", "nombre", "asignatura", "courseName"],
     catalogItem.courseName,
   );
 
   const codigoAsignatura = firstText(
     datosGenerales,
-    [
-      "codigoAsignatura",
-      "cursoCodigo",
-      "codigo",
-      "codigoCurso",
-      "courseCode",
-    ],
+    ["codigoAsignatura", "cursoCodigo", "codigo", "codigoCurso", "courseCode"],
     catalogItem.courseCode,
   );
 
@@ -324,8 +315,7 @@ function buildPDFItem(
       "docentes",
       "nombreDocente",
       "teacherName",
-    ]) ||
-    firstText(completeObject, ["docente", "docentes", "nombreDocente"]);
+    ]) || firstText(completeObject, ["docente", "docentes", "nombreDocente"]);
 
   const horasTeoria = firstNumberText(datosGenerales, [
     "horasTeoria",
@@ -370,8 +360,7 @@ function buildPDFItem(
       "totalCreditos",
       "creditos_total",
       "total_creditos",
-    ]) ||
-    String(catalogItem.credits || "");
+    ]) || String(catalogItem.credits || "");
 
   return {
     id: catalogItem.uniqueKey,
@@ -380,10 +369,7 @@ function buildPDFItem(
       "tipoAsignatura",
       "tipo_asignatura",
     ]),
-    tipoEstudios: firstText(datosGenerales, [
-      "tipoEstudios",
-      "tipo_estudios",
-    ]),
+    tipoEstudios: firstText(datosGenerales, ["tipoEstudios", "tipo_estudios"]),
     modalidad: firstText(datosGenerales, [
       "modalidadAsignatura",
       "modalidad",
@@ -475,7 +461,9 @@ export default function SyllabusCatalog() {
         item.courseName.toLowerCase().includes(search) ||
         item.courseCode.toLowerCase().includes(search) ||
         item.sumilla.toLowerCase().includes(search) ||
-        String(item.estadoRevision ?? "").toLowerCase().includes(search),
+        String(item.estadoRevision ?? "")
+          .toLowerCase()
+          .includes(search),
     );
   }, [catalog, searchTerm]);
 
@@ -515,7 +503,9 @@ export default function SyllabusCatalog() {
       return;
     }
 
-    setSelectedSyllabusIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    setSelectedSyllabusIds((prev) =>
+      Array.from(new Set([...prev, ...filteredIds])),
+    );
   };
 
   const exportCatalogItems = async (
@@ -534,12 +524,7 @@ export default function SyllabusCatalog() {
           try {
             const complete = await fetchCompleteSyllabus(item.id);
             return buildPDFItem(item, complete);
-          } catch (err) {
-            console.warn(
-              `No se pudo cargar el sílabo completo ${item.id}. Se usará información del catálogo.`,
-              err,
-            );
-
+          } catch {
             return buildPDFItem(item, {});
           }
         }),
@@ -560,7 +545,6 @@ export default function SyllabusCatalog() {
 
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Error al exportar PDF:", err);
       alert(
         err instanceof Error
           ? err.message

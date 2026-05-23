@@ -64,7 +64,6 @@ export const SessionProvider = ({
     if (getSession.isError && shouldFetch) {
       sessionStorage.removeItem("token");
       sessionStorage.removeItem("mailToken");
-      console.log("❌ Sesión inválida - tokens eliminados");
     }
   }, [getSession.isError, shouldFetch]);
 

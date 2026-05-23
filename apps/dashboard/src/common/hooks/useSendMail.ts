@@ -18,6 +18,21 @@ export interface SendMailOptions {
 export const MAX_FILE_BYTES = 3 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 export const MAX_FILES = 5;
+const MAX_SUBJECT_LENGTH = 150;
+const MAX_BODY_LENGTH = 10000;
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "png",
+  "jpg",
+  "jpeg",
+]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const humanSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -39,11 +54,34 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+const getSafeFileName = (name: string) =>
+  name
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim() || "adjunto";
+
+const getFileExtension = (name: string) =>
+  name.split(".").pop()?.toLowerCase().trim() ?? "";
+
 const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   const { to, subject, body, files = [] } = opts;
 
   if (!to.trim() || !subject.trim() || !body.trim()) {
     throw new Error("Completa destinatario, asunto y mensaje");
+  }
+
+  if (!EMAIL_PATTERN.test(to.trim())) {
+    throw new Error("El destinatario no tiene un formato de correo válido");
+  }
+
+  if (subject.length > MAX_SUBJECT_LENGTH) {
+    throw new Error(
+      `El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`,
+    );
+  }
+
+  if (body.length > MAX_BODY_LENGTH) {
+    throw new Error(`El mensaje no debe superar ${MAX_BODY_LENGTH} caracteres`);
   }
 
   const mailToken = sessionStorage.getItem("mailToken");
@@ -75,6 +113,12 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
       if (file.size > MAX_FILE_BYTES) {
         throw new Error(`Archivo muy grande: ${file.name}`);
       }
+
+      const extension = getFileExtension(file.name);
+
+      if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
+        throw new Error(`Tipo de archivo no permitido: ${file.name}`);
+      }
     }
 
     const converted: GraphFileAttachment[] = [];
@@ -84,7 +128,7 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
 
       converted.push({
         "@odata.type": "#microsoft.graph.fileAttachment",
-        name: file.name,
+        name: getSafeFileName(file.name),
         contentType: file.type || "application/octet-stream",
         contentBytes,
       });
@@ -120,8 +164,7 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text || "Error al enviar el correo");
+    throw new Error("No se pudo enviar el correo con Microsoft Graph");
   }
 };
 

@@ -89,7 +89,7 @@ export default function CoordinatorHome() {
     },
     {
       icon: <Mail size={30} />,
-      title: "Enviar correos",
+      title: "Notificación de Revisión",
       description: "Envía notificaciones y comunicados académicos.",
       onClick: () => navigate("/coordinator/send-email"),
     },

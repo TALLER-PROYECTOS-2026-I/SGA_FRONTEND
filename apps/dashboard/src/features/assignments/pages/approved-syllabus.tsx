@@ -204,13 +204,7 @@ export default function ApprovedSyllabus() {
       `${selectedFromTracking.codigo} - ${selectedFromTracking.asignatura}`,
     );
     setShowDropdown(false);
-  }, [
-    syllabusIdParam,
-    courseCodeParam,
-    courseNameParam,
-    statusParam,
-    toast,
-  ]);
+  }, [syllabusIdParam, courseCodeParam, courseNameParam, statusParam, toast]);
 
   const approvedSyllabi = syllabi.filter((syllabus) => {
     return normalizeStatus(syllabus.estadoRevision) === "APROBADO";
@@ -301,7 +295,10 @@ export default function ApprovedSyllabus() {
     setIsGeneratingPDF(true);
 
     try {
-      toast.info("Generando PDF oficial", "Validando información del sílabo...");
+      toast.info(
+        "Generando PDF oficial",
+        "Validando información del sílabo...",
+      );
 
       const data = await loadCompleteSyllabus();
 
@@ -312,8 +309,7 @@ export default function ApprovedSyllabus() {
         "PDF generado correctamente",
         "Ahora puedes visualizar o descargar el documento.",
       );
-    } catch (err) {
-      console.error("Error al generar PDF oficial:", err);
+    } catch {
       toast.error(
         "Error",
         "Error al generar el PDF oficial. Por favor intenta nuevamente.",
@@ -349,8 +345,7 @@ export default function ApprovedSyllabus() {
       window.open(url, "_blank");
 
       toast.success("Éxito", "Vista previa abierta en nueva pestaña");
-    } catch (err) {
-      console.error("Error al previsualizar PDF:", err);
+    } catch {
       toast.error(
         "Error",
         "Error al generar la vista previa. Por favor intenta nuevamente.",
@@ -385,8 +380,7 @@ export default function ApprovedSyllabus() {
       URL.revokeObjectURL(url);
 
       toast.success("Éxito", "PDF oficial descargado correctamente");
-    } catch (err) {
-      console.error("Error al descargar PDF:", err);
+    } catch {
       toast.error(
         "Error",
         "Error al generar el PDF. Por favor intenta nuevamente.",
@@ -669,124 +663,128 @@ export default function ApprovedSyllabus() {
           </div>
         </div>
 
-            {isPdfGenerated && generatedPdfData && (
-              <section className="mt-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl">
-                <div className="mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <h2 className="text-xl font-bold text-gray-900">
-                    PDF generado correctamente
-                  </h2>
-                </div>
+        {isPdfGenerated && generatedPdfData && (
+          <section className="mt-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <h2 className="text-xl font-bold text-gray-900">
+                PDF generado correctamente
+              </h2>
+            </div>
 
-                <div
-                  className={`rounded-2xl border p-5 ${
-                    warningMessage
-                      ? "border-yellow-300 bg-yellow-50"
-                      : "border-green-200 bg-green-50"
-                  }`}
-                >
-                  <p
-                    className={`mb-4 flex items-center gap-2 text-sm font-semibold ${
-                      warningMessage ? "text-yellow-800" : "text-green-800"
-                    }`}
-                  >
-                    {warningMessage ? (
-                      <AlertTriangle size={16} />
-                    ) : (
-                      <CheckCircle2 size={16} />
-                    )}
-                    El PDF oficial fue generado. Verificación de secciones:
-                  </p>
+            <div
+              className={`rounded-2xl border p-5 ${
+                warningMessage
+                  ? "border-yellow-300 bg-yellow-50"
+                  : "border-green-200 bg-green-50"
+              }`}
+            >
+              <p
+                className={`mb-4 flex items-center gap-2 text-sm font-semibold ${
+                  warningMessage ? "text-yellow-800" : "text-green-800"
+                }`}
+              >
+                {warningMessage ? (
+                  <AlertTriangle size={16} />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
+                El PDF oficial fue generado. Verificación de secciones:
+              </p>
 
-                  <div className="grid grid-cols-1 gap-x-10 gap-y-1 text-sm md:grid-cols-2">
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.datosGenerales)}
-                      label="I. Datos Generales"
-                    />
+              <div className="grid grid-cols-1 gap-x-10 gap-y-1 text-sm md:grid-cols-2">
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.datosGenerales)}
+                  label="I. Datos Generales"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.sumilla)}
-                      label="II. Sumilla"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.sumilla)}
+                  label="II. Sumilla"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.competenciasCurso?.length)}
-                      label="III. Competencias"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.competenciasCurso?.length)}
+                  label="III. Competencias"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.unidadesDidacticas?.length)}
-                      label="IV. Programación de Contenidos"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.unidadesDidacticas?.length)}
+                  label="IV. Programación de Contenidos"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.estrategiasMetodologicas?.length)}
-                      label="V. Estrategias Metodológicas"
-                    />
+                <SectionCheck
+                  ok={Boolean(
+                    generatedPdfData.estrategiasMetodologicas?.length,
+                  )}
+                  label="V. Estrategias Metodológicas"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.recursosDidacticos)}
-                      label="VI. Recursos Didácticos"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.recursosDidacticos)}
+                  label="VI. Recursos Didácticos"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.evaluacionAprendizaje)}
-                      label="VII. Sistema de Evaluación"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.evaluacionAprendizaje)}
+                  label="VII. Sistema de Evaluación"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.fuentes?.length)}
-                      label="VIII. Fuentes de Información"
-                    />
+                <SectionCheck
+                  ok={Boolean(generatedPdfData.fuentes?.length)}
+                  label="VIII. Fuentes de Información"
+                />
 
-                    <SectionCheck
-                      ok={Boolean(generatedPdfData.aportesResultadosPrograma?.length)}
-                      label="IX. Aportes y Contribuciones"
-                    />
-                  </div>
-                </div>
+                <SectionCheck
+                  ok={Boolean(
+                    generatedPdfData.aportesResultadosPrograma?.length,
+                  )}
+                  label="IX. Aportes y Contribuciones"
+                />
+              </div>
+            </div>
 
-                <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleDownloadPDF}
-                    disabled={isDownloadingPDF}
-                    className="h-11 min-w-[190px] px-6 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
-                  >
-                    {isDownloadingPDF ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Descargando...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-5 h-5" />
-                        Descargar PDF
-                      </>
-                    )}
-                  </button>
+            <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleDownloadPDF}
+                disabled={isDownloadingPDF}
+                className="h-11 min-w-[190px] px-6 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
+              >
+                {isDownloadingPDF ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Descargando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    Descargar PDF
+                  </>
+                )}
+              </button>
 
-                  <button
-                    type="button"
-                    onClick={handlePreviewPDF}
-                    disabled={isPreviewingPDF}
-                    className="h-11 min-w-[160px] px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
-                  >
-                    {isPreviewingPDF ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Cargando...
-                      </>
-                    ) : (
-                      <>
-                        <Printer className="w-5 h-5" />
-                        Imprimir
-                      </>
-                    )}
-                  </button>
-                </div>
-              </section>
-            )}
+              <button
+                type="button"
+                onClick={handlePreviewPDF}
+                disabled={isPreviewingPDF}
+                className="h-11 min-w-[160px] px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-sm"
+              >
+                {isPreviewingPDF ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-5 h-5" />
+                    Imprimir
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        )}
 
         <div className="mt-6 flex items-center justify-between gap-4">
           <button

@@ -1,4 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import {
+  isInconsistentNoDocente,
+  isPendingAssignment,
+} from "./course-assignment-status";
 
 export interface Course {
   id: string;
@@ -6,6 +10,11 @@ export interface Course {
   code: string;
   ciclo?: string;
   escuela?: string;
+  docenteId?: number | null;
+  nombreDocente?: string | null;
+  estadoRevision?: string | null;
+  isPendingAssignment: boolean;
+  isInconsistentNoDocente: boolean;
 }
 
 interface CourseBackendResponse {
@@ -14,6 +23,9 @@ interface CourseBackendResponse {
   code: string;
   ciclo?: string;
   escuela?: string;
+  docenteId?: number | null;
+  nombreDocente?: string | null;
+  estadoRevision?: string | null;
 }
 
 interface ApiResponse {
@@ -22,13 +34,39 @@ interface ApiResponse {
   data: CourseBackendResponse[];
 }
 
-async function fetchCourses(): Promise<Course[]> {
+function mapCourse(course: CourseBackendResponse): Course {
+  const mapped = {
+    id: course.id.toString(),
+    name: course.name,
+    code: course.code,
+    ciclo: course.ciclo,
+    escuela: course.escuela,
+    docenteId: course.docenteId ?? null,
+    nombreDocente: course.nombreDocente ?? null,
+    estadoRevision: course.estadoRevision ?? null,
+  };
+
+  return {
+    ...mapped,
+    isPendingAssignment: isPendingAssignment(mapped),
+    isInconsistentNoDocente: isInconsistentNoDocente(mapped),
+  };
+}
+
+async function fetchCourses(options?: {
+  sinAsignar?: boolean;
+}): Promise<Course[]> {
   const apiBase =
     import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
-  const url = `${apiBase}/assignments/courses`;
+  const params = new URLSearchParams();
+  if (options?.sinAsignar) {
+    params.set("sinAsignar", "true");
+  }
+  const query = params.toString();
+  const url = `${apiBase}/assignments/courses${query ? `?${query}` : ""}`;
 
   const res = await fetch(url, {
-    credentials: "include", // Importante para enviar cookies (sessionSGA)
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -41,27 +79,31 @@ async function fetchCourses(): Promise<Course[]> {
 
   const response: ApiResponse = await res.json();
 
-  // Verificar que la respuesta sea exitosa y tenga datos
   if (!response.success || !Array.isArray(response.data)) {
     throw new Error(response.message || "Error al obtener cursos");
   }
 
-  // Mapear del formato del backend al formato del frontend
-  return response.data.map((course) => ({
-    id: course.id.toString(),
-    name: course.name,
-    code: course.code,
-    ciclo: course.ciclo,
-    escuela: course.escuela,
-  }));
+  return response.data.map(mapCourse);
 }
 
 export function useCourses() {
   return useQuery<Course[], Error>({
-    queryKey: ["assignments", "courses"],
-    queryFn: fetchCourses,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
+    queryKey: ["assignments", "courses", "all"],
+    queryFn: () => fetchCourses(),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+
+/** Solo sílabos BORRADOR sin docente (pendientes de asignación). */
+export function usePendingCourses() {
+  return useQuery<Course[], Error>({
+    queryKey: ["assignments", "courses", "pending"],
+    queryFn: () => fetchCourses({ sinAsignar: true }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
   });

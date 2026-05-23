@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 export interface Permission {
   numeroSeccion: number;
@@ -39,19 +40,44 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-class PermissionsManager {
-  async fetchByDocente(docenteId: number | string, baseUrl?: string) {
-    const apiBase = getApiBase(baseUrl);
-    const url = `${apiBase}/permisos/${encodeURIComponent(String(docenteId))}`;
+function normalizePermissionSection(section: Permission): Permission | null {
+  const numeroSeccion = Number(section.numeroSeccion);
 
-    const res = await fetch(url);
+  if (Number.isNaN(numeroSeccion)) {
+    return null;
+  }
+
+  return { numeroSeccion };
+}
+
+class PermissionsManager {
+  async fetchByDocente(
+    docenteId: number | string,
+    silaboId?: number | string | null,
+    baseUrl?: string,
+  ) {
+    const apiBase = getApiBase(baseUrl);
+
+    const query = silaboId
+      ? `?silaboId=${encodeURIComponent(String(silaboId))}`
+      : "";
+
+    const url = `${apiBase}/permisos/${encodeURIComponent(
+      String(docenteId),
+    )}${query}`;
+
+    const res = await authFetch(url);
 
     if (!res.ok) {
       throw new Error(await readErrorMessage(res));
     }
 
     const json = await res.json();
-    return json as Permission[];
+    const data = Array.isArray(json) ? json : [];
+
+    return data
+      .map((item) => normalizePermissionSection(item))
+      .filter((item): item is Permission => item !== null);
   }
 
   async savePermissions(
@@ -61,7 +87,13 @@ class PermissionsManager {
     const apiBase = getApiBase(baseUrl);
     const url = `${apiBase}/permisos`;
 
-    const res = await fetch(url, {
+    const permisos = Array.isArray(data.permisos)
+      ? data.permisos
+          .map((item) => normalizePermissionSection(item))
+          .filter((item): item is Permission => item !== null)
+      : [];
+
+    const res = await authFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -69,7 +101,7 @@ class PermissionsManager {
       body: JSON.stringify({
         silaboId: Number(data.silaboId),
         docenteId: Number(data.docenteId),
-        permisos: Array.isArray(data.permisos) ? data.permisos : [],
+        permisos,
       }),
     });
 
@@ -83,16 +115,18 @@ export const permissionsManager = new PermissionsManager();
 
 export const usePermissions = (
   docenteId: number | string | null | undefined,
+  silaboId?: number | string | null,
   options?: UseQueryOptions<Permission[], Error>,
 ) => {
   return useQuery<Permission[], Error>({
-    queryKey: ["permissions", docenteId],
+    queryKey: ["permissions", docenteId, silaboId ?? "all"],
     queryFn: () =>
-      permissionsManager.fetchByDocente(docenteId as number | string),
+      permissionsManager.fetchByDocente(docenteId as number | string, silaboId),
     enabled: docenteId !== null && docenteId !== undefined,
     retry: false,
-    staleTime: 30_000,
-    refetchOnMount: true,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
     ...options,
   });
@@ -107,6 +141,10 @@ export const useSavePermissions = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["permissions", variables.docenteId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["permissions", variables.docenteId, variables.silaboId],
       });
     },
   });
