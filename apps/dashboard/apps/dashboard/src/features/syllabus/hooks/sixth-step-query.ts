@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 // ========================================
 // TIPOS PARA FÓRMULAS DE EVALUACIÓN
 // ========================================
+
 export interface Variable {
   codigo: string;
   nombre: string;
@@ -66,17 +68,19 @@ export interface FormulaEvaluacionUpdate {
 }
 
 export interface FormulaResponse {
-  message: string;
-  data: FormulaEvaluacion;
+  message?: string;
+  data?: FormulaEvaluacion | null;
 }
 
 // ========================================
-// TIPOS PARA RECURSOS DIDÁCTICOS (legacy)
+// TIPOS PARA RECURSOS DIDÁCTICOS
 // ========================================
+
 export interface RecursoDidactico {
   id?: number;
   silaboId?: number;
   tipo?: string;
+  titulo?: string;
   descripcion?: string;
   [key: string]: unknown;
 }
@@ -90,6 +94,7 @@ export interface RecursosDidacticosResponse {
 export interface RecursosDidacticosData {
   recursos?: RecursoDidactico[];
   items?: RecursoDidactico[];
+  recursos_didacticos_notas?: RecursoDidactico[];
   [key: string]: unknown;
 }
 
@@ -99,13 +104,106 @@ interface ApiErrorResponse {
   [key: string]: unknown;
 }
 
+// ========================================
+// HELPERS
+// ========================================
+
+const getApiBase = (baseUrl?: string): string => {
+  const apiBase =
+    baseUrl ??
+    import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_URL ??
+    "http://localhost:7071/api";
+
+  return String(apiBase).replace(/\/$/, "");
+};
+
+const parseErrorMessage = async (res: Response): Promise<string> => {
+  const text = await res.text();
+
+  if (!text) {
+    return `Error ${res.status}: ${res.statusText}`;
+  }
+
+  try {
+    const json = JSON.parse(text) as ApiErrorResponse;
+    return json.message || json.error || text;
+  } catch {
+    return text;
+  }
+};
+
+const normalizeRecursosResponse = (
+  response: unknown,
+): RecursosDidacticosResponse => {
+  const raw = response as {
+    data?: unknown;
+    items?: RecursoDidactico[];
+    recursos?: RecursoDidactico[];
+    recursos_didacticos_notas?: RecursoDidactico[];
+  };
+
+  if (Array.isArray(response)) {
+    return { items: response as RecursoDidactico[] };
+  }
+
+  if (raw?.data) {
+    const data = raw.data as {
+      items?: RecursoDidactico[];
+      recursos?: RecursoDidactico[];
+      recursos_didacticos_notas?: RecursoDidactico[];
+    };
+
+    if (Array.isArray(raw.data)) {
+      return { items: raw.data as RecursoDidactico[] };
+    }
+
+    if (data.items) return { items: data.items };
+    if (data.recursos) return { items: data.recursos };
+    if (data.recursos_didacticos_notas) {
+      return { items: data.recursos_didacticos_notas };
+    }
+
+    return { items: [] };
+  }
+
+  if (raw?.items) return { items: raw.items };
+  if (raw?.recursos) return { items: raw.recursos };
+  if (raw?.recursos_didacticos_notas) {
+    return { items: raw.recursos_didacticos_notas };
+  }
+
+  return { items: [] };
+};
+
+const normalizeFormulaResponse = (
+  response: unknown,
+): FormulaEvaluacion | null => {
+  const raw = response as {
+    data?: FormulaEvaluacion | null;
+    id?: number;
+  };
+
+  if (!response) return null;
+
+  if (raw.data) {
+    return raw.data;
+  }
+
+  if (raw.id) {
+    return response as FormulaEvaluacion;
+  }
+
+  return null;
+};
+
+// ========================================
+// MANAGER PARA RECURSOS DIDÁCTICOS
+// ========================================
+
 class SixthStepManager {
   getApiBase(baseUrl?: string): string {
-    return (
-      baseUrl ??
-      import.meta.env.VITE_API_BASE_URL ??
-      "http://localhost:7071/api"
-    );
+    return getApiBase(baseUrl);
   }
 
   async fetchRecursosDidacticos(
@@ -113,47 +211,24 @@ class SixthStepManager {
     baseUrl?: string,
   ): Promise<RecursosDidacticosResponse> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/recursos-didacticos`;
+    const url = `${apiBase}/syllabus/${syllabusId}/recursos_didacticos_notas`;
 
-    const res = await fetch(url);
+    const res = await authFetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
     if (res.status === 404) {
       return { items: [] };
     }
+
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`${res.status} ${t}`);
+      throw new Error(await parseErrorMessage(res));
     }
 
     const response = await res.json();
-
-    // Manejar diferentes formatos de respuesta
-    if (response.data) {
-      const data = response.data;
-      if (Array.isArray(data)) {
-        return { items: data };
-      }
-      if (data.items) {
-        return data;
-      }
-      if (data.recursos) {
-        return { items: data.recursos };
-      }
-      return { items: [] };
-    }
-
-    if (Array.isArray(response)) {
-      return { items: response };
-    }
-
-    if (response.items) {
-      return response;
-    }
-
-    if (response.recursos) {
-      return { items: response.recursos };
-    }
-
-    return { items: [] };
+    return normalizeRecursosResponse(response);
   }
 
   async createRecursosDidacticos(
@@ -162,24 +237,19 @@ class SixthStepManager {
     baseUrl?: string,
   ): Promise<{ message: string }> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/recursos-didacticos`;
+    const url = `${apiBase}/syllabus/recursos_didacticos_notas`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        silaboId: syllabusId,
+        ...data,
+      }),
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text) as ApiErrorResponse;
-        const apiMessage = json?.message || json?.error;
-        if (apiMessage) throw new Error(apiMessage);
-        throw new Error(JSON.stringify(json));
-      } catch (_parseError) {
-        throw new Error(text || `Error ${res.status}` || "error" + _parseError);
-      }
+      throw new Error(await parseErrorMessage(res));
     }
 
     return res.json();
@@ -191,24 +261,16 @@ class SixthStepManager {
     baseUrl?: string,
   ): Promise<{ message: string }> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${syllabusId}/recursos-didacticos`;
+    const url = `${apiBase}/syllabus/${syllabusId}/recursos_didacticos_notas`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text) as ApiErrorResponse;
-        const apiMessage = json?.message || json?.error;
-        if (apiMessage) throw new Error(apiMessage);
-        throw new Error(JSON.stringify(json));
-      } catch (_parseError) {
-        throw new Error(text || `Error ${res.status}` || "error" + _parseError);
-      }
+      throw new Error(await parseErrorMessage(res));
     }
 
     return res.json();
@@ -221,7 +283,7 @@ export const useRecursosDidacticos = (syllabusId: number | null) => {
   const isValidId = syllabusId !== null && syllabusId > 0;
 
   return useQuery<RecursosDidacticosResponse, Error>({
-    queryKey: ["syllabus", syllabusId, "recursos-didacticos"],
+    queryKey: ["syllabus", syllabusId, "recursos_didacticos_notas"],
     queryFn: () => sixthStepManager.fetchRecursosDidacticos(syllabusId!),
     enabled: isValidId,
     retry: false,
@@ -245,28 +307,29 @@ export const useSaveRecursosDidacticos = () => {
     mutationFn: ({ syllabusId, data, isCreating }) => {
       if (isCreating) {
         return sixthStepManager.createRecursosDidacticos(syllabusId, data);
-      } else {
-        return sixthStepManager.updateRecursosDidacticos(syllabusId, data);
       }
+
+      return sixthStepManager.updateRecursosDidacticos(syllabusId, data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "recursos-didacticos"],
+        queryKey: [
+          "syllabus",
+          variables.syllabusId,
+          "recursos_didacticos_notas",
+        ],
       });
     },
   });
 };
 
 // ========================================
-// MANAGER Y HOOKS PARA FÓRMULAS DE EVALUACIÓN
+// MANAGER PARA FÓRMULAS DE EVALUACIÓN
 // ========================================
+
 class SixthStepFormulaManager {
   getApiBase(baseUrl?: string): string {
-    return (
-      baseUrl ??
-      import.meta.env.VITE_API_BASE_URL ??
-      "http://localhost:7071/api"
-    );
+    return getApiBase(baseUrl);
   }
 
   async fetchFormula(
@@ -276,23 +339,24 @@ class SixthStepFormulaManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${silaboId}/formula_evaluacion`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       headers: {
         "Content-Type": "application/json",
       },
     });
 
+    // Si aún no existe fórmula registrada, se devuelve null.
+    // Esto evita romper la pantalla cuando el sílabo todavía no tiene evaluación guardada.
     if (res.status === 404) {
       return null;
     }
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Error ${res.status}: ${text}`);
+      throw new Error(await parseErrorMessage(res));
     }
 
-    const response: FormulaResponse = await res.json();
-    return response.data;
+    const response = await res.json();
+    return normalizeFormulaResponse(response);
   }
 
   async createFormula(
@@ -302,7 +366,7 @@ class SixthStepFormulaManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/formula_evaluacion`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -311,30 +375,28 @@ class SixthStepFormulaManager {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      let errorMessage = `Error ${res.status}`;
-      try {
-        const json = JSON.parse(text);
-        errorMessage = json.message || json.error || errorMessage;
-      } catch {
-        errorMessage = text || errorMessage;
-      }
-      throw new Error(errorMessage);
+      throw new Error(await parseErrorMessage(res));
     }
 
-    const response: FormulaResponse = await res.json();
-    return response.data;
+    const response = (await res.json()) as FormulaResponse;
+    const data = response.data;
+
+    if (!data) {
+      throw new Error("El backend no devolvió la fórmula creada");
+    }
+
+    return data;
   }
 
   async updateFormula(
-    silaboId: number,
+    formulaId: number,
     formula: FormulaEvaluacionUpdate,
     baseUrl?: string,
   ): Promise<FormulaEvaluacion> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${silaboId}/formula_evaluacion`;
+    const url = `${apiBase}/syllabus/${formulaId}/formula_evaluacion`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -343,23 +405,21 @@ class SixthStepFormulaManager {
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      let errorMessage = `Error ${res.status}`;
-      try {
-        const json = JSON.parse(text);
-        errorMessage = json.message || json.error || errorMessage;
-      } catch {
-        errorMessage = text || errorMessage;
-      }
-      throw new Error(errorMessage);
+      throw new Error(await parseErrorMessage(res));
     }
 
-    const response: FormulaResponse = await res.json();
-    return response.data;
+    const response = (await res.json()) as FormulaResponse;
+    const data = response.data;
+
+    if (!data) {
+      throw new Error("El backend no devolvió la fórmula actualizada");
+    }
+
+    return data;
   }
 }
 
-const sixthStepFormulaManager = new SixthStepFormulaManager();
+export const sixthStepFormulaManager = new SixthStepFormulaManager();
 
 export const useFormulaQuery = (silaboId: number | null) => {
   const isValidId = silaboId !== null && silaboId > 0;
@@ -369,8 +429,12 @@ export const useFormulaQuery = (silaboId: number | null) => {
     queryFn: () => sixthStepFormulaManager.fetchFormula(silaboId!),
     enabled: isValidId,
     retry: false,
+    throwOnError: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 };
 
@@ -393,10 +457,10 @@ export const useUpdateFormula = () => {
   return useMutation<
     FormulaEvaluacion,
     Error,
-    { silaboId: number; formula: FormulaEvaluacionUpdate }
+    { formulaId: number; formula: FormulaEvaluacionUpdate }
   >({
-    mutationFn: ({ silaboId, formula }) =>
-      sixthStepFormulaManager.updateFormula(silaboId, formula),
+    mutationFn: ({ formulaId, formula }) =>
+      sixthStepFormulaManager.updateFormula(formulaId, formula),
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: ["syllabus", data.silaboId, "formula_evaluacion"],

@@ -1,4 +1,5 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 export interface MethodologicalStrategy {
   titulo: string;
@@ -24,8 +25,9 @@ interface DidacticResourcesResponse {
   };
 }
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api"
+).replace(/\/+$/, "");
 
 // ==================== GET APIs ====================
 
@@ -33,7 +35,7 @@ async function fetchMethodologicalStrategies(
   syllabusId: string,
 ): Promise<MethodologicalStrategy[]> {
   const url = `${API_BASE}/syllabus/${syllabusId}/estrategias_metodologicas`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "GET",
     credentials: "include",
   });
@@ -51,7 +53,7 @@ async function fetchDidacticResources(
   syllabusId: string,
 ): Promise<DidacticResource[]> {
   const url = `${API_BASE}/syllabus/${syllabusId}/recursos_didacticos_notas`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "GET",
     credentials: "include",
   });
@@ -67,12 +69,12 @@ async function fetchDidacticResources(
 
 // ==================== PUT APIs ====================
 
-async function updateMethodologicalStrategies(
+export async function updateMethodologicalStrategiesForSyllabus(
   syllabusId: string,
   estrategias: MethodologicalStrategy[],
 ): Promise<void> {
   const url = `${API_BASE}/syllabus/${syllabusId}/estrategias_metodologicas`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -85,12 +87,12 @@ async function updateMethodologicalStrategies(
   }
 }
 
-async function updateDidacticResources(
+export async function updateDidacticResourcesForSyllabus(
   syllabusId: string,
   recursos: DidacticResource[],
 ): Promise<void> {
   const url = `${API_BASE}/syllabus/${syllabusId}/recursos_didacticos_notas`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -110,7 +112,10 @@ export function useMethodologicalStrategiesQuery(syllabusId: string | null) {
     queryKey: ["methodological-strategies", syllabusId],
     queryFn: () => fetchMethodologicalStrategies(syllabusId!),
     enabled: !!syllabusId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -119,7 +124,10 @@ export function useDidacticResourcesQuery(syllabusId: string | null) {
     queryKey: ["didactic-resources", syllabusId],
     queryFn: () => fetchDidacticResources(syllabusId!),
     enabled: !!syllabusId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -133,10 +141,15 @@ export function useUpdateMethodologicalStrategies() {
     }: {
       syllabusId: string;
       estrategias: MethodologicalStrategy[];
-    }) => updateMethodologicalStrategies(syllabusId, estrategias),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
+    }) => updateMethodologicalStrategiesForSyllabus(syllabusId, estrategias),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: ["methodological-strategies", variables.syllabusId],
+      });
+
+      await queryClient.refetchQueries({
+        queryKey: ["methodological-strategies", variables.syllabusId],
+        type: "all",
       });
     },
   });
@@ -152,10 +165,15 @@ export function useUpdateDidacticResources() {
     }: {
       syllabusId: string;
       recursos: DidacticResource[];
-    }) => updateDidacticResources(syllabusId, recursos),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
+    }) => updateDidacticResourcesForSyllabus(syllabusId, recursos),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: ["didactic-resources", variables.syllabusId],
+      });
+
+      await queryClient.refetchQueries({
+        queryKey: ["didactic-resources", variables.syllabusId],
+        type: "all",
       });
     },
   });

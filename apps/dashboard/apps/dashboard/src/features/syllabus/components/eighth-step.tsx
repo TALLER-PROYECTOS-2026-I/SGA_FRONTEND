@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Step } from "./step";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import { useSyllabusContext } from "../contexts/syllabus-context";
 import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
 import { useSubmitToAnalysis } from "../hooks/use-submit-to-analysis";
-import { useSaveResultados } from "../hooks/eighth-step-query";
+import { useResultados, useSaveResultados } from "../hooks/eighth-step-query";
 import {
   ChevronDown,
   GraduationCap,
@@ -16,6 +20,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useCreateDraft } from "../create-draft/create-draft-context";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
+import {
+  finalizeCreateSyllabus,
+  FinalizeSectionError,
+} from "../create-draft/finalize-create-syllabus";
+import { clearCreateDraftStorage } from "../create-draft/storage";
+import type { DraftStudentOutcome } from "../create-draft/types";
+import { SyllabusCreateConflictError } from "../hooks/first-step-query";
 
 interface StudentOutcome {
   id: number;
@@ -24,102 +37,321 @@ interface StudentOutcome {
   level: "K" | "R" | "";
 }
 
+function normalizeAporteValue(value: unknown): "K" | "R" | "" {
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (raw === "K") return "K";
+  if (raw === "R") return "R";
+
+  return "";
+}
+
+function normalizeOutcomeCode(value: unknown, fallback: string) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw || raw === "-" || raw === "K" || raw === "R") {
+    return fallback;
+  }
+
+  return raw;
+}
+
+function getResultadosItems(response: unknown) {
+  const data = response as {
+    items?: unknown[];
+    resultados?: unknown[];
+    outcomes?: unknown[];
+    data?: unknown;
+  };
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  return data?.items ?? data?.resultados ?? data?.outcomes ?? [];
+}
+
 const mockStudentOutcomes: StudentOutcome[] = [
   {
     id: 1,
-    code: "K",
+    code: "RP1",
     description:
       "Analizar un sistema complejo de computación aplicar principios de computación y otras disciplinas relevantes",
     level: "",
   },
   {
     id: 2,
-    code: "R",
+    code: "RP2",
     description: "Diseñar implementar y evaluar",
     level: "",
   },
   {
     id: 3,
-    code: "",
+    code: "RP3",
     description: "Comunicación efectiva en una variedad",
     level: "",
   },
   {
     id: 4,
-    code: "",
+    code: "RP4",
     description: "Reconoce la responsabilidad profesional",
     level: "",
   },
   {
     id: 5,
-    code: "",
+    code: "RP5",
     description: "Trabajo de manera efectiva como miembro líder o un equipos",
     level: "",
   },
   {
     id: 6,
-    code: "",
+    code: "RP6",
     description: "Brindar soporte a la entrega",
     level: "",
   },
   {
     id: 7,
-    code: "",
+    code: "RP7",
     description: "Aprendizaje continuo",
     level: "",
   },
 ];
 
 export default function EighthStep() {
-  const { syllabusId } = useSyllabusContext();
+  const { syllabusId, setSyllabusId } = useSyllabusContext();
+  const { draft, clearCreateDraft, setEighthStepData } = useCreateDraft();
+  const { isDraftCreateMode } = useIsDraftCreateMode();
+  const [searchParams] = useSearchParams();
   const { isReviewMode } = useReviewMode();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(8);
+
+  const resolvedSyllabusId = useMemo(() => {
+    const querySyllabusId = searchParams.get("syllabusId");
+    if (querySyllabusId) {
+      const parsed = Number(querySyllabusId);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    const fromContext =
+      syllabusId != null && Number(syllabusId) > 0 ? Number(syllabusId) : null;
+    if (fromContext) return fromContext;
+
+    const queryIdParam = searchParams.get("id");
+    const queryId = queryIdParam ? Number(queryIdParam) : NaN;
+    if (Number.isFinite(queryId) && queryId > 0) return queryId;
+
+    return null;
+  }, [syllabusId, searchParams]);
+
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
   const navigate = useNavigate();
 
   const [outcomes, setOutcomes] =
     useState<StudentOutcome[]>(mockStudentOutcomes);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const saveResultados = useSaveResultados();
   const submitToAnalysis = useSubmitToAnalysis();
+  const {
+    data: resultadosFromApi,
+    isLoading: isLoadingResultados,
+    isFetching: isFetchingResultados,
+  } = useResultados(isDraftCreateMode ? null : resolvedSyllabusId);
 
-  const canEdit = !isReviewMode;
+  const canEditOutcomes =
+    !isReviewMode &&
+    hasEditPermissionForSection(8) &&
+    !isLockedByState &&
+    !isResolvingState;
 
   const selectedK = outcomes.filter((outcome) => outcome.level === "K").length;
   const selectedR = outcomes.filter((outcome) => outcome.level === "R").length;
   const notApply = outcomes.filter((outcome) => outcome.level === "").length;
 
-  const handleNextStep = async () => {
-    if (!syllabusId) {
-      toast.error("ID del sílabo no encontrado");
+  useEffect(() => {
+    if (!isDraftCreateMode || !draft.contributions?.length) return;
+
+    const byCode = new Map(
+      draft.contributions.map((item) => [item.code, item]),
+    );
+
+    setOutcomes(
+      mockStudentOutcomes.map((mockOutcome, index) => {
+        const code = mockOutcome.code || `RP${index + 1}`;
+        const found = byCode.get(code);
+
+        return {
+          ...mockOutcome,
+          code,
+          level: found?.level ?? "",
+        };
+      }),
+    );
+  }, [isDraftCreateMode, draft.contributions]);
+
+  useEffect(() => {
+    if (isDraftCreateMode) return;
+    if (isLoadingResultados || isFetchingResultados) {
       return;
     }
 
+    const items = getResultadosItems(resultadosFromApi);
+    const byCode = new Map<string, Record<string, unknown>>();
+
+    if (Array.isArray(items)) {
+      items.forEach((item: unknown, index: number) => {
+        const record = item as Record<string, unknown>;
+        const code = normalizeOutcomeCode(
+          record.resultadoProgramaCodigo ?? record.codigo ?? record.code,
+          `RP${index + 1}`,
+        );
+
+        byCode.set(code, record);
+      });
+    }
+
+    setOutcomes(
+      mockStudentOutcomes.map((mockOutcome, index) => {
+        const code = mockOutcome.code || `RP${index + 1}`;
+        const found = byCode.get(code);
+
+        return {
+          ...mockOutcome,
+          code,
+          description: found
+            ? String(
+                found.resultadoProgramaDescripcion ??
+                  found.descripcion ??
+                  found.description ??
+                  mockOutcome.description,
+              ).trim() || mockOutcome.description
+            : mockOutcome.description,
+          level: found
+            ? normalizeAporteValue(
+                found.aporteValor ?? found.nivel ?? found.level,
+              )
+            : "",
+        };
+      }),
+    );
+  }, [
+    resultadosFromApi,
+    isLoadingResultados,
+    isFetchingResultados,
+    isDraftCreateMode,
+  ]);
+
+  const outcomesToDraft = (): DraftStudentOutcome[] =>
+    outcomes.map((outcome) => ({
+      id: outcome.id,
+      code: outcome.code,
+      description: outcome.description,
+      level: outcome.level,
+    }));
+
+  const persistResultados = async (targetSyllabusId: number) => {
+    if (!canEditOutcomes) {
+      throw new Error("No tienes permiso para guardar esta sección.");
+    }
+
+    const resultadosData = {
+      resultados: outcomes.map((outcome, index) => ({
+        id: outcome.id,
+        code: outcome.code || `RP${index + 1}`,
+        resultadoProgramaCodigo: outcome.code || `RP${index + 1}`,
+        description: outcome.description,
+        resultadoProgramaDescripcion: outcome.description,
+        level: outcome.level || ("" as const),
+        aporteValor: outcome.level || ("" as const),
+      })),
+    };
+
+    await saveResultados.mutateAsync({
+      syllabusId: targetSyllabusId,
+      data: resultadosData,
+      isCreating: false,
+    });
+  };
+
+  const handleNextStep = async () => {
+    if (isSubmittingRef.current) return;
+
     try {
+      isSubmittingRef.current = true;
       setIsSubmitting(true);
 
-      if (canEdit) {
-        console.log("💾 Guardando resultados del paso 8...", outcomes);
+      if (isDraftCreateMode) {
+        if (!draft.generalData) {
+          toast.error("Faltan datos generales", {
+            description: "Complete el paso 1 antes de crear el sílabo.",
+          });
+          return;
+        }
 
-        const resultadosData = {
-          resultados: outcomes.map((outcome) => ({
-            id: outcome.id,
-            code: outcome.code,
-            description: outcome.description,
-            level: outcome.level || ("" as const),
-          })),
+        const contributions = outcomesToDraft();
+        setEighthStepData(contributions);
+
+        const draftToFinalize: typeof draft = {
+          ...draft,
+          contributions,
         };
 
-        await saveResultados.mutateAsync({
-          syllabusId,
-          data: resultadosData,
-          isCreating: false,
-        });
+        try {
+          const { syllabusId: newId } =
+            await finalizeCreateSyllabus(draftToFinalize);
 
+          clearCreateDraft();
+          clearCreateDraftStorage();
+          setSyllabusId(newId);
+
+          toast.success("Sílabo creado correctamente", {
+            description: "Puede continuar editándolo en modo edición.",
+          });
+
+          navigate(`/syllabus?id=${newId}&mode=edit`);
+        } catch (error) {
+          if (error instanceof SyllabusCreateConflictError) {
+            toast.error("No se pudo crear el sílabo", {
+              description:
+                error.message ||
+                "Ya existe un sílabo con el mismo curso, semestre y programa. Revise el código de asignatura en el paso 1.",
+              duration: 10000,
+            });
+            return;
+          }
+
+          if (error instanceof FinalizeSectionError) {
+            setSyllabusId(error.syllabusId);
+            navigate(`/syllabus?id=${error.syllabusId}&mode=edit`);
+          }
+        }
+
+        return;
+      }
+
+      const activeSyllabusId = resolvedSyllabusId;
+
+      if (!activeSyllabusId) {
+        toast.error("ID del sílabo no encontrado");
+        return;
+      }
+
+      if (canEditOutcomes) {
+        await persistResultados(activeSyllabusId);
         toast.success("Datos guardados correctamente");
-      } else {
-        console.log(
-          "ℹ️ Usuario sin permisos de edición en Step 8, omitiendo guardado",
-        );
       }
 
       const confirmed = window.confirm(
@@ -129,16 +361,15 @@ export default function EighthStep() {
       );
 
       if (!confirmed) {
-        const message = canEdit
+        const message = canEditOutcomes
           ? "Envío cancelado. Los cambios fueron guardados."
           : "Envío cancelado.";
+
         toast.info(message);
         return;
       }
 
-      console.log("📤 Enviando sílabo a análisis...");
-
-      await submitToAnalysis.mutateAsync({ syllabusId });
+      await submitToAnalysis.mutateAsync({ syllabusId: activeSyllabusId });
 
       toast.success("¡Sílabo enviado a revisión exitosamente!", {
         description: "El coordinador revisará tu sílabo pronto.",
@@ -148,8 +379,6 @@ export default function EighthStep() {
         navigate("/my-syllabus");
       }, 2000);
     } catch (error) {
-      console.error("❌ Error:", error);
-
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -159,20 +388,36 @@ export default function EighthStep() {
         description: errorMessage,
       });
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleLevelChange = (id: number, level: "K" | "R" | "") => {
-    setOutcomes(
-      outcomes.map((outcome) =>
+    if (!canEditOutcomes) return;
+
+    setOutcomes((prevOutcomes) =>
+      prevOutcomes.map((outcome) =>
         outcome.id === id ? { ...outcome, level } : outcome,
       ),
     );
   };
 
+  if (!isDraftCreateMode && (isLoadingResultados || isResolvingState)) {
+    return (
+      <Step step={8} onNextStep={handleNextStep} hideControls>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+            <Loader2 size={18} className="animate-spin" />
+            Cargando aportes de la asignatura...
+          </div>
+        </div>
+      </Step>
+    );
+  }
+
   return (
-    <Step step={8} onNextStep={handleNextStep} hideControls={isSubmitting}>
+    <Step step={8} onNextStep={handleNextStep} disableNext={isSubmitting}>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
         <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
           <div className="flex items-center gap-4">
@@ -184,6 +429,7 @@ export default function EighthStep() {
               <h2 className="text-2xl font-bold text-gray-900">
                 Aporte de la Asignatura
               </h2>
+
               <p className="text-sm text-gray-500 mt-1">
                 Define el nivel de aporte de la asignatura al logro de los
                 resultados del estudiante.
@@ -197,7 +443,12 @@ export default function EighthStep() {
         </div>
 
         <div className="p-8">
-          {!canEdit && (
+          <CoordinatorCommentsBanner
+            stepNumber={8}
+            comments={coordinatorComments}
+          />
+
+          {!canEditOutcomes && (
             <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-yellow-500 text-white flex items-center justify-center shrink-0">
@@ -208,9 +459,13 @@ export default function EighthStep() {
                   <p className="text-sm font-bold text-yellow-800">
                     Modo solo lectura
                   </p>
+
                   <p className="text-sm text-yellow-700 mt-1 leading-relaxed">
-                    No tienes permisos para editar esta sección. Puedes revisar
-                    el contenido y finalizar el proceso de envío.
+                    {isReviewMode
+                      ? "Estás revisando este paso en modo coordinador. Puedes consultar los aportes, pero no modificarlos."
+                      : isDisapprovedCorrection
+                        ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                        : "No tienes permisos para editar esta sección. Puedes revisar el contenido."}
                   </p>
                 </div>
               </div>
@@ -228,6 +483,7 @@ export default function EighthStep() {
                   <h3 className="font-bold text-gray-900">
                     Información del paso
                   </h3>
+
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">
                     El aporte de la asignatura al logro de los Resultados del
                     Estudiante en la formación del graduado se establece en la
@@ -241,6 +497,7 @@ export default function EighthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Clave
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">{selectedK}</p>
                 </div>
 
@@ -248,6 +505,7 @@ export default function EighthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Relacionado
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">{selectedR}</p>
                 </div>
 
@@ -255,6 +513,7 @@ export default function EighthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     No aplica
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">{notApply}</p>
                 </div>
               </div>
@@ -269,6 +528,7 @@ export default function EighthStep() {
 
               <div>
                 <h3 className="font-bold text-blue-900">Leyenda</h3>
+
                 <div className="flex flex-wrap gap-3 mt-3">
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-100 text-sm text-blue-800">
                     <strong>K</strong> = Clave
@@ -297,6 +557,7 @@ export default function EighthStep() {
                   <h3 className="text-lg font-bold text-gray-900">
                     Tabla de resultados del estudiante
                   </h3>
+
                   <p className="text-sm text-gray-500 mt-1">
                     Selecciona el nivel correspondiente para cada resultado.
                   </p>
@@ -308,12 +569,12 @@ export default function EighthStep() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
-                    <th className="px-6 py-4 text-left font-bold w-[8%]">
-                      #
-                    </th>
+                    <th className="px-6 py-4 text-left font-bold w-[8%]">#</th>
+
                     <th className="px-6 py-4 text-left font-bold w-[72%]">
                       Descripción
                     </th>
+
                     <th className="px-6 py-4 text-center font-bold w-[20%]">
                       Nivel
                     </th>
@@ -341,15 +602,15 @@ export default function EighthStep() {
                           <div className="relative">
                             <select
                               value={outcome.level}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 handleLevelChange(
                                   outcome.id,
-                                  e.target.value as "K" | "R" | "",
+                                  event.target.value as "K" | "R" | "",
                                 )
                               }
-                              disabled={!canEdit}
+                              disabled={!canEditOutcomes || isSubmitting}
                               className={`appearance-none h-10 min-w-[90px] rounded-xl px-4 pr-10 text-sm font-bold outline-none transition-all ${
-                                canEdit
+                                canEditOutcomes && !isSubmitting
                                   ? "bg-gray-50 border border-gray-200 text-gray-700 cursor-pointer hover:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                   : "bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed"
                               }`}
@@ -379,13 +640,12 @@ export default function EighthStep() {
               </div>
 
               <div>
-                <h3 className="font-bold text-gray-900">
-                  Antes de finalizar
-                </h3>
+                <h3 className="font-bold text-gray-900">Antes de finalizar</h3>
+
                 <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                  Verifica que los niveles seleccionados correspondan al aporte
-                  real de la asignatura. Al continuar, el sílabo será enviado a
-                  revisión.
+                  {isDraftCreateMode
+                    ? "Verifica los aportes seleccionados. Al crear el sílabo se guardarán todas las secciones del borrador."
+                    : "Verifica que los niveles seleccionados correspondan al aporte real de la asignatura. Al continuar, el sílabo será enviado a revisión."}
                 </p>
               </div>
             </div>
@@ -402,8 +662,11 @@ export default function EighthStep() {
                   <p className="text-sm font-bold text-blue-700">
                     Procesando...
                   </p>
+
                   <p className="text-sm text-blue-600 mt-1">
-                    Guardando datos y enviando a revisión.
+                    {isDraftCreateMode
+                      ? "Creando sílabo y guardando todas las secciones..."
+                      : "Guardando datos y enviando a revisión."}
                   </p>
                 </div>
               </div>

@@ -10,11 +10,16 @@ import type {
   DidacticResource,
 } from "../hooks/fifth-step-query";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Step } from "./step";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
 import { useFinalizeSyllabus } from "../hooks/use-finalize-syllabus";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
+import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import {
   X,
   Plus,
@@ -23,12 +28,89 @@ import {
   Loader2,
   Info,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
+import { useCreateDraft } from "../create-draft/create-draft-context";
+
+function normalizeItem(item: { titulo: string; descripcion: string }) {
+  return {
+    titulo: item.titulo.trim(),
+    descripcion: item.descripcion.trim(),
+  };
+}
+
+function isEmptyItem(item: { titulo: string; descripcion: string }) {
+  return !item.titulo.trim() && !item.descripcion.trim();
+}
+
+function isIncompleteItem(item: { titulo: string; descripcion: string }) {
+  const hasTitle = item.titulo.trim().length > 0;
+  const hasDescription = item.descripcion.trim().length > 0;
+
+  return (hasTitle && !hasDescription) || (!hasTitle && hasDescription);
+}
+
+function validateItems(
+  items: { titulo: string; descripcion: string }[],
+  label: string,
+) {
+  const normalized = items.map(normalizeItem);
+
+  if (normalized.length === 0 || normalized.every(isEmptyItem)) {
+    throw new Error(`Debe registrar al menos un elemento en ${label}.`);
+  }
+
+  const incompleteIndex = normalized.findIndex(isIncompleteItem);
+
+  if (incompleteIndex >= 0) {
+    throw new Error(
+      `Complete título y descripción en ${label}, registro ${incompleteIndex + 1}.`,
+    );
+  }
+
+  return normalized.filter((item) => !isEmptyItem(item));
+}
 
 export default function FifthStep() {
   const { nextStep } = useSteps();
   const { syllabusId } = useSyllabusContext();
+  const { isDraftCreateMode } = useIsDraftCreateMode();
+  const { draft, setFifthStepData } = useCreateDraft();
+  const [searchParams] = useSearchParams();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(5);
+  const { isReviewMode } = useReviewMode();
+
+  const resolvedSyllabusId = useMemo(() => {
+    const querySyllabusId = searchParams.get("syllabusId");
+    if (querySyllabusId) {
+      const parsed = Number(querySyllabusId);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    const fromContext = Number(syllabusId);
+    if (Number.isFinite(fromContext) && fromContext > 0) {
+      return fromContext;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = Number(params.get("syllabusId") || params.get("id"));
+
+    if (Number.isFinite(fromQuery) && fromQuery > 0) {
+      return fromQuery;
+    }
+
+    return null;
+  }, [syllabusId, searchParams]);
+
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
 
   const [methodologicalStrategies, setMethodologicalStrategies] = useState<
     MethodologicalStrategy[] | undefined
@@ -38,48 +120,108 @@ export default function FifthStep() {
     DidacticResource[] | undefined
   >(undefined);
 
+  const querySyllabusId =
+    isDraftCreateMode || !resolvedSyllabusId
+      ? null
+      : String(resolvedSyllabusId);
+
   const { data: serverStrategies, isLoading: loadingStrategies } =
-    useMethodologicalStrategiesQuery(syllabusId ? String(syllabusId) : null);
+    useMethodologicalStrategiesQuery(querySyllabusId);
 
   const { data: serverResources, isLoading: loadingResources } =
-    useDidacticResourcesQuery(syllabusId ? String(syllabusId) : null);
+    useDidacticResourcesQuery(querySyllabusId);
 
   const saveStrategiesMutation = useUpdateMethodologicalStrategies();
   const saveResourcesMutation = useUpdateDidacticResources();
 
+  const isSaving =
+    saveStrategiesMutation.isPending || saveResourcesMutation.isPending;
+
+  const canEdit =
+    !isReviewMode &&
+    hasEditPermissionForSection(5) &&
+    !isLockedByState &&
+    !isResolvingState;
+
+  const inputsDisabled =
+    !canEdit ||
+    isSaving ||
+    (!isDraftCreateMode && (loadingStrategies || loadingResources)) ||
+    isResolvingState;
+
+  const persistFifthStep = async () => {
+    if (!canEdit) {
+      throw new Error("No tienes permiso para editar esta sección.");
+    }
+
+    const normalizedId = resolvedSyllabusId
+      ? String(resolvedSyllabusId).trim()
+      : "";
+    const isValidId = normalizedId !== "" && /^\d+$/.test(normalizedId);
+
+    if (!isValidId) {
+      throw new Error("ID del syllabus no válido");
+    }
+
+    if (
+      methodologicalStrategies === undefined ||
+      didacticResources === undefined
+    ) {
+      throw new Error("Esperando datos del servidor...");
+    }
+
+    const strategiesToSave = validateItems(
+      methodologicalStrategies,
+      "estrategias metodológicas",
+    );
+
+    const resourcesToSave = validateItems(
+      didacticResources,
+      "recursos didácticos",
+    );
+
+    await Promise.all([
+      saveStrategiesMutation.mutateAsync({
+        syllabusId: normalizedId,
+        estrategias: strategiesToSave,
+      }),
+      saveResourcesMutation.mutateAsync({
+        syllabusId: normalizedId,
+        recursos: resourcesToSave,
+      }),
+    ]);
+  };
+
   const { isLastStep, finalizeSyllabus } = useFinalizeSyllabus({
-    syllabusId,
+    syllabusId: resolvedSyllabusId,
     onBeforeFinalize: async () => {
-      const normalizedId = syllabusId ? String(syllabusId).trim() : "";
-      const isValidId = normalizedId !== "" && /^\d+$/.test(normalizedId);
-
-      if (!isValidId) {
-        throw new Error("ID del syllabus no válido");
-      }
-
-      if (
-        methodologicalStrategies === undefined ||
-        didacticResources === undefined
-      ) {
-        throw new Error("Esperando datos del servidor...");
-      }
-
-      await Promise.all([
-        saveStrategiesMutation.mutateAsync({
-          syllabusId: normalizedId,
-          estrategias: methodologicalStrategies,
-        }),
-        saveResourcesMutation.mutateAsync({
-          syllabusId: normalizedId,
-          recursos: didacticResources,
-        }),
-      ]);
-
+      await persistFifthStep();
       toast.success("Datos guardados correctamente");
     },
   });
 
   useEffect(() => {
+    if (!isDraftCreateMode) return;
+
+    if (draft.methodologicalStrategies) {
+      setMethodologicalStrategies(draft.methodologicalStrategies);
+    } else {
+      setMethodologicalStrategies([{ titulo: "", descripcion: "" }]);
+    }
+
+    if (draft.didacticResources) {
+      setDidacticResources(draft.didacticResources);
+    } else {
+      setDidacticResources([{ titulo: "", descripcion: "" }]);
+    }
+  }, [
+    isDraftCreateMode,
+    draft.methodologicalStrategies,
+    draft.didacticResources,
+  ]);
+
+  useEffect(() => {
+    if (isDraftCreateMode) return;
     if (serverStrategies !== undefined) {
       setMethodologicalStrategies(
         serverStrategies.length > 0
@@ -87,9 +229,10 @@ export default function FifthStep() {
           : [{ titulo: "", descripcion: "" }],
       );
     }
-  }, [serverStrategies]);
+  }, [serverStrategies, isDraftCreateMode]);
 
   useEffect(() => {
+    if (isDraftCreateMode) return;
     if (serverResources !== undefined) {
       setDidacticResources(
         serverResources.length > 0
@@ -97,9 +240,11 @@ export default function FifthStep() {
           : [{ titulo: "", descripcion: "" }],
       );
     }
-  }, [serverResources]);
+  }, [serverResources, isDraftCreateMode]);
 
   const addStrategy = () => {
+    if (!canEdit) return;
+
     setMethodologicalStrategies((s) => [
       ...(s || []),
       { titulo: "", descripcion: "" },
@@ -107,7 +252,18 @@ export default function FifthStep() {
   };
 
   const removeStrategy = (index: number) => {
-    setMethodologicalStrategies((s) => (s || []).filter((_, i) => i !== index));
+    if (!canEdit) return;
+
+    const confirmed = window.confirm(
+      "¿Deseas eliminar esta estrategia metodológica?",
+    );
+
+    if (!confirmed) return;
+
+    setMethodologicalStrategies((s) => {
+      const next = (s || []).filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ titulo: "", descripcion: "" }];
+    });
   };
 
   const updateStrategy = (
@@ -115,12 +271,16 @@ export default function FifthStep() {
     field: "titulo" | "descripcion",
     value: string,
   ) => {
+    if (!canEdit) return;
+
     setMethodologicalStrategies((s) =>
       (s || []).map((st, i) => (i === index ? { ...st, [field]: value } : st)),
     );
   };
 
   const addResource = () => {
+    if (!canEdit) return;
+
     setDidacticResources((r) => [
       ...(r || []),
       { titulo: "", descripcion: "" },
@@ -128,7 +288,18 @@ export default function FifthStep() {
   };
 
   const removeResource = (index: number) => {
-    setDidacticResources((r) => (r || []).filter((_, i) => i !== index));
+    if (!canEdit) return;
+
+    const confirmed = window.confirm(
+      "¿Deseas eliminar este recurso didáctico?",
+    );
+
+    if (!confirmed) return;
+
+    setDidacticResources((r) => {
+      const next = (r || []).filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ titulo: "", descripcion: "" }];
+    });
   };
 
   const updateResource = (
@@ -136,6 +307,8 @@ export default function FifthStep() {
     field: "titulo" | "descripcion",
     value: string,
   ) => {
+    if (!canEdit) return;
+
     setDidacticResources((r) =>
       (r || []).map((res, i) =>
         i === index ? { ...res, [field]: value } : res,
@@ -144,60 +317,71 @@ export default function FifthStep() {
   };
 
   const handleNextStep = async () => {
+    if (!canEdit) {
+      nextStep();
+      return;
+    }
+
     if (isLastStep) {
       await finalizeSyllabus();
       return;
     }
 
-    const normalizedId = syllabusId ? String(syllabusId).trim() : "";
-    const isValidId = normalizedId !== "" && /^\d+$/.test(normalizedId);
+    if (isDraftCreateMode) {
+      try {
+        if (
+          methodologicalStrategies === undefined ||
+          didacticResources === undefined
+        ) {
+          throw new Error(
+            "Complete estrategias y recursos antes de continuar.",
+          );
+        }
 
-    if (!isValidId) {
-      toast.error("ID del syllabus no válido");
-      return;
-    }
+        const strategiesToSave = validateItems(
+          methodologicalStrategies,
+          "estrategias metodológicas",
+        );
 
-    if (
-      methodologicalStrategies === undefined ||
-      didacticResources === undefined
-    ) {
-      toast.error("Esperando datos del servidor...");
+        const resourcesToSave = validateItems(
+          didacticResources,
+          "recursos didácticos",
+        );
+
+        setFifthStepData({
+          methodologicalStrategies: strategiesToSave,
+          didacticResources: resourcesToSave,
+        });
+        nextStep();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Revise los datos del paso 5",
+        );
+      }
       return;
     }
 
     try {
-      await Promise.all([
-        saveStrategiesMutation.mutateAsync({
-          syllabusId: normalizedId,
-          estrategias: methodologicalStrategies,
-        }),
-        saveResourcesMutation.mutateAsync({
-          syllabusId: normalizedId,
-          recursos: didacticResources,
-        }),
-      ]);
-
+      await persistFifthStep();
       toast.success("Datos guardados correctamente");
       nextStep();
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Error desconocido";
+
       toast.error(`Error al guardar: ${errorMessage}`);
-      console.error("Error guardando datos del paso 5:", err);
     }
   };
-
-  const isSaving =
-    saveStrategiesMutation.isPending || saveResourcesMutation.isPending;
 
   const totalStrategies = methodologicalStrategies?.length ?? 0;
   const totalResources = didacticResources?.length ?? 0;
 
-  const inputClass =
-    "w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent";
+  const disabledInputClass =
+    "disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed disabled:opacity-70";
 
-  const textareaClass =
-    "w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent";
+  const inputClass = `w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`;
+
+  const textareaClass = `w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`;
 
   return (
     <Step step={5} onNextStep={handleNextStep}>
@@ -212,6 +396,7 @@ export default function FifthStep() {
               <h2 className="text-2xl font-bold text-gray-900">
                 Estrategias y Recursos
               </h2>
+
               <p className="text-sm text-gray-500 mt-1">
                 Registra las estrategias metodológicas y los recursos didácticos
                 del sílabo.
@@ -225,6 +410,33 @@ export default function FifthStep() {
         </div>
 
         <div className="p-8">
+          <CoordinatorCommentsBanner
+            stepNumber={5}
+            comments={coordinatorComments}
+          />
+
+          {!canEdit && (
+            <div className="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-5 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500 text-white flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-yellow-800">
+                  Modo solo lectura
+                </p>
+
+                <p className="text-sm text-yellow-700 mt-1">
+                  {isReviewMode
+                    ? "Estás revisando este paso en modo coordinador. Puedes consultar las estrategias y recursos, pero no modificarlos."
+                    : isDisapprovedCorrection
+                      ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                      : "No tienes permiso para editar esta sección. Puedes revisar las estrategias y recursos, pero no modificarlos."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -236,6 +448,7 @@ export default function FifthStep() {
                   <h3 className="font-bold text-gray-900">
                     Información del paso
                   </h3>
+
                   <p className="text-sm text-gray-600 mt-1">
                     Completa ambas secciones antes de continuar. Los datos se
                     guardarán al avanzar al siguiente paso.
@@ -248,6 +461,7 @@ export default function FifthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Estrategias
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
                     {totalStrategies}
                   </p>
@@ -257,6 +471,7 @@ export default function FifthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Recursos
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
                     {totalResources}
                   </p>
@@ -266,6 +481,7 @@ export default function FifthStep() {
                   <p className="text-xs font-semibold text-gray-400 uppercase">
                     Total
                   </p>
+
                   <p className="text-xl font-bold text-gray-900">
                     {totalStrategies + totalResources}
                   </p>
@@ -273,6 +489,13 @@ export default function FifthStep() {
               </div>
             </div>
           </div>
+
+          {(loadingStrategies || loadingResources || isResolvingState) && (
+            <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
+              <Loader2 size={18} className="animate-spin" />
+              Cargando estrategias y recursos...
+            </div>
+          )}
 
           {isSaving && (
             <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
@@ -294,6 +517,7 @@ export default function FifthStep() {
                       <h3 className="text-lg font-bold text-gray-900">
                         5. Estrategias Metodológicas
                       </h3>
+
                       <p className="text-sm text-gray-500 mt-1">
                         Define las estrategias que guiarán el proceso de
                         enseñanza y aprendizaje.
@@ -321,6 +545,7 @@ export default function FifthStep() {
                     <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                       <FileText className="text-gray-400" size={26} />
                     </div>
+
                     <p className="text-sm font-semibold text-gray-700">
                       Cargando datos...
                     </p>
@@ -342,6 +567,7 @@ export default function FifthStep() {
                               <label className="block text-sm font-bold text-gray-900 mb-2">
                                 Título
                               </label>
+
                               <input
                                 type="text"
                                 value={strategy.titulo}
@@ -354,6 +580,7 @@ export default function FifthStep() {
                                 }
                                 placeholder="Ingrese el título de la estrategia..."
                                 className={inputClass}
+                                disabled={inputsDisabled}
                               />
                             </div>
 
@@ -361,6 +588,7 @@ export default function FifthStep() {
                               <label className="block text-sm font-bold text-gray-900 mb-2">
                                 Descripción
                               </label>
+
                               <textarea
                                 value={strategy.descripcion}
                                 onChange={(e) =>
@@ -373,6 +601,7 @@ export default function FifthStep() {
                                 placeholder="Ingrese la descripción de la estrategia..."
                                 rows={4}
                                 className={textareaClass}
+                                disabled={inputsDisabled}
                               />
                             </div>
                           </div>
@@ -381,7 +610,10 @@ export default function FifthStep() {
                             type="button"
                             onClick={() => removeStrategy(index)}
                             className="w-10 h-10 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={methodologicalStrategies.length <= 1}
+                            disabled={
+                              inputsDisabled ||
+                              methodologicalStrategies.length <= 1
+                            }
                             title="Eliminar estrategia"
                           >
                             <X size={19} />
@@ -393,7 +625,8 @@ export default function FifthStep() {
                     <button
                       type="button"
                       onClick={addStrategy}
-                      className="w-full h-12 flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm"
+                      disabled={inputsDisabled}
+                      className="w-full h-12 flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus size={18} />
                       Agregar estrategia metodológica
@@ -415,6 +648,7 @@ export default function FifthStep() {
                       <h3 className="text-lg font-bold text-gray-900">
                         6. Recursos Didácticos
                       </h3>
+
                       <p className="text-sm text-gray-500 mt-1">
                         Registra los recursos, materiales o herramientas de
                         apoyo para el desarrollo del curso.
@@ -442,6 +676,7 @@ export default function FifthStep() {
                     <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                       <FileText className="text-gray-400" size={26} />
                     </div>
+
                     <p className="text-sm font-semibold text-gray-700">
                       Cargando datos...
                     </p>
@@ -463,6 +698,7 @@ export default function FifthStep() {
                               <label className="block text-sm font-bold text-gray-900 mb-2">
                                 Título
                               </label>
+
                               <input
                                 type="text"
                                 value={resource.titulo}
@@ -475,6 +711,7 @@ export default function FifthStep() {
                                 }
                                 placeholder="Ingrese el título del recurso..."
                                 className={inputClass}
+                                disabled={inputsDisabled}
                               />
                             </div>
 
@@ -482,6 +719,7 @@ export default function FifthStep() {
                               <label className="block text-sm font-bold text-gray-900 mb-2">
                                 Descripción
                               </label>
+
                               <textarea
                                 value={resource.descripcion}
                                 onChange={(e) =>
@@ -494,6 +732,7 @@ export default function FifthStep() {
                                 placeholder="Ingrese la descripción del recurso..."
                                 rows={4}
                                 className={textareaClass}
+                                disabled={inputsDisabled}
                               />
                             </div>
                           </div>
@@ -502,7 +741,9 @@ export default function FifthStep() {
                             type="button"
                             onClick={() => removeResource(index)}
                             className="w-10 h-10 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={didacticResources.length <= 1}
+                            disabled={
+                              inputsDisabled || didacticResources.length <= 1
+                            }
                             title="Eliminar recurso"
                           >
                             <X size={19} />
@@ -514,7 +755,8 @@ export default function FifthStep() {
                     <button
                       type="button"
                       onClick={addResource}
-                      className="w-full h-12 flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm"
+                      disabled={inputsDisabled}
+                      className="w-full h-12 flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus size={18} />
                       Agregar recurso didáctico

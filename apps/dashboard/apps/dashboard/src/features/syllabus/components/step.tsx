@@ -9,6 +9,7 @@ type StepProps = {
   onNextStep: () => void;
   children: React.ReactNode;
   hideControls?: boolean;
+  disableNext?: boolean;
 };
 
 const stepNames: Record<number, string> = {
@@ -27,6 +28,7 @@ export const Step = ({
   children,
   onNextStep,
   hideControls = false,
+  disableNext = false,
 }: StepProps) => {
   const { currentStep } = useSteps();
   const { isReviewMode, onFieldReview, onFieldComment, reviewData } =
@@ -75,6 +77,7 @@ export const Step = ({
       <StepControls
         onNextStep={onNextStep}
         hideControls={hideControls || isReviewMode}
+        disableNext={disableNext}
       />
     </div>
   );

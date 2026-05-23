@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
 import { Step } from "./step";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import {
   X,
   Plus,
@@ -11,6 +12,8 @@ import {
   HeartHandshake,
   Loader2,
   Info,
+  AlertTriangle,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -18,9 +21,12 @@ import {
   useUpdateCompetencias,
   useUpdateActitudes,
   useUpdateComponentes,
-  useSaveCompetencias,
-  useSaveActitudes,
 } from "../hooks/third-step-query";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
+import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
+import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
+import { useCreateDraft } from "../create-draft/create-draft-context";
 
 interface CompetenciaItem {
   id: string;
@@ -51,25 +57,61 @@ type SectionKey = keyof FormData;
 export default function ThirdStep() {
   const { nextStep } = useSteps();
   const { syllabusId, courseName } = useSyllabusContext();
+  const { isDraftCreateMode } = useIsDraftCreateMode();
+  const { draft, setThirdStepData } = useCreateDraft();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(3);
+  const { isReviewMode } = useReviewMode();
 
-  console.log("Syllabus ID in ThirdStep:", syllabusId, "Course:", courseName);
+  const resolvedSyllabusId = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
 
-  const { data: thirdStepData, isLoading } = useThirdStepData(
-    syllabusId ? Number(syllabusId) : null,
-  );
+    const fromQuery = Number(params.get("syllabusId") || params.get("id"));
+
+    if (Number.isFinite(fromQuery) && fromQuery > 0) {
+      return fromQuery;
+    }
+
+    const fromContext = Number(syllabusId);
+
+    if (Number.isFinite(fromContext) && fromContext > 0) {
+      return fromContext;
+    }
+
+    return null;
+  }, [syllabusId]);
+
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
+
+  const canEdit =
+    !isReviewMode &&
+    hasEditPermissionForSection(3) &&
+    !isLockedByState &&
+    !isResolvingState;
+
+  const {
+    data: thirdStepData,
+    isLoading,
+    isFetching,
+  } = useThirdStepData(isDraftCreateMode ? null : resolvedSyllabusId);
 
   const updateCompetencias = useUpdateCompetencias();
   const updateComponentes = useUpdateComponentes();
   const updateActitudes = useUpdateActitudes();
-
-  const createCompetencias = useSaveCompetencias();
-  const createActitudes = useSaveActitudes();
 
   const [formData, setFormData] = useState<FormData>({
     competencias: [],
     componentes: [],
     contenidosActitudinales: [],
   });
+  const [showCodes, setShowCodes] = useState(false);
+  const userChangedCodeVisibilityRef = useRef(false);
+  const hasHydratedDraftRef = useRef(false);
 
   const originalDataRef = useRef<FormData>({
     competencias: [],
@@ -78,9 +120,31 @@ export default function ThirdStep() {
   });
 
   useEffect(() => {
-    if (thirdStepData) {
-      console.log("📊 Datos del backend recibidos:", thirdStepData);
+    if (!isDraftCreateMode || hasHydratedDraftRef.current) return;
 
+    if (draft.competencias) {
+      setFormData({
+        competencias: draft.competencias.competencias,
+        componentes: draft.competencias.componentes,
+        contenidosActitudinales: draft.competencias.contenidosActitudinales,
+      });
+      setShowCodes(draft.competencias.showCodes ?? false);
+      originalDataRef.current = JSON.parse(
+        JSON.stringify({
+          competencias: draft.competencias.competencias,
+          componentes: draft.competencias.componentes,
+          contenidosActitudinales: draft.competencias.contenidosActitudinales,
+        }),
+      );
+      hasHydratedDraftRef.current = true;
+    }
+  }, [isDraftCreateMode, draft.competencias]);
+
+  useEffect(() => {
+    if (isDraftCreateMode) return;
+    if (isLoading || isFetching) return;
+
+    if (thirdStepData) {
       const mappedData = {
         competencias: thirdStepData.competenciasPrincipales.map((item) => ({
           id: String(item.id || `temp-${Date.now()}`),
@@ -99,18 +163,30 @@ export default function ThirdStep() {
         })),
       };
 
-      console.log("✅ Datos mapeados para el formulario:", mappedData);
       setFormData(mappedData);
       originalDataRef.current = JSON.parse(JSON.stringify(mappedData));
+
+      if (!userChangedCodeVisibilityRef.current) {
+        const hasAnyCode =
+          mappedData.competencias.some((item) => item.code?.trim()) ||
+          mappedData.componentes.some((item) => item.code?.trim()) ||
+          mappedData.contenidosActitudinales.some((item) => item.code?.trim());
+
+        setShowCodes(hasAnyCode);
+      }
     }
-  }, [thirdStepData]);
+  }, [thirdStepData, isLoading, isFetching]);
 
   const addItem = (section: keyof FormData) => {
+    if (!canEdit) return;
+
     const newId = `temp-${Date.now()}`;
 
     let defaultCode = "";
 
-    if (section === "componentes") {
+    if (!showCodes) {
+      defaultCode = "";
+    } else if (section === "componentes") {
       const nextIndex = formData[section].length + 1;
       defaultCode = `g.${nextIndex}`;
     } else if (section === "contenidosActitudinales") {
@@ -128,21 +204,25 @@ export default function ThirdStep() {
   };
 
   const removeItem = (section: keyof FormData, id: string) => {
-  const confirmed = window.confirm(
-    "¿Seguro que deseas eliminar este registro?",
-  );
+    if (!canEdit) return;
 
-  if (!confirmed) return;
+    const confirmed = window.confirm(
+      "¿Seguro que deseas eliminar este registro?",
+    );
 
-  setFormData((prev) => ({
-    ...prev,
-    [section]: prev[section].filter((item) => item.id !== id),
-  }));
+    if (!confirmed) return;
 
-  toast.success("Registro eliminado correctamente");
-};
+    setFormData((prev) => ({
+      ...prev,
+      [section]: prev[section].filter((item) => item.id !== id),
+    }));
+
+    toast.success("Registro eliminado correctamente");
+  };
 
   const updateItem = (section: keyof FormData, id: string, text: string) => {
+    if (!canEdit) return;
+
     setFormData((prev) => ({
       ...prev,
       [section]: prev[section].map((item) =>
@@ -156,6 +236,8 @@ export default function ThirdStep() {
     id: string,
     code: string,
   ) => {
+    if (!canEdit) return;
+
     setFormData((prev) => ({
       ...prev,
       [section]: prev[section].map((item) =>
@@ -182,81 +264,126 @@ export default function ThirdStep() {
     return false;
   };
 
-  const isCreateOperation = (section: keyof FormData): boolean => {
-    if (originalDataRef.current[section].length === 0) return true;
+  const shouldSyncSection = (section: keyof FormData): boolean => {
+    if (hasRealChanges(section)) return true;
 
-    const allTemporary = formData[section].every((item) =>
-      item.id.startsWith("temp-"),
+    return (
+      !showCodes &&
+      originalDataRef.current[section].some((item) => item.code.trim())
+    );
+  };
+
+  const codePayload = (code: string) => {
+    if (!showCodes) return {};
+
+    return { code: code.trim() };
+  };
+
+  const formDataForPersistedState = (): FormData => {
+    if (showCodes) return formData;
+
+    return {
+      competencias: formData.competencias.map((item) => ({
+        ...item,
+        code: "",
+      })),
+      componentes: formData.componentes.map((item) => ({ ...item, code: "" })),
+      contenidosActitudinales: formData.contenidosActitudinales.map((item) => ({
+        ...item,
+        code: "",
+      })),
+    };
+  };
+
+  const handleToggleCodes = () => {
+    if (disabledByPermission || isSavingStep) return;
+
+    userChangedCodeVisibilityRef.current = true;
+    setShowCodes((current) => !current);
+  };
+
+  const validateBeforeSave = () => {
+    if (formData.competencias.length === 0) {
+      throw new Error("Debe registrar al menos una competencia.");
+    }
+
+    if (formData.componentes.length === 0) {
+      throw new Error("Debe registrar al menos un componente.");
+    }
+
+    const sections = Object.values(formData) as Array<
+      Array<CompetenciaItem | ComponenteItem | ContenidoActitudinalItem>
+    >;
+
+    const hasEmptyDescription = sections.some((items) =>
+      items.some((item) => !item.text.trim()),
     );
 
-    return allTemporary;
+    if (hasEmptyDescription) {
+      throw new Error("Completa todas las descripciones antes de continuar.");
+    }
+
+    if (showCodes) {
+      const hasEmptyCode = sections.some((items) =>
+        items.some((item) => !item.code.trim()),
+      );
+
+      if (hasEmptyCode) {
+        throw new Error(
+          "Completa el código o desactiva la opción Usar códigos.",
+        );
+      }
+    }
   };
 
-  const wereAllItemsDeleted = (section: keyof FormData): boolean => {
-    const hadOriginalData = originalDataRef.current[section].length > 0;
-    const hasCurrentData = formData[section].length > 0;
+  const runThirdStepPersistence = async (forFooter: boolean) => {
+    if (!canEdit) {
+      if (forFooter) {
+        throw new Error(
+          "No tienes permiso para editar competencias y componentes.",
+        );
+      }
 
-    return hadOriginalData && !hasCurrentData;
-  };
+      return;
+    }
 
-  const handleSubmit = async () => {
-  if (!syllabusId) {
-    toast.error("No se encontró el ID del sílabo");
-    return;
-  }
+    if (isLockedByState || isResolvingState) {
+      if (forFooter) {
+        throw new Error("El sílabo no está disponible para edición.");
+      }
 
-  const sections = Object.values(formData) as Array<
-  Array<CompetenciaItem | ComponenteItem | ContenidoActitudinalItem>
-  >;
+      return;
+    }
 
-  const hasEmptyFields = sections.some((items) =>
-    items.some((item) => !item.text.trim() || !item.code.trim()),
-  );
+    if (!resolvedSyllabusId) {
+      if (forFooter) throw new Error("No se encontró el ID del sílabo");
+      toast.error("No se encontró el ID del sílabo");
+      return;
+    }
 
-  if (hasEmptyFields) {
-    toast.error("Completa todos los códigos y descripciones antes de continuar");
-    return;
-  }
+    validateBeforeSave();
 
-  const numSyllabusId = Number(syllabusId);
-  const promises: Promise<{ message?: string }>[] = [];
-  let toastId: string | number | undefined;
+    const numSyllabusId = Number(resolvedSyllabusId);
+    const promises: Promise<{ message?: string }>[] = [];
+    let toastId: string | number | undefined;
 
     try {
-      if (hasRealChanges("competencias")) {
-        const isCreate = isCreateOperation("competencias");
-        const allDeleted = wereAllItemsDeleted("competencias");
-
-        console.log(
-          `🔄 Competencias: ${
-            allDeleted
-              ? "PUT con items:[] (eliminar todos)"
-              : isCreate
-                ? "POST (crear)"
-                : "PUT (sincronizar)"
-          }`,
-        );
-
+      if (shouldSyncSection("competencias")) {
         if (
-          originalDataRef.current["competencias"].length === 0 &&
-          formData.competencias.length === 0
+          !(
+            originalDataRef.current.competencias.length === 0 &&
+            formData.competencias.length === 0
+          )
         ) {
-          console.log("⚠️ No hay competencias para crear ni sincronizar");
-        } else {
           const competenciasPayload = {
             items: formData.competencias.map((item, index) => {
-              const validCode =
-                item.code && item.code.trim() !== ""
-                  ? item.code.trim()
-                  : String.fromCharCode(65 + (index % 26));
-
               const baseItem = {
-                text: item.text,
-                code: validCode,
+                text: item.text.trim(),
+                ...codePayload(item.code),
                 order: index + 1,
               };
 
-              if (!isCreate && !item.id.startsWith("temp-")) {
+              if (!item.id.startsWith("temp-")) {
                 return { ...baseItem, id: Number(item.id) };
               }
 
@@ -264,52 +391,27 @@ export default function ThirdStep() {
             }),
           };
 
-          if (isCreate) {
-            promises.push(
-              createCompetencias.mutateAsync({
-                syllabusId: numSyllabusId,
-                data: competenciasPayload,
-              }),
-            );
-          } else {
-            promises.push(
-              updateCompetencias.mutateAsync({
-                syllabusId: numSyllabusId,
-                data: competenciasPayload,
-              }),
-            );
-          }
+          promises.push(
+            updateCompetencias.mutateAsync({
+              syllabusId: numSyllabusId,
+              data: competenciasPayload,
+            }),
+          );
         }
       }
 
-      if (hasRealChanges("componentes")) {
-        const allDeleted = wereAllItemsDeleted("componentes");
-
-        console.log(
-          `🔄 Componentes: ${
-            allDeleted
-              ? "PUT con items:[] (eliminar todos)"
-              : "PUT (sincronizar)"
-          }`,
-        );
-
+      if (shouldSyncSection("componentes")) {
         if (
-          originalDataRef.current["componentes"].length === 0 &&
-          formData.componentes.length === 0
+          !(
+            originalDataRef.current.componentes.length === 0 &&
+            formData.componentes.length === 0
+          )
         ) {
-          console.log("⚠️ No hay componentes para crear ni sincronizar");
-        } else {
           const componentesPayload = {
             items: formData.componentes.map((item, index) => {
-              const codePattern = /^[a-zA-Z]\.\d+$/;
-              const validCode =
-                item.code && codePattern.test(item.code.trim())
-                  ? item.code.trim()
-                  : `g.${index + 1}`;
-
               const baseItem = {
-                text: item.text,
-                code: validCode,
+                text: item.text.trim(),
+                ...codePayload(item.code),
                 order: index + 1,
               };
 
@@ -330,41 +432,22 @@ export default function ThirdStep() {
         }
       }
 
-      if (hasRealChanges("contenidosActitudinales")) {
-        const isCreate = isCreateOperation("contenidosActitudinales");
-        const allDeleted = wereAllItemsDeleted("contenidosActitudinales");
-
-        console.log(
-          `🔄 Actitudes: ${
-            allDeleted
-              ? "PUT con items:[] (eliminar todos)"
-              : isCreate
-                ? "POST (crear)"
-                : "PUT (sincronizar)"
-          }`,
-        );
-
+      if (shouldSyncSection("contenidosActitudinales")) {
         if (
-          originalDataRef.current["contenidosActitudinales"].length === 0 &&
-          formData.contenidosActitudinales.length === 0
+          !(
+            originalDataRef.current.contenidosActitudinales.length === 0 &&
+            formData.contenidosActitudinales.length === 0
+          )
         ) {
-          console.log("⚠️ No hay actitudes para crear ni sincronizar");
-        } else {
           const actitudesPayload = {
             items: formData.contenidosActitudinales.map((item, index) => {
-              const codePattern = /^[a-zA-Z]$/;
-              const validCode =
-                item.code && codePattern.test(item.code.trim())
-                  ? item.code.trim().toUpperCase()
-                  : String.fromCharCode(65 + (index % 26));
-
               const baseItem = {
-                text: item.text,
-                code: validCode,
+                text: item.text.trim(),
+                ...codePayload(item.code),
                 order: index + 1,
               };
 
-              if (!isCreate && !item.id.startsWith("temp-")) {
+              if (!item.id.startsWith("temp-")) {
                 return { ...baseItem, id: Number(item.id) };
               }
 
@@ -372,48 +455,44 @@ export default function ThirdStep() {
             }),
           };
 
-          if (isCreate) {
-            promises.push(
-              createActitudes.mutateAsync({
-                syllabusId: numSyllabusId,
-                data: actitudesPayload,
-              }),
-            );
-          } else {
-            promises.push(
-              updateActitudes.mutateAsync({
-                syllabusId: numSyllabusId,
-                data: actitudesPayload,
-              }),
-            );
-          }
+          promises.push(
+            updateActitudes.mutateAsync({
+              syllabusId: numSyllabusId,
+              data: actitudesPayload,
+            }),
+          );
         }
       }
 
       if (promises.length > 0) {
-        toastId = toast.loading("Guardando cambios...");
+        if (!forFooter) {
+          toastId = toast.loading("Guardando cambios...");
+        }
+
         const results = await Promise.all(promises);
 
-        toast.dismiss(toastId);
+        if (toastId) {
+          toast.dismiss(toastId);
+        }
 
-        results.forEach((result) => {
-          console.log("✅ Resultado:", result);
-          toast.success(result.message || "Cambios guardados correctamente");
-        });
+        if (!forFooter) {
+          results.forEach((result) => {
+            toast.success(result.message || "Cambios guardados correctamente");
+          });
+        }
 
-        originalDataRef.current = JSON.parse(JSON.stringify(formData));
-      } else {
-        console.log("ℹ️ No hay cambios para guardar");
+        const persistedState = formDataForPersistedState();
+        originalDataRef.current = JSON.parse(JSON.stringify(persistedState));
+        if (!showCodes) {
+          setFormData(persistedState);
+        }
+      } else if (!forFooter) {
         toast.info("No hay cambios para guardar");
       }
-
-      nextStep();
     } catch (error) {
       if (toastId) {
         toast.dismiss(toastId);
       }
-
-      console.error("❌ Error al guardar:", error);
 
       let errorMessage = "Error al guardar los cambios";
 
@@ -426,7 +505,46 @@ export default function ThirdStep() {
         }
       }
 
-      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (isReviewMode) {
+      nextStep();
+      return;
+    }
+
+    if (!canEdit) {
+      nextStep();
+      return;
+    }
+
+    if (isDraftCreateMode) {
+      try {
+        validateBeforeSave();
+        setThirdStepData({
+          competencias: formData.competencias,
+          componentes: formData.componentes,
+          contenidosActitudinales: formData.contenidosActitudinales,
+          showCodes,
+        });
+        nextStep();
+      } catch (error) {
+        if (error instanceof Error) {
+          toast.error(error.message);
+        }
+      }
+      return;
+    }
+
+    try {
+      await runThirdStepPersistence(false);
+      nextStep();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -435,11 +553,25 @@ export default function ThirdStep() {
     formData.componentes.length +
     formData.contenidosActitudinales.length;
 
-  const textAreaClass =
-    "w-full min-h-[90px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent";
+  const disabledByPermission =
+    !canEdit ||
+    isReviewMode ||
+    isLockedByState ||
+    isResolvingState ||
+    (!isDraftCreateMode && (isLoading || isFetching));
 
-  const codeInputClass =
-    "w-full h-11 rounded-xl px-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 text-center font-semibold outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent";
+  const textAreaClass = `w-full min-h-[90px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+    disabledByPermission ? "opacity-70 cursor-not-allowed bg-gray-100" : ""
+  }`;
+
+  const codeInputClass = `w-full h-11 rounded-xl px-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 text-center font-semibold outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+    disabledByPermission ? "opacity-70 cursor-not-allowed bg-gray-100" : ""
+  }`;
+
+  const isSavingStep =
+    updateCompetencias.isPending ||
+    updateComponentes.isPending ||
+    updateActitudes.isPending;
 
   const renderEditableSection = ({
     section,
@@ -497,21 +629,24 @@ export default function ThirdStep() {
               className="rounded-2xl border border-gray-100 bg-gray-50 p-4"
             >
               <div className="flex flex-col lg:flex-row gap-3">
-                <div className="w-full lg:w-20">
-                  <label className="block text-xs font-bold text-gray-500 mb-2">
-                    Código
-                  </label>
-                  <input
-                    type="text"
-                    value={item.code}
-                    onChange={(e) =>
-                      updateItemCode(section, item.id, e.target.value)
-                    }
-                    className={codeInputClass}
-                    placeholder="Código"
-                    maxLength={10}
-                  />
-                </div>
+                {showCodes ? (
+                  <div className="w-full lg:w-20">
+                    <label className="block text-xs font-bold text-gray-500 mb-2">
+                      Código
+                    </label>
+                    <input
+                      type="text"
+                      value={item.code}
+                      onChange={(e) =>
+                        updateItemCode(section, item.id, e.target.value)
+                      }
+                      className={codeInputClass}
+                      placeholder="Código"
+                      maxLength={10}
+                      disabled={disabledByPermission || isSavingStep}
+                    />
+                  </div>
+                ) : null}
 
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-gray-500 mb-2">
@@ -525,6 +660,7 @@ export default function ThirdStep() {
                     className={textAreaClass}
                     rows={2}
                     placeholder={placeholder}
+                    disabled={disabledByPermission || isSavingStep}
                   />
                 </div>
 
@@ -532,11 +668,13 @@ export default function ThirdStep() {
                   <button
                     type="button"
                     onClick={() => removeItem(section, item.id)}
-                    className="w-10 h-10 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                    className="w-10 h-10 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={
-                      (section === "competencias" ||
+                      disabledByPermission ||
+                      isSavingStep ||
+                      ((section === "competencias" ||
                         section === "componentes") &&
-                      items.length <= 1
+                        items.length <= 1)
                     }
                     title="Eliminar"
                   >
@@ -555,7 +693,8 @@ export default function ThirdStep() {
             <button
               type="button"
               onClick={() => addItem(section)}
-              className="h-11 px-5 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm"
+              disabled={disabledByPermission || isSavingStep}
+              className="h-11 px-5 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={18} />
               {addLabel}
@@ -592,6 +731,35 @@ export default function ThirdStep() {
         </div>
 
         <div className="p-8">
+          <CoordinatorCommentsBanner
+            stepNumber={3}
+            comments={coordinatorComments}
+          />
+
+          {!canEdit && (
+            <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-50 px-6 py-5 text-yellow-800">
+              <div className="flex items-start gap-4">
+                <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500 text-white">
+                  <AlertTriangle size={22} />
+                </div>
+
+                <div>
+                  <p className="font-bold">
+                    {isReviewMode ? "Modo revisión" : "Modo solo lectura"}
+                  </p>
+
+                  <p className="mt-1 text-sm">
+                    {isReviewMode
+                      ? "Estás revisando este paso en modo coordinador. Puedes consultar las competencias y componentes, pero no modificarlos."
+                      : isDisapprovedCorrection
+                        ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                        : "No tienes permiso para editar esta sección. Puedes revisar la información, pero no modificarla."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mb-7 rounded-2xl border border-gray-100 bg-gray-50 p-5">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -640,7 +808,41 @@ export default function ThirdStep() {
             </div>
           </div>
 
-          {isLoading && (
+          <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+                  <Hash size={20} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-gray-900">
+                    Códigos en competencias y componentes
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Activa esta opción solo si el sílabo requiere códigos en
+                    competencias, componentes o contenidos actitudinales.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleCodes}
+                disabled={disabledByPermission || isSavingStep}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  showCodes
+                    ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <Hash size={16} />
+                {showCodes ? "Ocultar códigos" : "Usar códigos"}
+              </button>
+            </div>
+          </div>
+
+          {!isDraftCreateMode && (isLoading || isFetching) && (
             <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
               <Loader2 size={18} className="animate-spin" />
               Cargando datos...
@@ -656,9 +858,9 @@ export default function ThirdStep() {
               <div>
                 <h3 className="font-bold text-blue-900">Recomendación</h3>
                 <p className="text-sm text-blue-700 leading-relaxed mt-1">
-                  Completa cada registro con una descripción clara y un código
-                  identificador. Los cambios se guardarán al pasar al siguiente
-                  paso.
+                  Completa cada registro con una descripción clara. Si el sílabo
+                  requiere identificadores, activa la opción de códigos antes de
+                  guardar.
                 </p>
               </div>
             </div>
