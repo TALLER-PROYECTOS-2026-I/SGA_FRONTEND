@@ -29,6 +29,7 @@ import { getRoleName } from "../../../common/constants/roles";
 import { toast } from "sonner";
 
 type SendResult = "idle" | "success" | "error";
+type ReviewNotificationType = "APPROVED" | "REJECTED";
 
 type AuditEventPayload = {
   tabla: string;
@@ -41,7 +42,7 @@ type AuditEventPayload = {
   newValues?: unknown;
 };
 
-function buildManualNotificationMessage({
+function buildApprovedNotificationMessage({
   teacherName,
   courseName,
   courseCode,
@@ -56,19 +57,52 @@ function buildManualNotificationMessage({
 
   return `Estimado(a) ${safeTeacherName},
 
-Se le informa que el sílabo correspondiente a la asignatura indicada presenta observaciones pendientes de atención.
+Se le comunica que el sílabo correspondiente a la asignatura ${safeCourseName} (${safeCourseCode}) ha sido revisado y aprobado correctamente.
 
-Curso/Sílabo: ${safeCourseName}
-Código: ${safeCourseCode}
-
-Acción esperada:
-Ingrese al Sistema de Gestión Académica, revise las observaciones correspondientes y realice las actualizaciones necesarias en el sílabo asignado.
+No se requieren acciones adicionales.
 
 Atentamente,
 Comité Curricular EPICS`;
 }
 
-const DEFAULT_MANUAL_MESSAGE = buildManualNotificationMessage({});
+function buildRejectedNotificationMessage({
+  teacherName,
+  courseName,
+  courseCode,
+}: {
+  teacherName?: string;
+  courseName?: string;
+  courseCode?: string;
+}) {
+  const safeTeacherName = teacherName?.trim() || "Docente responsable";
+  const safeCourseName = courseName?.trim() || "Asignatura seleccionada";
+  const safeCourseCode = courseCode?.trim() || "No informado";
+
+  return `Estimado(a) ${safeTeacherName},
+
+Se le comunica que el sílabo correspondiente a la asignatura ${safeCourseName} (${safeCourseCode}) ha sido revisado y presenta observaciones pendientes de atención.
+
+Acción esperada:
+Ingrese al Sistema de Gestión Académica, revise las observaciones registradas por el coordinador y realice las correcciones necesarias. Luego vuelva a enviar el sílabo a revisión.
+
+Atentamente,
+Comité Curricular EPICS`;
+}
+
+function buildReviewNotificationMessage(
+  type: ReviewNotificationType,
+  params: {
+    teacherName?: string;
+    courseName?: string;
+    courseCode?: string;
+  },
+) {
+  return type === "APPROVED"
+    ? buildApprovedNotificationMessage(params)
+    : buildRejectedNotificationMessage(params);
+}
+
+const DEFAULT_REVIEW_MESSAGE = buildReviewNotificationMessage("REJECTED", {});
 
 function formatFileSize(size: number) {
   return `${Math.round(size / 1024)} KB`;
@@ -167,13 +201,16 @@ export default function SendEmail() {
   const [courseSearch, setCourseSearch] = useState("");
   const [showCourseDropdown, setShowCourseDropdown] = useState(false);
 
-  const [message, setMessage] = useState(DEFAULT_MANUAL_MESSAGE);
-  const [charCount, setCharCount] = useState(DEFAULT_MANUAL_MESSAGE.length);
+  const [notificationType, setNotificationType] =
+    useState<ReviewNotificationType>("REJECTED");
+  const [message, setMessage] = useState(DEFAULT_REVIEW_MESSAGE);
+  const [charCount, setCharCount] = useState(DEFAULT_REVIEW_MESSAGE.length);
+
   const [attachments, setAttachments] = useState<File[]>([]);
   const [sendResult, setSendResult] = useState<SendResult>("idle");
   const [resultMessage, setResultMessage] = useState("");
 
-  const maxChars = 400;
+  const maxChars = 800;
 
   const { sendMail, isSending } = useSendMail();
 
@@ -219,8 +256,7 @@ export default function SendEmail() {
   useEffect(() => {
     if (teacherEmailParam && teachers.length > 0) {
       const teacher = teachers.find(
-        (item) =>
-          item.email.toLowerCase() === teacherEmailParam.toLowerCase(),
+        (item) => item.email.toLowerCase() === teacherEmailParam.toLowerCase(),
       );
 
       if (teacher) {
@@ -316,7 +352,7 @@ export default function SendEmail() {
   useEffect(() => {
     if (fromPermissions) return;
 
-    const nextMessage = buildManualNotificationMessage({
+    const nextMessage = buildReviewNotificationMessage(notificationType, {
       teacherName: selectedTeacher?.name || teacherNameParam,
       courseName: selectedCourse?.name || courseNameParam,
       courseCode: selectedCourse?.code || courseCodeParam,
@@ -326,6 +362,7 @@ export default function SendEmail() {
     setCharCount(nextMessage.length);
   }, [
     fromPermissions,
+    notificationType,
     selectedTeacher,
     selectedCourse,
     teacherNameParam,
@@ -426,11 +463,42 @@ Comité Curricular EPICS`;
     enabledSections,
   ]);
 
-  const subject = fromPermissions
-    ? `Habilitación de edición de sílabo - ${courseCode || "N/A"}`
-    : selectedCourse
-      ? `Notificación - Curso ${selectedCourse.code}`
-      : "Notificación académica";
+  const getEmailSubject = () => {
+    if (fromPermissions) {
+      return `Habilitación de edición de sílabo - ${courseCode || "N/A"}`;
+    }
+
+    if (notificationType === "APPROVED") {
+      return `Sílabo aprobado - ${courseCode || "N/A"}`;
+    }
+
+    return `Observaciones del sílabo - ${courseCode || "N/A"}`;
+  };
+
+  const subject = getEmailSubject();
+
+  const getSendButtonLabel = () => {
+    if (fromPermissions) {
+      return "Enviar correo de habilitación";
+    }
+
+    return "Enviar notificación";
+  };
+
+  const handleNotificationTypeChange = (type: ReviewNotificationType) => {
+    setNotificationType(type);
+    setSendResult("idle");
+    setResultMessage("");
+
+    const nextMessage = buildReviewNotificationMessage(type, {
+      teacherName: selectedTeacher?.name || teacherNameParam,
+      courseName: selectedCourse?.name || courseNameParam,
+      courseCode: selectedCourse?.code || courseCodeParam,
+    });
+
+    setMessage(nextMessage);
+    setCharCount(nextMessage.length);
+  };
 
   const bodyToSend = fromPermissions
     ? permissionHtmlMessage
@@ -629,7 +697,9 @@ Comité Curricular EPICS`;
         setSelectedCourse(null);
         setCourseSearch("");
 
-        const resetMessage = buildManualNotificationMessage({});
+        setNotificationType("REJECTED");
+
+        const resetMessage = buildReviewNotificationMessage("REJECTED", {});
         setMessage(resetMessage);
         setCharCount(resetMessage.length);
       }
@@ -675,13 +745,13 @@ Comité Curricular EPICS`;
           <h1 className="text-3xl font-bold text-gray-900">
             {fromPermissions
               ? "Enviar correo de habilitación"
-              : "Enviar Correo"}
+              : "Notificación de Revisión"}
           </h1>
 
           <p className="text-sm text-gray-500 mt-1">
             {fromPermissions
               ? "Notifica al docente que su alcance de edición fue configurado."
-              : "Envía notificaciones académicas a docentes con archivos adjuntos."}
+              : "Envía al docente el resultado de la revisión del sílabo."}
           </p>
         </div>
 
@@ -696,13 +766,13 @@ Comité Curricular EPICS`;
                 <h2 className="text-xl font-bold text-gray-900">
                   {fromPermissions
                     ? "Correo de habilitación"
-                    : "Datos del Correo"}
+                    : "Resultado de la revisión"}
                 </h2>
 
                 <p className="text-sm text-gray-500 mt-1">
                   {fromPermissions
                     ? "Revisa el contenido generado y envía la notificación al docente."
-                    : "Selecciona el destinatario, curso y escribe el mensaje."}
+                    : "Selecciona el resultado, el docente y el curso para generar la notificación."}
                 </p>
               </div>
             </div>
@@ -710,9 +780,43 @@ Comité Curricular EPICS`;
 
           <div className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              {!fromPermissions && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-900 mb-2">
+                    1. Resultado de la revisión
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleNotificationTypeChange("APPROVED")}
+                      className={`h-12 rounded-xl border text-sm font-bold transition-colors ${
+                        notificationType === "APPROVED"
+                          ? "bg-green-600 text-white border-green-600 shadow-md"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-green-50 hover:text-green-700"
+                      }`}
+                    >
+                      Aprobado
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleNotificationTypeChange("REJECTED")}
+                      className={`h-12 rounded-xl border text-sm font-bold transition-colors ${
+                        notificationType === "REJECTED"
+                          ? "bg-red-600 text-white border-red-600 shadow-md"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-red-50 hover:text-red-700"
+                      }`}
+                    >
+                      Desaprobado
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-bold text-gray-900 mb-2">
-                  1. Destinatario
+                  {fromPermissions ? "1. Destinatario" : "2. Destinatario"}
                 </label>
 
                 <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -828,7 +932,7 @@ Comité Curricular EPICS`;
 
               <div>
                 <label className="block text-sm font-bold text-gray-900 mb-2">
-                  2. Curso
+                  {fromPermissions ? "2. Curso" : "3. Curso"}
                 </label>
 
                 <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -941,9 +1045,7 @@ Comité Curricular EPICS`;
                 </h3>
 
                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800">
-                  <p className="font-semibold">
-                    Tipo de acceso: {accessLabel}
-                  </p>
+                  <p className="font-semibold">Tipo de acceso: {accessLabel}</p>
 
                   {enabledSections.length > 0 ? (
                     <div className="mt-2">
@@ -974,7 +1076,7 @@ Comité Curricular EPICS`;
               <div className="mt-7">
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-bold text-gray-900">
-                    3. Mensaje al Docente
+                    4. Mensaje generado para el docente
                   </label>
 
                   <span
@@ -989,7 +1091,7 @@ Comité Curricular EPICS`;
                 <textarea
                   value={message}
                   onChange={handleMessageChange}
-                  placeholder={DEFAULT_MANUAL_MESSAGE}
+                  placeholder={DEFAULT_REVIEW_MESSAGE}
                   rows={8}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 resize-none bg-gray-50 text-sm text-gray-700 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 />
@@ -998,7 +1100,9 @@ Comité Curricular EPICS`;
 
             <div className="mt-7">
               <label className="block text-sm font-bold text-gray-900 mb-2">
-                4. Archivos Adjuntos{" "}
+                {fromPermissions
+                  ? "4. Archivos Adjuntos"
+                  : "5. Archivos Adjuntos"}{" "}
                 <span className="font-medium text-gray-400">(opcional)</span>
               </label>
 
@@ -1130,9 +1234,7 @@ Comité Curricular EPICS`;
                 ) : (
                   <>
                     <Send size={18} />
-                    {fromPermissions
-                      ? "Enviar correo de habilitación"
-                      : "Enviar"}
+                    {getSendButtonLabel()}
                   </>
                 )}
               </button>
