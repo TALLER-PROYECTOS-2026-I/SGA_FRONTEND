@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 // Interfaces para Fuentes Bibliográficas (Paso 7)
 export interface Fuente {
@@ -18,7 +19,7 @@ export interface Fuente {
 export interface FuenteCreate {
   tipo: "LIBRO" | "ART" | "WEB";
   autores: string;
-  anio: number;
+  anio?: number;
   titulo: string;
   editorialRevista?: string;
   ciudad?: string;
@@ -69,7 +70,7 @@ class SeventhStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${silaboId}/fuentes`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -96,7 +97,7 @@ class SeventhStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${silaboId}/fuentes`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -129,7 +130,7 @@ class SeventhStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${silaboId}/fuentes/${fuenteId}`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -161,7 +162,7 @@ class SeventhStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${silaboId}/fuentes/${fuenteId}`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -182,7 +183,7 @@ class SeventhStepManager {
   }
 }
 
-const seventhStepManager = new SeventhStepManager();
+export const seventhStepManager = new SeventhStepManager();
 
 export const useFuentesQuery = (silaboId: number | null) => {
   const isValidId = silaboId !== null && silaboId > 0;
@@ -192,8 +193,10 @@ export const useFuentesQuery = (silaboId: number | null) => {
     queryFn: () => seventhStepManager.fetchFuentes(silaboId!),
     enabled: isValidId,
     retry: false,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 };
 

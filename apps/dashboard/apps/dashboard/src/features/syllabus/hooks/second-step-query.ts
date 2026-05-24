@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 export interface SumillaResponse {
   id?: number;
@@ -21,24 +22,40 @@ interface ApiErrorResponse {
 }
 
 class SecondStepManager {
-  private getApiBase(baseUrl?: string) {
-    return (
+  private getApiBase(baseUrl?: string): string {
+    const apiBase =
       baseUrl ??
       import.meta.env.VITE_API_BASE_URL ??
-      "http://localhost:7071/api"
-    );
+      "http://localhost:7071/api";
+
+    return apiBase.replace(/\/+$/, "");
   }
 
   private normalizeSumillaResponse(response: unknown): SumillaResponse | null {
+    if (!response || typeof response !== "object") {
+      return null;
+    }
+
     const responseObject = response as {
+      success?: boolean;
       content?: unknown;
       data?: unknown;
       sumilla?: string;
       contenido?: string;
+      id?: number;
     };
 
+    if (responseObject.sumilla || responseObject.contenido) {
+      const text = responseObject.sumilla ?? responseObject.contenido ?? "";
+      return {
+        id: responseObject.id,
+        sumilla: text,
+        contenido: responseObject.contenido ?? text,
+      };
+    }
+
     let data: unknown =
-      responseObject?.content ?? responseObject?.data ?? responseObject;
+      responseObject.content ?? responseObject.data ?? responseObject;
 
     if (Array.isArray(data)) {
       if (data.length === 0) return null;
@@ -50,10 +67,16 @@ class SecondStepManager {
     }
 
     const item = data as SumillaResponse;
+    const sumillaText = item.sumilla ?? item.contenido ?? "";
+
+    if (!sumillaText.trim() && !item.id) {
+      return null;
+    }
 
     return {
       ...item,
-      sumilla: item.sumilla ?? item.contenido ?? "",
+      sumilla: sumillaText,
+      contenido: item.contenido ?? sumillaText,
     };
   }
 
@@ -82,7 +105,7 @@ class SecondStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/sumilla`;
 
-    const res = await fetch(url);
+    const res = await authFetch(url);
 
     if (res.status === 404) {
       return null;
@@ -105,7 +128,7 @@ class SecondStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/sumilla`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildPayload(data)),
@@ -127,7 +150,7 @@ class SecondStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/sumilla`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.buildPayload(data)),
@@ -153,10 +176,10 @@ export const useSumilla = (syllabusId: number | null) => {
     enabled: isValidId,
     retry: false,
     throwOnError: false,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
     refetchOnReconnect: false,
   });
 };
@@ -176,9 +199,14 @@ export const useSaveSumilla = () => {
 
       return secondStepManager.updateSumilla(syllabusId, data);
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: ["syllabus", variables.syllabusId, "sumilla"],
+      });
+
+      await queryClient.refetchQueries({
+        queryKey: ["syllabus", variables.syllabusId, "sumilla"],
+        type: "all",
       });
     },
   });

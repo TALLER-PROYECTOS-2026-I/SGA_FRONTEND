@@ -7,12 +7,23 @@ export function getStoredAuthToken() {
   );
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+}
+
 export function getApiBaseUrl() {
-  return (
+  const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL ??
     import.meta.env.VITE_API_URL ??
-    "http://localhost:7071/api"
-  ).replace(/\/+$/, "");
+    "http://localhost:7071/api";
+
+  return trimTrailingSlashes(apiBaseUrl);
 }
 
 export function getHttpErrorFallback(status: number): string {
