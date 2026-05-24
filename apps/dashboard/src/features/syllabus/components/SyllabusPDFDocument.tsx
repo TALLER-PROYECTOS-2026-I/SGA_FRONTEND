@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Document,
   Page,
@@ -759,9 +758,7 @@ function getOutcomeRows(aportes?: unknown[]) {
       value: getOutcomeValue(aporte),
       originalIndex: index,
     }))
-    .filter(
-      (aporte) => isNonEmpty(aporte.code) || isNonEmpty(aporte.description),
-    )
+    .filter((aporte) => isNonEmpty(aporte.code) || isNonEmpty(aporte.description))
     .sort((a, b) => {
       const numberDiff = outcomeNumber(a.code) - outcomeNumber(b.code);
       if (Number.isFinite(numberDiff) && numberDiff !== 0) return numberDiff;
@@ -772,16 +769,13 @@ function getOutcomeRows(aportes?: unknown[]) {
 export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
   const datos = data.datosGenerales;
 
-  const bibliograficas = data.fuentes?.filter(
-    (fuente) => fuente.tipo !== "WEB",
-  );
+  const bibliograficas = data.fuentes?.filter((fuente) => fuente.tipo !== "WEB");
 
   const electronicas = data.fuentes?.filter((fuente) => fuente.tipo === "WEB");
 
   const horasTeoria = toNumber(datos.horasTeoria);
   const horasPractica = toNumber(datos.horasPractica);
-  const totalHoras =
-    toNumber(datos.horasTotales) || horasTeoria + horasPractica;
+  const totalHoras = toNumber(datos.horasTotales) || horasTeoria + horasPractica;
   const creditosTeoria = toNumber(datos.creditosTeoria);
   const creditosPractica = toNumber(datos.creditosPractica);
   const totalCreditos =
@@ -802,9 +796,8 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
           </Text>
           <Text style={styles.areaTitle}>
             ÁREA CURRICULAR:{" "}
-            {cleanText(
-              datos.areaCurricular || "TECNOLOGÍA DE INFORMACIÓN",
-            ).toUpperCase()}
+            {cleanText(datos.areaCurricular || "TECNOLOGÍA DE INFORMACIÓN")
+              .toUpperCase()}
           </Text>
         </View>
 
@@ -844,7 +837,9 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
               {datos.codigoAsignatura || ""}
             </GeneralRow>
 
-            <GeneralRow label="Ciclo">{datos.ciclo || ""}</GeneralRow>
+            <GeneralRow label="Ciclo">
+              {datos.ciclo || ""}
+            </GeneralRow>
 
             <GeneralRow label="Requisitos">
               {datos.requisitos || "Ninguno"}
@@ -853,8 +848,8 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
             <GeneralRow label="Cantidad de horas">
               <View style={styles.hoursBlock}>
                 <Text style={styles.hoursLine}>
-                  Teoría ({formatTwoDigits(horasTeoria)}) Práctica (
-                  {formatTwoDigits(horasPractica)}) Total horas (
+                  Teoría ({formatTwoDigits(horasTeoria)})    Práctica (
+                  {formatTwoDigits(horasPractica)})    Total horas (
                   {formatTwoDigits(totalHoras)})
                 </Text>
                 <Text style={styles.hoursLine}>
@@ -897,9 +892,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
         <View style={styles.section}>
           <SectionTitle>II. SUMILLA</SectionTitle>
           {isNonEmpty(data.sumilla) ? (
-            <Text style={styles.paragraph}>
-              {cleanText(data.sumilla).trim()}
-            </Text>
+            <Text style={styles.paragraph}>{cleanText(data.sumilla).trim()}</Text>
           ) : (
             <Text style={styles.emptyText}>Sin información registrada.</Text>
           )}
@@ -959,17 +952,13 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                   <Text style={styles.programHeaderText}>SEMANA</Text>
                 </View>
 
-                <View
-                  style={[styles.programCell, styles.programConceptualCell]}
-                >
+                <View style={[styles.programCell, styles.programConceptualCell]}>
                   <Text style={styles.programHeaderText}>
                     CONTENIDOS CONCEPTUALES
                   </Text>
                 </View>
 
-                <View
-                  style={[styles.programCell, styles.programProceduralCell]}
-                >
+                <View style={[styles.programCell, styles.programProceduralCell]}>
                   <Text style={styles.programHeaderText}>
                     CONTENIDOS PROCEDIMENTALES
                   </Text>
@@ -1002,10 +991,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                 const isEvent = isEventWeek(semana);
 
                 return (
-                  <View
-                    key={semana.id || semana.semana}
-                    style={styles.programRow}
-                  >
+                  <View key={semana.id || semana.semana} style={styles.programRow}>
                     <View style={[styles.programCell, styles.programWeekCell]}>
                       <Text style={styles.hourText}>{semana.semana}</Text>
                     </View>
@@ -1030,9 +1016,7 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                       )}
                     </View>
 
-                    <View
-                      style={[styles.programCell, styles.programActivityCell]}
-                    >
+                    <View style={[styles.programCell, styles.programActivityCell]}>
                       {isEvent ? (
                         <Text style={styles.programText}>
                           {cleanText(semana.actividadesAprendizaje)}
@@ -1148,12 +1132,14 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                 </Text>
               )}
 
-              {data.evaluacionAprendizaje?.componentesPF?.map((item, index) => (
-                <Text key={index} style={styles.text}>
-                  <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
-                  {item.descripcion}
-                </Text>
-              ))}
+              {data.evaluacionAprendizaje?.componentesPF?.map(
+                (item, index) => (
+                  <Text key={index} style={styles.text}>
+                    <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
+                    {item.descripcion}
+                  </Text>
+                ),
+              )}
 
               {data.evaluacionAprendizaje?.descripcionPE && (
                 <Text style={styles.text}>
@@ -1170,12 +1156,14 @@ export function SyllabusPDFDocument({ data }: SyllabusPDFDocumentProps) {
                 </Text>
               )}
 
-              {data.evaluacionAprendizaje?.componentesPE?.map((item, index) => (
-                <Text key={index} style={styles.text}>
-                  <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
-                  {item.descripcion}
-                </Text>
-              ))}
+              {data.evaluacionAprendizaje?.componentesPE?.map(
+                (item, index) => (
+                  <Text key={index} style={styles.text}>
+                    <Text style={styles.textBold}>{item.codigo}</Text> ={" "}
+                    {item.descripcion}
+                  </Text>
+                ),
+              )}
             </>
           )}
         </View>

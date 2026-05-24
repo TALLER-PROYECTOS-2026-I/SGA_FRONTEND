@@ -170,7 +170,9 @@ export default function ThirdStep() {
         const hasAnyCode =
           mappedData.competencias.some((item) => item.code?.trim()) ||
           mappedData.componentes.some((item) => item.code?.trim()) ||
-          mappedData.contenidosActitudinales.some((item) => item.code?.trim());
+          mappedData.contenidosActitudinales.some((item) =>
+            item.code?.trim(),
+          );
 
         setShowCodes(hasAnyCode);
       }
@@ -268,8 +270,7 @@ export default function ThirdStep() {
     if (hasRealChanges(section)) return true;
 
     return (
-      !showCodes &&
-      originalDataRef.current[section].some((item) => item.code.trim())
+      !showCodes && originalDataRef.current[section].some((item) => item.code.trim())
     );
   };
 
@@ -329,9 +330,7 @@ export default function ThirdStep() {
       );
 
       if (hasEmptyCode) {
-        throw new Error(
-          "Completa el código o desactiva la opción Usar códigos.",
-        );
+        throw new Error("Completa el código o desactiva la opción Usar códigos.");
       }
     }
   };

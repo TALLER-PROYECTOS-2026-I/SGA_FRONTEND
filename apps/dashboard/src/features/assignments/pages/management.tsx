@@ -345,105 +345,107 @@ export default function Management() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-7">
-          <h1 className="text-3xl font-bold text-gray-900">Asignar Docente</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Completa los datos para asignar un sílabo a un docente.
-          </p>
-        </div>
+  <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-7">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Asignar Docente
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Completa los datos para asignar un sílabo a un docente.
+        </p>
+      </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
-                <UserPlus size={30} />
-              </div>
-
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Datos de la Asignación
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Selecciona el docente, la asignatura y envía el mensaje de
-                  asignación.
-                </p>
-              </div>
-            </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+        <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
+          <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md">
+            <UserPlus size={30} />
           </div>
 
-          <div className="p-8">
-            {pendingCourses.length > 0 && (
-              <section className="mb-8 rounded-xl border border-amber-100 bg-amber-50/60 p-5">
-                <h3 className="text-sm font-bold text-amber-900">
-                  Sin asignar ({pendingCourses.length})
-                </h3>
-                <p className="text-xs text-amber-800/80 mt-1 mb-3">
-                  Sílabos en borrador pendientes de asignar docente.
-                </p>
-                <ul className="space-y-2 max-h-40 overflow-y-auto">
-                  {pendingCourses.map((course) => (
-                    <li
-                      key={course.id}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm border border-amber-100"
-                    >
-                      <span className="font-medium text-gray-900 truncate">
-                        {course.name}
-                      </span>
-                      <span className="shrink-0 text-xs text-gray-500">
-                        {course.code}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-              <TeacherSelect
-                selectedTeacher={selectedTeacher}
-                teacherSearch={teacherSearch}
-                setTeacherSearch={setTeacherSearch}
-                showTeacherDropdown={showTeacherDropdown}
-                setShowTeacherDropdown={setShowTeacherDropdown}
-                onTeacherSelect={handleTeacherSelect}
-                onClearTeacher={handleClearTeacher}
-                teachers={filteredTeachers}
-              />
-
-              <CourseSelect
-                selectedCourse={selectedCourse}
-                courseSearch={courseSearch}
-                setCourseSearch={setCourseSearch}
-                showCourseDropdown={showCourseDropdown}
-                setShowCourseDropdown={setShowCourseDropdown}
-                onCourseSelect={handleCourseSelect}
-                onClearCourse={handleClearCourse}
-                courses={filteredPendingCourses}
-                showInconsistentBadge={false}
-              />
-
-              <CourseCodeInput courseCode={courseCode} />
-
-              <AcademicPeriodInput academicPeriod={academicPeriod} />
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Datos de la Asignación
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Selecciona el docente, la asignatura y envía el mensaje de
+                asignación.
+              </p>
             </div>
+          </div>
+        </div>
 
-            <div className="mt-7">
-              <MessageTextarea
-                message={message}
-                onChange={handleMessageChange}
-                charCount={charCount}
-                maxChars={maxChars}
-              />
-            </div>
+        <div className="p-8">
+          {pendingCourses.length > 0 && (
+            <section className="mb-8 rounded-xl border border-amber-100 bg-amber-50/60 p-5">
+              <h3 className="text-sm font-bold text-amber-900">
+                Sin asignar ({pendingCourses.length})
+              </h3>
+              <p className="text-xs text-amber-800/80 mt-1 mb-3">
+                Sílabos en borrador pendientes de asignar docente.
+              </p>
+              <ul className="space-y-2 max-h-40 overflow-y-auto">
+                {pendingCourses.map((course) => (
+                  <li
+                    key={course.id}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm border border-amber-100"
+                  >
+                    <span className="font-medium text-gray-900 truncate">
+                      {course.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-gray-500">
+                      {course.code}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-            <div className="mt-8 border-t border-gray-100 pt-6">
-              <FormActions onGoBack={handleGoBack} onSubmit={handleSubmit} />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <TeacherSelect
+              selectedTeacher={selectedTeacher}
+              teacherSearch={teacherSearch}
+              setTeacherSearch={setTeacherSearch}
+              showTeacherDropdown={showTeacherDropdown}
+              setShowTeacherDropdown={setShowTeacherDropdown}
+              onTeacherSelect={handleTeacherSelect}
+              onClearTeacher={handleClearTeacher}
+              teachers={filteredTeachers}
+            />
+
+            <CourseSelect
+              selectedCourse={selectedCourse}
+              courseSearch={courseSearch}
+              setCourseSearch={setCourseSearch}
+              showCourseDropdown={showCourseDropdown}
+              setShowCourseDropdown={setShowCourseDropdown}
+              onCourseSelect={handleCourseSelect}
+              onClearCourse={handleClearCourse}
+              courses={filteredPendingCourses}
+              showInconsistentBadge={false}
+            />
+
+            <CourseCodeInput courseCode={courseCode} />
+
+            <AcademicPeriodInput academicPeriod={academicPeriod} />
+          </div>
+
+          <div className="mt-7">
+            <MessageTextarea
+              message={message}
+              onChange={handleMessageChange}
+              charCount={charCount}
+              maxChars={maxChars}
+            />
+          </div>
+
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <FormActions onGoBack={handleGoBack} onSubmit={handleSubmit} />
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

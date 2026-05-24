@@ -7,7 +7,9 @@ export function UserAvatar(props: React.HTMLAttributes<HTMLDivElement>) {
   const [imageError, setImageError] = useState(false);
 
   const shouldShowImage =
-    !!photoUrl && !imageError && !String(photoUrl).startsWith("blob:");
+    !!photoUrl &&
+    !imageError &&
+    !String(photoUrl).startsWith("blob:");
 
   if (isLoading) {
     return (

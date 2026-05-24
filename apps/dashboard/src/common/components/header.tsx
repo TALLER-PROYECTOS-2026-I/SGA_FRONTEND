@@ -4,7 +4,12 @@ import { Link } from "react-router-dom";
 import { authService } from "../../features/auth/services/auth-service";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { getRoleName } from "../constants/roles";
-import { ChevronDown, GraduationCap, LogOut, User } from "lucide-react";
+import {
+  ChevronDown,
+  GraduationCap,
+  LogOut,
+  User,
+} from "lucide-react";
 
 const roleDisplayNames = {
   docente: "Docente",
@@ -109,7 +114,9 @@ export default function Header({ user }: HeaderProps) {
               </p>
 
               {email && (
-                <p className="text-xs text-gray-500 truncate mt-0.5">{email}</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5">
+                  {email}
+                </p>
               )}
 
               <div className="mt-3 inline-flex items-center rounded-full bg-red-50 border border-red-100 px-3 py-1 text-xs font-bold text-red-700">

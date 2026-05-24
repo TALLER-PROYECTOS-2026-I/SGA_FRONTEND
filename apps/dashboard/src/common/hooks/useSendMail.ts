@@ -55,10 +55,7 @@ const fileToBase64 = (file: File): Promise<string> =>
   });
 
 const getSafeFileName = (name: string) =>
-  name
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim() || "adjunto";
+  name.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").trim() || "adjunto";
 
 const getFileExtension = (name: string) =>
   name.split(".").pop()?.toLowerCase().trim() ?? "";
@@ -75,9 +72,7 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   }
 
   if (subject.length > MAX_SUBJECT_LENGTH) {
-    throw new Error(
-      `El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`,
-    );
+    throw new Error(`El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`);
   }
 
   if (body.length > MAX_BODY_LENGTH) {

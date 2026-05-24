@@ -17,14 +17,16 @@ import { useAllAssignments } from "../../assignments/hooks/assignments-query";
 import { useCoordinator } from "../contexts/coordinator-context";
 import { getRoleName } from "../../../common/constants/roles";
 
-type AssignmentStatus = "APROBADO" | "EN_PROCESO" | "PENDIENTE" | "ASIGNADO";
+type AssignmentStatus =
+  | "APROBADO"
+  | "EN_PROCESO"
+  | "PENDIENTE"
+  | "ASIGNADO";
 
 type FilterStatus = "ALL" | AssignmentStatus;
 
 function normalizeStatus(status?: string | null): AssignmentStatus {
-  const value = String(status || "")
-    .trim()
-    .toUpperCase();
+  const value = String(status || "").trim().toUpperCase();
 
   if (value === "APROBADO") {
     return "APROBADO";
@@ -163,7 +165,8 @@ export default function PermissionsList() {
       }
     }
 
-    const matchesStatus = selectedStatus === "ALL" || status === selectedStatus;
+    const matchesStatus =
+      selectedStatus === "ALL" || status === selectedStatus;
 
     return matchesSearch && matchesStatus;
   });
@@ -271,7 +274,9 @@ export default function PermissionsList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">Aprobados</p>
 
-                  <h2 className="text-3xl font-bold mt-1">{totalAprobados}</h2>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {totalAprobados}
+                  </h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -283,7 +288,9 @@ export default function PermissionsList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">En proceso</p>
 
-                  <h2 className="text-3xl font-bold mt-1">{totalEnProceso}</h2>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {totalEnProceso}
+                  </h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -295,7 +302,9 @@ export default function PermissionsList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">Pendientes</p>
 
-                  <h2 className="text-3xl font-bold mt-1">{totalPendientes}</h2>
+                  <h2 className="text-3xl font-bold mt-1">
+                    {totalPendientes}
+                  </h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -388,7 +397,9 @@ export default function PermissionsList() {
                     >
                       <span
                         className={`w-3 h-3 rounded-full ${
-                          searchFilter === "area" ? "bg-red-500" : "bg-gray-300"
+                          searchFilter === "area"
+                            ? "bg-red-500"
+                            : "bg-gray-300"
                         }`}
                       />
 
@@ -429,49 +440,47 @@ export default function PermissionsList() {
                   Todos
                 </button>
 
-                {(Object.keys(statusConfig) as AssignmentStatus[]).map(
-                  (key) => {
-                    const cfg = statusConfig[key];
+                {(Object.keys(statusConfig) as AssignmentStatus[]).map((key) => {
+                  const cfg = statusConfig[key];
 
-                    const count = assignments.filter(
-                      (assignment) =>
-                        normalizeStatus(assignment.estadoRevision) === key,
-                    ).length;
+                  const count = assignments.filter(
+                    (assignment) =>
+                      normalizeStatus(assignment.estadoRevision) === key,
+                  ).length;
 
-                    const isSelected = selectedStatus === key;
+                  const isSelected = selectedStatus === key;
 
-                    return (
-                      <button
-                        type="button"
-                        key={key}
-                        onClick={() => setSelectedStatus(key)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                  return (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => setSelectedStatus(key)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                        isSelected
+                          ? `${cfg.color} text-white border-transparent shadow-sm`
+                          : `${cfg.bgColor} ${cfg.textColor} border-transparent hover:shadow-sm`
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          isSelected ? "bg-white" : cfg.color
+                        }`}
+                      />
+
+                      {cfg.label}
+
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${
                           isSelected
-                            ? `${cfg.color} text-white border-transparent shadow-sm`
-                            : `${cfg.bgColor} ${cfg.textColor} border-transparent hover:shadow-sm`
+                            ? "bg-white/20 text-white"
+                            : "bg-white/70 text-gray-800"
                         }`}
                       >
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            isSelected ? "bg-white" : cfg.color
-                          }`}
-                        />
-
-                        {cfg.label}
-
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            isSelected
-                              ? "bg-white/20 text-white"
-                              : "bg-white/70 text-gray-800"
-                          }`}
-                        >
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

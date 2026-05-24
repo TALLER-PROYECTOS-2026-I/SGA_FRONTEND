@@ -189,9 +189,7 @@ export const useSyllabusAutoSave = () => {
   );
 
   const saveSection = useCallback(
-    async (
-      optionsOrData: SaveSectionOptions | SectionData,
-    ): Promise<number> => {
+    async (optionsOrData: SaveSectionOptions | SectionData): Promise<number> => {
       setIsSaving(true);
       setSaveError(null);
 

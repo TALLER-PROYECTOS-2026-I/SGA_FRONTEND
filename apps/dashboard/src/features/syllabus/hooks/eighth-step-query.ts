@@ -166,7 +166,7 @@ class EighthStepManager {
     return String(descripcion).trim();
   }
 
-  private normalizeContributionItems(
+    private normalizeContributionItems(
     data: ResultadosData,
   ): NormalizedContribution[] {
     const items = this.getItems(data);
@@ -272,16 +272,13 @@ class EighthStepManager {
     }
 
     for (const item of validItems) {
-      const res = await authFetch(
-        this.getContributionUrl(syllabusId, baseUrl),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(this.buildPayload(syllabusId, item)),
+      const res = await authFetch(this.getContributionUrl(syllabusId, baseUrl), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(this.buildPayload(syllabusId, item)),
+      });
 
       if (!res.ok) {
         throw await this.parseError(res);

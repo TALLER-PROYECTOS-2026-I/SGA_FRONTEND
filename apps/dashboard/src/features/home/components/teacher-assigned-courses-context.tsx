@@ -106,9 +106,7 @@ function CourseRelationCard({
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-4 space-y-3 transition-all duration-200 hover:bg-gray-50">
-      <p className="text-sm font-semibold text-gray-900">
-        {course.nombreMalla}
-      </p>
+      <p className="text-sm font-semibold text-gray-900">{course.nombreMalla}</p>
 
       {course.cursoCodigo ? (
         <p className="text-xs text-gray-500">Código: {course.cursoCodigo}</p>
@@ -132,11 +130,13 @@ function CourseRelationCard({
           )}
           {isDownloading ? "Descargando..." : "Descargar sílabo"}
         </button>
-      ) : showDownload ? (
-        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-          Sílabo no disponible
-        </span>
-      ) : null}
+      ) : (
+        showDownload ? (
+          <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+            Sílabo no disponible
+          </span>
+        ) : null
+      )}
     </div>
   );
 }
@@ -301,10 +301,7 @@ export function TeacherAssignedCoursesContext({
   );
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
-  const courses = useMemo(
-    () => normalizeAssignments(assignments),
-    [assignments],
-  );
+  const courses = useMemo(() => normalizeAssignments(assignments), [assignments]);
   const selectedCourse = courses.find(
     (course) => course.syllabusId === selectedSyllabusId,
   );
@@ -313,10 +310,7 @@ export function TeacherAssignedCoursesContext({
     data: context,
     isLoading,
     isError,
-  } = useCurriculumContext(
-    selectedSyllabusId,
-    selectedCourse?.cursoNombre ?? "",
-  );
+  } = useCurriculumContext(selectedSyllabusId, selectedCourse?.cursoNombre ?? "");
 
   const handleDownload = async (course: RelatedCourseWithMeta) => {
     if (!course.silaboId) return;
@@ -347,10 +341,10 @@ export function TeacherAssignedCoursesContext({
         </span>
         <div>
           <h2 className="text-xl font-bold text-gray-900">Cursos asignados</h2>
-          <p className="text-sm text-gray-500">
-            Selecciona un curso para consultar sus cursos previos y posteriores
-            según la malla curricular.
-          </p>
+        <p className="text-sm text-gray-500">
+          Selecciona un curso para consultar sus cursos previos y posteriores
+          según la malla curricular.
+        </p>
         </div>
       </div>
 

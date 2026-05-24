@@ -1,5 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
-
 import { useState, useEffect } from "react";
 import { Step } from "./step";
 import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
@@ -286,9 +284,7 @@ export default function SixthStep() {
     if (canEdit) {
       if (isDraftCreateMode) {
         if (!currentFormula) {
-          toast.error(
-            "Selecciona un esquema de evaluación antes de continuar.",
-          );
+          toast.error("Selecciona un esquema de evaluación antes de continuar.");
           return;
         }
 
@@ -340,8 +336,8 @@ export default function SixthStep() {
               </h2>
 
               <p className="text-sm text-gray-500 mt-1">
-                Selecciona el esquema de evaluación que se utilizará para
-                calcular el promedio final de la asignatura.
+                Selecciona el esquema de evaluación que se utilizará para calcular
+                el promedio final de la asignatura.
               </p>
             </div>
 
@@ -495,7 +491,9 @@ export default function SixthStep() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-blue-900">Recomendación</h3>
+                    <h3 className="font-bold text-blue-900">
+                      Recomendación
+                    </h3>
 
                     <p className="text-sm text-blue-700 leading-relaxed mt-1">
                       Revisa la leyenda y las fórmulas desglosadas antes de
@@ -616,20 +614,22 @@ export default function SixthStep() {
                               </h5>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {subFormula.legend.map((item, legendIndex) => (
-                                  <div
-                                    key={legendIndex}
-                                    className="rounded-xl border border-gray-100 bg-white px-4 py-3"
-                                  >
-                                    <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
-                                      {item.key}
-                                    </span>
+                                {subFormula.legend.map(
+                                  (item, legendIndex) => (
+                                    <div
+                                      key={legendIndex}
+                                      className="rounded-xl border border-gray-100 bg-white px-4 py-3"
+                                    >
+                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
+                                        {item.key}
+                                      </span>
 
-                                    <span className="text-sm text-gray-700">
-                                      {item.description}
-                                    </span>
-                                  </div>
-                                ))}
+                                      <span className="text-sm text-gray-700">
+                                        {item.description}
+                                      </span>
+                                    </div>
+                                  ),
+                                )}
                               </div>
                             </div>
                           </div>

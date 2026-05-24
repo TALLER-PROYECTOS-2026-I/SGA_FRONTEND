@@ -71,7 +71,9 @@ export class SyllabusCreateConflictError extends Error {
 
 export function getApiBase(baseUrl?: string): string {
   const apiBase =
-    baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
+    baseUrl ??
+    import.meta.env.VITE_API_BASE_URL ??
+    "http://localhost:7071/api";
 
   return apiBase.replace(/\/+$/, "");
 }
@@ -189,9 +191,7 @@ class SyllabusManager {
     const syllabusId = Number(json.syllabusId ?? json.id);
 
     if (!Number.isFinite(syllabusId) || syllabusId <= 0) {
-      throw new Error(
-        "No se recibió un identificador válido del sílabo creado.",
-      );
+      throw new Error("No se recibió un identificador válido del sílabo creado.");
     }
 
     return { syllabusId };

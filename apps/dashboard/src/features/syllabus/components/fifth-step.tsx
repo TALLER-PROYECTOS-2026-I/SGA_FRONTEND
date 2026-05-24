@@ -146,7 +146,8 @@ export default function FifthStep() {
   const inputsDisabled =
     !canEdit ||
     isSaving ||
-    (!isDraftCreateMode && (loadingStrategies || loadingResources)) ||
+    (!isDraftCreateMode &&
+      (loadingStrategies || loadingResources)) ||
     isResolvingState;
 
   const persistFifthStep = async () => {
@@ -333,9 +334,7 @@ export default function FifthStep() {
           methodologicalStrategies === undefined ||
           didacticResources === undefined
         ) {
-          throw new Error(
-            "Complete estrategias y recursos antes de continuar.",
-          );
+          throw new Error("Complete estrategias y recursos antes de continuar.");
         }
 
         const strategiesToSave = validateItems(

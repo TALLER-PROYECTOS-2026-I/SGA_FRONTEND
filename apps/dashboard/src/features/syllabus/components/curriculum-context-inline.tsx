@@ -54,9 +54,7 @@ function RelatedCourseCard({
 }) {
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 space-y-2">
-      <p className="text-sm font-semibold text-gray-800">
-        {course.nombreMalla}
-      </p>
+      <p className="text-sm font-semibold text-gray-800">{course.nombreMalla}</p>
 
       {course.cursoCodigo && (
         <p className="text-xs text-gray-500">Código: {course.cursoCodigo}</p>
@@ -182,14 +180,10 @@ export function CurriculumContextInline({
           </p>
 
           <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 space-y-2">
-            <p className="text-sm font-bold text-blue-900">
-              {actual.cursoNombre}
-            </p>
+            <p className="text-sm font-bold text-blue-900">{actual.cursoNombre}</p>
 
             {actual.cursoCodigo && (
-              <p className="text-xs text-gray-600">
-                Código: {actual.cursoCodigo}
-              </p>
+              <p className="text-xs text-gray-600">Código: {actual.cursoCodigo}</p>
             )}
 
             {(actual.ciclo != null || actual.linea) && (

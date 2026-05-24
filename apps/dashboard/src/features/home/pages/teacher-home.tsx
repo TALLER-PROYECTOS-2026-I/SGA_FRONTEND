@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   ClipboardList,
   CheckCircle,
@@ -15,9 +14,7 @@ import { useAssignments } from "../../assignments/hooks/assignments-query";
 import { TeacherAssignedCoursesContext } from "../components/teacher-assigned-courses-context";
 
 function normalizeStatus(status?: string | null) {
-  const value = String(status || "")
-    .trim()
-    .toUpperCase();
+  const value = String(status || "").trim().toUpperCase();
 
   if (value === "APROBADO") {
     return "APROBADO";
@@ -55,8 +52,7 @@ export default function TeacherHome() {
   const totalActivos = assignments.length;
 
   const totalAprobados = assignments.filter(
-    (assignment: any) =>
-      normalizeStatus(assignment.estadoRevision) === "APROBADO",
+    (assignment: any) => normalizeStatus(assignment.estadoRevision) === "APROBADO",
   ).length;
 
   const totalEnProceso = assignments.filter(

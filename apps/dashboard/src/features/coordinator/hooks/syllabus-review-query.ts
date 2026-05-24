@@ -188,10 +188,7 @@ function mapFieldToSections(fieldId: string): number[] {
   return stepToSectionMap[step] ?? [0];
 }
 
-function fieldRelatesToSection(
-  fieldId: string,
-  sectionNumber: number,
-): boolean {
+function fieldRelatesToSection(fieldId: string, sectionNumber: number): boolean {
   return mapFieldToSections(fieldId).includes(sectionNumber);
 }
 
@@ -277,9 +274,7 @@ async function readReviewApiError(response: Response): Promise<string> {
   return readApiErrorMessage(response, getHttpErrorFallback(response.status));
 }
 
-function backendRevisionToReviewData(
-  payload: BackendRevisionResponse,
-): ReviewData {
+function backendRevisionToReviewData(payload: BackendRevisionResponse): ReviewData {
   const rawSections = payload.data?.secciones ?? payload.secciones ?? [];
 
   if (!Array.isArray(rawSections) || rawSections.length === 0) {
