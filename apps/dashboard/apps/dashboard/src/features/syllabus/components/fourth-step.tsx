@@ -1277,9 +1277,7 @@ export default function FourthStep() {
                       Agregar semana
                       {nextWeekAvailable === null
                         ? " (Máximo alcanzado)"
-                        : nextWeekAvailable !== null
-                          ? ` (${formatWeekLabel(nextWeekAvailable)})`
-                          : ""}
+                        : ` (${formatWeekLabel(nextWeekAvailable)})`}
                     </button>
 
                     <div>
