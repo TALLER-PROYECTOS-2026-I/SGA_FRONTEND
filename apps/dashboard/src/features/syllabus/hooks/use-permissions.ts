@@ -1,9 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "../../../common/utils/auth-fetch";
-import {
-  sectionsToUiSteps,
-  SECTION_TO_UI_STEP,
-} from "../utils/section-permissions";
 
 export interface PermissionSection {
   numeroSeccion: number;
