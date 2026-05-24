@@ -39,7 +39,6 @@ export const useFinalizeSyllabus = ({
         await onBeforeFinalize();
       }
     } catch (error) {
-      console.error("❌ Error al guardar datos:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Error al guardar datos";
       toast.error("Error al guardar", {
@@ -62,8 +61,6 @@ export const useFinalizeSyllabus = ({
             const loadingToast = toast.loading("Enviando sílabo a revisión...");
 
             try {
-              console.log("📤 Enviando sílabo a análisis...");
-
               await submitToAnalysis.mutateAsync({ syllabusId });
 
               toast.dismiss(loadingToast);
@@ -78,7 +75,6 @@ export const useFinalizeSyllabus = ({
               resolve(true);
             } catch (error) {
               toast.dismiss(loadingToast);
-              console.error("❌ Error al finalizar:", error);
 
               const errorMessage =
                 error instanceof Error

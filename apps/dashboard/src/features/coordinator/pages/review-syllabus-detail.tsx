@@ -21,10 +21,15 @@ import {
 
 import { SyllabusProvider } from "../../syllabus/contexts/syllabus-context";
 import { StepsContext } from "../../syllabus/contexts/steps-context-provider";
+import { PermissionsProvider } from "../../syllabus/contexts/permissions-context";
 import { ReviewModeProvider } from "../contexts/review-mode-context";
 
 import { useSyllabusSections } from "../hooks/syllabus-sections-query";
 import { useSyllabusSectionData } from "../hooks/syllabus-section-data-query";
+import {
+  useReviewData,
+  useSaveReviewData,
+} from "../hooks/syllabus-review-query";
 
 import FirstStep from "../../syllabus/components/first-step";
 import SecondStep from "../../syllabus/components/second-step";
@@ -34,6 +39,18 @@ import FifthStep from "../../syllabus/components/fifth-step";
 import SixthStep from "../../syllabus/components/sixth-step";
 import SeventhStep from "../../syllabus/components/seventh-step";
 import EighthStep from "../../syllabus/components/eighth-step";
+
+type ReviewStatus = "approved" | "rejected" | null;
+
+type ReviewData = Record<
+  string,
+  {
+    status: ReviewStatus;
+    comment: string;
+  }
+>;
+
+const REVIEW_ALLOWED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function ReviewSyllabusDetail() {
   const { id } = useParams<{ id: string }>();
@@ -82,16 +99,16 @@ export default function ReviewSyllabusDetail() {
   const teacherName =
     searchParams.get("teacherName") || "Docente no disponible";
   const syllabusId = searchParams.get("syllabusId");
-  const docenteIdParam = searchParams.get("docenteId");
 
   const {
-    data: syllabusSections = [],
-    isLoading: sectionsLoading,
-    isError: sectionsError,
-  } = useSyllabusSections(
-    syllabusId ? parseInt(syllabusId) : null,
-    docenteIdParam ? parseInt(docenteIdParam) : null,
-  );
+    data: savedReviewData,
+    isLoading: reviewDataLoading,
+    isError: reviewDataError,
+  } = useReviewData(parsedSyllabusId);
+
+  const saveReviewData = useSaveReviewData();
+
+  const shouldLoadSectionData = ["1", "2", "3", "4"].includes(selectedSection);
 
   const shouldLoadSectionData = ["1", "2", "3", "4"].includes(selectedSection);
 
@@ -112,7 +129,7 @@ export default function ReviewSyllabusDetail() {
     ) {
       setSelectedSection(syllabusSections[0].seccion.toString());
     }
-  }, [syllabusSections, selectedSection]);
+  }, [availableSections, selectedSection]);
 
   const stepperValue = useMemo(() => {
     const sectionToStepMap: Record<string, number> = {
@@ -140,13 +157,13 @@ export default function ReviewSyllabusDetail() {
     };
   }, [selectedSection]);
 
-  const handleFieldReview = (
-    fieldId: string,
-    status: "approved" | "rejected" | null,
-  ) => {
+  const handleFieldReview = (fieldId: string, status: ReviewStatus) => {
     setReviewData((prev) => ({
       ...prev,
-      [fieldId]: { ...prev[fieldId], status },
+      [fieldId]: {
+        comment: prev[fieldId]?.comment ?? "",
+        status,
+      },
     }));
   };
 
@@ -154,9 +171,8 @@ export default function ReviewSyllabusDetail() {
     setReviewData((prev) => ({
       ...prev,
       [fieldId]: {
-        ...prev[fieldId],
+        status: prev[fieldId]?.status ?? null,
         comment,
-        status: prev[fieldId]?.status || null,
       },
     }));
   };
@@ -254,19 +270,16 @@ export default function ReviewSyllabusDetail() {
   }, [availableSections, sectionsLoading, sectionsError, selectedSection]);
 
   const currentSection = availableSections.find(
-    (s) => s.id === selectedSection,
+    (section) => section.id === selectedSection,
   );
+
+  const isSavingReview = saveReviewData.isPending;
 
   return (
     <SyllabusProvider>
-      <ReviewModeProvider
-        isReviewMode={true}
-        onFieldReview={handleFieldReview}
-        onFieldComment={handleFieldComment}
-        reviewData={reviewData}
-        sectionData={sectionData}
-        sectionDataLoading={sectionDataLoading}
-        sectionDataError={sectionDataError}
+      <PermissionsProvider
+        allowedSteps={REVIEW_ALLOWED_STEPS}
+        hasEditPermissionForSection={() => false}
       >
         <StepsContext.Provider value={stepperValue}>
           <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
@@ -498,9 +511,9 @@ export default function ReviewSyllabusDetail() {
                 </div>
               </div>
             </div>
-          </div>
-        </StepsContext.Provider>
-      </ReviewModeProvider>
+          </StepsContext.Provider>
+        </ReviewModeProvider>
+      </PermissionsProvider>
     </SyllabusProvider>
   );
 }

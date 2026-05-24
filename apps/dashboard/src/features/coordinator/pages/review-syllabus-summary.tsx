@@ -33,6 +33,7 @@ interface SectionSummary {
   hasApproved: boolean;
   hasRejected: boolean;
   hasComments: boolean;
+  comments: string[];
 }
 
 const sectionDefinitions = [
@@ -47,11 +48,111 @@ const sectionDefinitions = [
   { id: "9", name: "Resultados (outcomes)" },
 ];
 
+const SECTION_TO_FIELD_MAP: Record<string, string> = {
+  "1": "step-1",
+  "2": "step-2",
+  "3": "step-3",
+  "4": "step-4",
+  "5": "step-5",
+  "6": "step-5",
+  "7": "step-6",
+  "8": "step-7",
+  "9": "step-8",
+};
+
+function getSectionsByFieldId(fieldId: string): string[] {
+  if (fieldId === "step-1") return ["1"];
+  if (fieldId === "step-2") return ["2"];
+  if (fieldId === "step-3") return ["3"];
+  if (fieldId === "step-4") return ["4"];
+  if (fieldId === "step-5") return ["5", "6"];
+  if (fieldId === "step-6") return ["7"];
+  if (fieldId === "step-7") return ["8"];
+  if (fieldId === "step-8") return ["9"];
+
+  if (
+    fieldId === "nombreAsignatura" ||
+    fieldId.startsWith("codigo-") ||
+    fieldId.startsWith("ciclo-") ||
+    fieldId.startsWith("creditos-") ||
+    fieldId.startsWith("horas-") ||
+    fieldId.startsWith("prerequisitos-") ||
+    fieldId.startsWith("docente-")
+  ) {
+    return ["1"];
+  }
+
+  if (fieldId === "sumilla") return ["2"];
+
+  if (
+    fieldId.startsWith("competencia-") ||
+    fieldId.startsWith("componente-") ||
+    fieldId.startsWith("contenido-actitudinal-")
+  ) {
+    return ["3"];
+  }
+
+  if (fieldId.startsWith("unit-") && fieldId.includes("-week-")) {
+    return ["4"];
+  }
+
+  if (fieldId.startsWith("strategy-")) return ["5"];
+
+  if (fieldId.startsWith("resource-")) return ["6"];
+
+  if (
+    fieldId === "evaluation-main-formula" ||
+    fieldId.startsWith("evaluation-")
+  ) {
+    return ["7"];
+  }
+
+  if (
+    fieldId.startsWith("bibliography-") ||
+    fieldId.startsWith("electronic-resource-")
+  ) {
+    return ["8"];
+  }
+
+  if (fieldId.startsWith("outcome-")) return ["9"];
+
+  return [];
+}
+
+function getCommentsForSection(
+  sectionId: string,
+  reviewData: Record<string, ReviewItem>,
+): string[] {
+  const comments = new Set<string>();
+
+  Object.entries(reviewData).forEach(([fieldId, data]) => {
+    const relatedSections = getSectionsByFieldId(fieldId);
+
+    if (!relatedSections.includes(sectionId)) return;
+
+    const comment = String(data.comment ?? "").trim();
+
+    if (comment) {
+      comments.add(comment);
+    }
+  });
+
+  const directFieldId = SECTION_TO_FIELD_MAP[sectionId];
+  const directComment = String(reviewData[directFieldId]?.comment ?? "").trim();
+
+  if (directComment) {
+    comments.add(directComment);
+  }
+
+  return Array.from(comments);
+}
+
 export default function ReviewSyllabusSummary() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
   const [sections, setSections] = useState<SectionSummary[]>([]);
   const [reviewData, setReviewData] = useState<Record<string, ReviewItem>>({});
   const [showModal, setShowModal] = useState(false);
@@ -60,6 +161,8 @@ export default function ReviewSyllabusSummary() {
   );
 
   const approveMutation = useApproveSyllabus();
+  const saveReviewData = useSaveReviewData();
+  const isFinalizing = approveMutation.isPending || saveReviewData.isPending;
 
   const courseName = searchParams.get("courseName") || "Curso sin nombre";
   const courseCode = searchParams.get("courseCode") || "Código no disponible";
@@ -160,6 +263,7 @@ export default function ReviewSyllabusSummary() {
             ([, data]) => data.comment && data.comment.trim() !== "",
           );
 
+        if (allRelatedFields.length === 0) {
           return {
             ...section,
             hasApproved: allApproved && !hasRejected,
@@ -178,16 +282,22 @@ export default function ReviewSyllabusSummary() {
             hasApproved: false,
             hasRejected: false,
             hasComments: false,
-          })),
+            comments: [],
+          };
+        }
+
+        const allApproved = allRelatedFields.every(
+          ([, data]) => data.status === "approved",
         );
       }
     } else {
       setSections(
-        sectionDefinitions.map((s) => ({
-          ...s,
+        sectionDefinitions.map((section) => ({
+          ...section,
           hasApproved: false,
           hasRejected: false,
           hasComments: false,
+          comments: [],
         })),
       );
     }
@@ -227,22 +337,47 @@ export default function ReviewSyllabusSummary() {
       const rejectedFields = Object.entries(reviewData).filter(
         ([, v]) => v.status === "rejected",
       );
+      return;
+    }
 
-      const missingComments = rejectedFields.some(([, v]) => {
-        return !(v.comment && v.comment.trim().length > 0);
-      });
+    const pendingFromReviewData = getPendingSectionNumbers(reviewData);
 
-      if (missingComments) {
+    if (pendingFromReviewData.length > 0) {
+      toast.error(
+        `Faltan secciones por revisar: ${pendingFromReviewData
+          .map(
+            (sectionNumber) =>
+              SECTION_NAME_MAP[sectionNumber] ?? `Sección ${sectionNumber}`,
+          )
+          .join(", ")}.`,
+      );
+      return;
+    }
+
+    if (hasRejectedSections) {
+      const rejectedSectionsWithoutComment = sections.filter(
+        (section) => section.hasRejected && section.comments.length === 0,
+      );
+
+      if (rejectedSectionsWithoutComment.length > 0) {
         toast.error(
-          "Por favor ingrese comentarios para los puntos marcados con 'X' antes de finalizar la desaprobación.",
+          "Para desaprobar, debe existir al menos una sección rechazada con comentario.",
         );
         return;
       }
+    } else if (summaryStats.approved !== summaryStats.total) {
+      toast.error("Para aprobar, todas las secciones deben estar aprobadas.");
+      return;
     }
 
     try {
+      await saveReviewData.mutateAsync({
+        syllabusId: parsedSyllabusId,
+        reviewData,
+      });
+
       await approveMutation.mutateAsync({
-        syllabusId: parseInt(syllabusId),
+        syllabusId: parsedSyllabusId,
         estado,
         reviewData,
       });
@@ -256,8 +391,15 @@ export default function ReviewSyllabusSummary() {
         toast.success("Revisión registrada. Sílabo aprobado.");
       }
     } catch (error) {
-      console.error("Error al finalizar revisión:", error);
-      toast.error("Error al finalizar la revisión. Intente nuevamente.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al finalizar la revisión. Intente nuevamente.";
+
+      toast.error("No se pudo finalizar la revisión", {
+        description: message,
+        duration: 10000,
+      });
     }
   };
 
@@ -346,6 +488,8 @@ export default function ReviewSyllabusSummary() {
                   <CheckCircle size={26} />
                 </div>
               </div>
+            </div>
+          </div>
 
               <div className="bg-red-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
                 <div>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 export interface PermissionSection {
   numeroSeccion: number;
@@ -24,17 +25,25 @@ class PermissionsManager {
       baseUrl ??
       import.meta.env.VITE_API_BASE_URL ??
       "http://localhost:7071/api"
-    );
+    ).replace(/\/+$/, "");
   }
 
   async fetchPermissions(
     userId: number,
+    syllabusId?: number | null,
     baseUrl?: string,
   ): Promise<PermissionSection[]> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/permisos/${userId}`;
 
-    const res = await fetch(url, {
+    const query = syllabusId
+      ? `?silaboId=${encodeURIComponent(String(syllabusId))}`
+      : "";
+
+    const url = `${apiBase}/permisos/${encodeURIComponent(
+      String(userId),
+    )}${query}`;
+
+    const res = await authFetch(url, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -82,12 +91,15 @@ class PermissionsManager {
 
 const permissionsManager = new PermissionsManager();
 
-export const usePermissions = (userId: number | null) => {
+export const usePermissions = (
+  userId: number | null,
+  syllabusId?: number | null,
+) => {
   const isValidId = userId !== null && userId > 0;
 
   const query = useQuery<PermissionSection[], Error>({
-    queryKey: ["permissions", userId],
-    queryFn: () => permissionsManager.fetchPermissions(userId!),
+    queryKey: ["permissions", userId, syllabusId ?? "sin-silabo"],
+    queryFn: () => permissionsManager.fetchPermissions(userId!, syllabusId),
     enabled: isValidId,
     retry: false,
     staleTime: 10 * 60 * 1000,
@@ -107,6 +119,7 @@ export const usePermissions = (userId: number | null) => {
 
   return {
     ...query,
+    rawPermissions: query.data ?? [],
     allowedSteps,
     isStepAllowed: (step: number) => allowedSteps.includes(step),
     hasEditPermissionForSection,
