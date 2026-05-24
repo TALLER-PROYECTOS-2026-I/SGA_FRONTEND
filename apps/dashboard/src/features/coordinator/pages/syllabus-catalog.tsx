@@ -17,7 +17,11 @@ import {
   SumillasCatalogPDFDocument,
   type SumillaPDFItem,
 } from "../components/SumillasCatalogPDFDocument";
-//import { authFetch } from "../../../common/utils/auth-fetch";
+import {
+  authFetch,
+  getApiBaseUrl,
+  readApiErrorMessage,
+} from "../../../common/utils/auth-fetch";
 
 const EMPTY_SUMILLA = "Este sílabo aún no tiene sumilla registrada.";
 
@@ -49,23 +53,17 @@ interface SyllabusCatalogItem {
 }
 
 async function fetchJson(url: string) {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || "";
-  const cleanBaseURL = baseURL.replace(/\/$/, "");
-  const fullUrl = `${cleanBaseURL}${url}`;
-
-  const response = await fetch(fullUrl);
+  const response = await authFetch(url);
 
   if (!response.ok) {
-    throw new Error(
-      await response.text().catch(() => "Error al consultar API"),
-    );
+    throw new Error(await readApiErrorMessage(response));
   }
 
   return response.json();
 }
 
 async function fetchSyllabusCatalog() {
-  const json = await fetchJson("/api/syllabus/catalog");
+  const json = await fetchJson(`${getApiBaseUrl()}/syllabus/catalog`);
 
   const data = Array.isArray(json)
     ? json
@@ -77,7 +75,9 @@ async function fetchSyllabusCatalog() {
 }
 
 async function fetchCompleteSyllabus(syllabusId: string | number) {
-  const json = await fetchJson(`/api/syllabus/${syllabusId}/complete`);
+  const json = await fetchJson(
+    `${getApiBaseUrl()}/syllabus/${syllabusId}/complete`,
+  );
 
   return json?.data ?? json;
 }
