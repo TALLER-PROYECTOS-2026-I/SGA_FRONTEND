@@ -71,10 +71,7 @@ function SyllabusProcessContent() {
   const userId = user?.id ? Number(user.id) : null;
   const currentSyllabusId = syllabusId ? Number(syllabusId) : null;
 
-  const { allowedSteps, isLoading, error } = usePermissions(
-    userId,
-    currentSyllabusId,
-  );
+  const { allowedSteps, isLoading, error } = usePermissions(userId);
 
   const { estadoRevision } = useSyllabusEditLock(currentSyllabusId);
   const { data: generalData, isLoading: isGeneralLoading } = useSyllabusGeneral(
