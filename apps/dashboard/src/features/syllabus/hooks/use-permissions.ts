@@ -11,8 +11,17 @@ export interface PermissionSection {
 
 export const FULL_STEPS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/** @deprecated Usar SECTION_TO_UI_STEP de utils/section-permissions */
-export const SECTION_TO_STEP_MAP = SECTION_TO_UI_STEP;
+export const SECTION_TO_STEP_MAP: Record<number, number> = {
+  1: 1, // Datos generales
+  2: 2, // Sumilla
+  3: 3, // Competencias
+  4: 4, // Programación del contenido
+  5: 5, // Estrategias metodológicas
+  6: 5, // Recursos didácticos
+  7: 6, // Evaluación del aprendizaje
+  8: 7, // Fuentes de consulta
+  9: 8, // Aportes / resultados
+};
 
 class PermissionsManager {
   getApiBase(baseUrl?: string): string {
@@ -49,20 +58,38 @@ class PermissionsManager {
     }
 
     const data: PermissionSection[] = await res.json();
-
     return Array.isArray(data) ? data : [];
   }
 
   sectionsToSteps(sections: PermissionSection[]): number[] {
     if (!sections || sections.length === 0) {
-      return [];
+      return FULL_STEPS;
     }
 
-    const sectionNumbers = sections
-      .map((section) => Number(section.numeroSeccion))
-      .filter((numeroSeccion) => !Number.isNaN(numeroSeccion));
+    const steps = new Set<number>();
 
-    return sectionsToUiSteps(sectionNumbers);
+    sections.forEach((section) => {
+      const step = SECTION_TO_STEP_MAP[section.numeroSeccion];
+
+      if (step) {
+        steps.add(step);
+      }
+    });
+
+    const result = Array.from(steps).sort((a, b) => a - b);
+
+    return result.length > 0 ? result : FULL_STEPS;
+  }
+
+  hasPermissionForSection(
+    sections: PermissionSection[] | undefined,
+    sectionNumber: number,
+  ): boolean {
+    if (!sections || sections.length === 0) {
+      return true;
+    }
+
+    return sections.some((section) => section.numeroSeccion === sectionNumber);
   }
 }
 
@@ -79,18 +106,19 @@ export const usePermissions = (
     queryFn: () => permissionsManager.fetchPermissions(userId!, syllabusId),
     enabled: isValidId,
     retry: false,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: false,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const allowedSteps = query.data
     ? permissionsManager.sectionsToSteps(query.data)
-    : [];
+    : FULL_STEPS;
 
-  const hasEditPermissionForSection = (stepNumber: number): boolean => {
-    return allowedSteps.includes(stepNumber);
+  const hasEditPermissionForSection = (sectionNumber: number): boolean => {
+    return permissionsManager.hasPermissionForSection(
+      query.data,
+      sectionNumber,
+    );
   };
 
   return {
