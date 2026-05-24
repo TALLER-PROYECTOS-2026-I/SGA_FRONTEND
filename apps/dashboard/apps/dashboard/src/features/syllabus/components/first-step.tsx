@@ -1,13 +1,31 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSteps } from "../contexts/steps-context-provider";
 import { useSyllabusContext } from "../contexts/syllabus-context";
+import { toast } from "sonner";
 import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import { Step } from "./step";
-import { useSyllabusGeneral } from "../hooks/first-step-query";
-import type { SyllabusGeneral } from "../hooks/first-step-query";
+import {
+  useSyllabusGeneral,
+  useSaveDatosGenerales,
+  type DatosGeneralesData,
+  type SyllabusGeneral,
+} from "../hooks/first-step-query";
+import { usePermissionsContext } from "../hooks/use-permissions-context";
+import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
+import { AlertTriangle } from "lucide-react";
+import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
+import { CurriculumContextInline } from "./curriculum-context-inline";
 import type { DatosGenerales } from "../../coordinator/hooks/syllabus-section-data-query";
-
-const API_BASE = "http://localhost:7071/api";
+import { useCreateDraft } from "../create-draft/create-draft-context";
+import {
+  debugDraftCreateMode,
+  useIsDraftCreateMode,
+} from "../create-draft/is-draft-create";
+import {
+  draftGeneralDataToContextGeneralData,
+  draftGeneralDataToFormState,
+  mapFormToDraftGeneralData,
+} from "../create-draft/mappers";
 
 const getCurrentSemester = () => {
   const now = new Date();
@@ -17,12 +35,18 @@ const getCurrentSemester = () => {
   return month <= 6 ? `${year}-I` : `${year}-II`;
 };
 
-type DocenteOption = {
-  id: number | string;
-  nombre_docente?: string;
-  nombreDocente?: string;
-  correo?: string;
-};
+const INSTITUTIONAL_DEFAULTS = {
+  departamentoAcademico: "Departamento de Ingeniería",
+  escuelaProfesional: "Ingeniería de Computación y Sistemas",
+  programaAcademico: "Ingeniería de Computación y Sistemas",
+} as const;
+
+const fixedGeneralFields = new Set([
+  "departamentoAcademico",
+  "escuelaProfesional",
+  "programaAcademico",
+  "semestreAcademico",
+]);
 
 type FormState = {
   nombreAsignatura: string;
@@ -45,11 +69,38 @@ type FormState = {
   [key: string]: string;
 };
 
+function buildDatosGeneralesPutPayload(
+  form: FormState,
+  horasTeoria: number,
+  horasPractica: number,
+  creditosTeoria: number,
+  creditosPractica: number,
+) {
+  return {
+    cursoNombre: form.nombreAsignatura,
+    cursoCodigo: form.codigoAsignatura,
+    departamentoAcademico: form.departamentoAcademico,
+    escuelaProfesional: form.escuelaProfesional,
+    programaAcademico: form.programaAcademico,
+    semestreAcademico: form.semestreAcademico,
+    tipoAsignatura: form.tipoAsignatura,
+    tipoDeEstudios: form.tipoEstudios,
+    modalidadDeAsignatura: form.modalidad,
+    ciclo: form.ciclo,
+    requisitos: form.requisitos,
+    horasTeoria,
+    horasPractica,
+    horasLaboratorio: 0,
+    horasTotales: horasTeoria + horasPractica,
+    creditosTotales: creditosTeoria + creditosPractica,
+  };
+}
+
 const createEmptyForm = (): FormState => ({
   nombreAsignatura: "",
-  departamentoAcademico: "",
-  escuelaProfesional: "",
-  programaAcademico: "",
+  departamentoAcademico: INSTITUTIONAL_DEFAULTS.departamentoAcademico,
+  escuelaProfesional: INSTITUTIONAL_DEFAULTS.escuelaProfesional,
+  programaAcademico: INSTITUTIONAL_DEFAULTS.programaAcademico,
   semestreAcademico: getCurrentSemester(),
   tipoAsignatura: "",
   tipoEstudios: "",
@@ -65,192 +116,188 @@ const createEmptyForm = (): FormState => ({
   horasPractica: "",
 });
 
+function hydrateFormFromGeneralData(
+  json: SyllabusGeneral | DatosGenerales,
+): FormState {
+  const creditosTeoria = Number(json.creditosTeoria ?? 0);
+  const creditosPractica = Number(json.creditosPractica ?? 0);
+  const creditosTotales =
+    "creditosTotales" in json && json.creditosTotales != null
+      ? Number(json.creditosTotales)
+      : creditosTeoria + creditosPractica;
+
+  return {
+    ...createEmptyForm(),
+    nombreAsignatura: json.nombreAsignatura ?? "",
+    departamentoAcademico: json.departamentoAcademico ?? "",
+    escuelaProfesional: json.escuelaProfesional ?? "",
+    programaAcademico: json.programaAcademico ?? "",
+    semestreAcademico: json.semestreAcademico ?? getCurrentSemester(),
+    tipoAsignatura: json.tipoAsignatura ?? "",
+    tipoEstudios: json.tipoEstudios ?? "",
+    modalidad: json.modalidad ?? "",
+    codigoAsignatura: json.codigoAsignatura ?? "",
+    ciclo: json.ciclo ?? "",
+    requisitos: json.requisitos ?? "",
+    creditosTeoria:
+      json.creditosTeoria != null ? String(json.creditosTeoria) : "",
+    creditosPractica:
+      json.creditosPractica != null ? String(json.creditosPractica) : "",
+    creditosTotal: String(creditosTotales),
+    docentes: json.docentes ?? "",
+    horasTeoria: json.horasTeoria != null ? String(json.horasTeoria) : "",
+    horasPractica: json.horasPractica != null ? String(json.horasPractica) : "",
+  };
+}
+
 export default function FirstStep() {
   const { nextStep } = useSteps();
+  const {
+    hasEditPermissionForSection,
+    getCommentsForSection,
+    isDisapprovedCorrection,
+  } = usePermissionsContext();
+  const coordinatorComments = getCommentsForSection(1);
+  const saveDatosGenerales = useSaveDatosGenerales();
 
-  const { syllabusId, setSyllabusId, setCourseName, setGeneralData, mode } =
-    useSyllabusContext();
+  const { setCourseName, setGeneralData, mode } = useSyllabusContext();
+  const { draft, setGeneralData: setDraftGeneralData } = useCreateDraft();
+  const { isDraftCreateMode, resolvedSyllabusId } = useIsDraftCreateMode();
 
   const { isReviewMode, sectionData } = useReviewMode();
 
-  const isCreateMode = mode === "create";
-  const isEditMode = mode === "edit";
-  const isReadOnly = isEditMode || isReviewMode;
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
 
-  const draftKey = syllabusId
-    ? `syllabus:general:${syllabusId}`
+  const isCreateMode = mode === "create";
+
+  const canEdit =
+    isCreateMode ||
+    (!isReviewMode &&
+      hasEditPermissionForSection(1) &&
+      !isLockedByState &&
+      !isResolvingState);
+
+  const isReadOnly = !canEdit;
+
+  const draftKey = resolvedSyllabusId
+    ? `syllabus:general:${resolvedSyllabusId}`
     : "syllabus:general:create";
 
-  const [form, setForm] = useState<FormState>(() => {
-    const emptyForm = createEmptyForm();
-
-    try {
-      if (mode === "create") {
-        return emptyForm;
-      }
-
-      const raw = localStorage.getItem(draftKey);
-      if (!raw) return emptyForm;
-
-      const parsed = JSON.parse(raw) as Partial<Record<keyof FormState, string>>;
-
-      return {
-        ...emptyForm,
-        ...parsed,
-      } as FormState;
-    } catch {
-      return emptyForm;
-    }
-  });
+  const [form, setForm] = useState<FormState>(() => createEmptyForm());
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   const [apiError, setApiError] = useState("");
   const [totalHours, setTotalHours] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [docentesOptions, setDocentesOptions] = useState<DocenteOption[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [docenteSearch, setDocenteSearch] = useState("");
-  const [selectedDocenteId, setSelectedDocenteId] = useState<string>("");
 
-  const { data, isLoading, isError, error } = useSyllabusGeneral(
-    isReviewMode || isCreateMode ? null : syllabusId,
+  const { data, isLoading, isFetching, isError, error } = useSyllabusGeneral(
+    isDraftCreateMode ? null : resolvedSyllabusId,
   );
 
+  const inputsDisabled =
+    isReadOnly ||
+    isCreating ||
+    isLoading ||
+    isFetching ||
+    isResolvingState ||
+    saveDatosGenerales.isPending;
+
   useEffect(() => {
-    const fetchDocentes = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/teacher`);
+    if (isDraftCreateMode) return;
 
-        if (!res.ok) {
-          throw new Error("No se pudieron cargar los docentes");
-        }
+    setHasHydrated(false);
+    setApiError("");
+    setErrors({});
+  }, [resolvedSyllabusId, isDraftCreateMode]);
 
-        const response = await res.json();
+  useEffect(() => {
+    if (!isDraftCreateMode) return;
 
-        const lista = Array.isArray(response)
-          ? response
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
-
-        setDocentesOptions(lista);
-      } catch (error) {
-        console.error("Error cargando docentes:", error);
-      }
-    };
-
-    if (isCreateMode) {
-      fetchDocentes();
+    if (!draft.generalData) {
+      setForm(createEmptyForm());
+      setTotalHours(0);
+      setErrors({});
+      setApiError("");
+      setHasHydrated(true);
+      return;
     }
-  }, [isCreateMode]);
+
+    if (hasHydrated) return;
+
+    const hydrated = draftGeneralDataToFormState(draft.generalData);
+    const horasTeoria = Number(hydrated.horasTeoria || 0);
+    const horasPractica = Number(hydrated.horasPractica || 0);
+
+    setTotalHours(horasTeoria + horasPractica);
+    setForm(hydrated);
+
+    if (hydrated.nombreAsignatura) {
+      setCourseName(hydrated.nombreAsignatura);
+    }
+
+    setGeneralData(draftGeneralDataToContextGeneralData(draft.generalData));
+    setHasHydrated(true);
+  }, [
+    isDraftCreateMode,
+    hasHydrated,
+    draft.generalData,
+    setCourseName,
+    setGeneralData,
+  ]);
 
   useEffect(() => {
-    if (isCreateMode || isReviewMode) return;
+    if (isDraftCreateMode) return;
 
     if (isError) {
       setApiError(error?.message ?? "Error fetching syllabus");
       return;
     }
 
-    if (!data) return;
+    if (!data || hasHydrated) return;
 
-    const json: SyllabusGeneral = data;
-
-    const horasTeoria = Number(json.horasTeoria ?? 0);
-    const horasPractica = Number(json.horasPractica ?? 0);
+    const hydrated = hydrateFormFromGeneralData(data);
+    const horasTeoria = Number(hydrated.horasTeoria || 0);
+    const horasPractica = Number(hydrated.horasPractica || 0);
     const horasTotales = Number(
-      json.horasTotales ?? horasTeoria + horasPractica,
+      data.horasTotales ?? horasTeoria + horasPractica,
     );
 
     setTotalHours(horasTotales);
+    setForm(hydrated);
 
-    if (json.nombreAsignatura) {
-      setCourseName(json.nombreAsignatura);
+    if (hydrated.nombreAsignatura) {
+      setCourseName(hydrated.nombreAsignatura);
     }
 
-    setForm((s) => ({
-      ...s,
-      nombreAsignatura: json.nombreAsignatura ?? s.nombreAsignatura,
-      departamentoAcademico:
-        json.departamentoAcademico ?? s.departamentoAcademico,
-      escuelaProfesional: json.escuelaProfesional ?? s.escuelaProfesional,
-      programaAcademico: json.programaAcademico ?? s.programaAcademico,
-      semestreAcademico: json.semestreAcademico ?? s.semestreAcademico,
-      tipoAsignatura: json.tipoAsignatura ?? s.tipoAsignatura,
-      tipoEstudios: json.tipoEstudios ?? s.tipoEstudios,
-      modalidad: json.modalidad ?? s.modalidad,
-      codigoAsignatura: json.codigoAsignatura ?? s.codigoAsignatura,
-      ciclo: json.ciclo ?? s.ciclo,
-      requisitos: json.requisitos ?? s.requisitos,
-      creditosTeoria:
-        json.creditosTeoria != null
-          ? String(json.creditosTeoria)
-          : s.creditosTeoria,
-      creditosPractica:
-        json.creditosPractica != null
-          ? String(json.creditosPractica)
-          : s.creditosPractica,
-      creditosTotal:
-        json.creditosTotales != null
-          ? String(json.creditosTotales)
-          : s.creditosTotal,
-      docentes: json.docentes ?? s.docentes,
-      horasTeoria:
-        json.horasTeoria != null ? String(json.horasTeoria) : s.horasTeoria,
-      horasPractica:
-        json.horasPractica != null
-          ? String(json.horasPractica)
-          : s.horasPractica,
-    }));
-  }, [data, isError, error, setCourseName, isReviewMode, isCreateMode]);
+    setHasHydrated(true);
+  }, [data, isError, error, isDraftCreateMode, hasHydrated, setCourseName]);
 
   useEffect(() => {
     if (!isReviewMode || !sectionData) return;
 
     const json = sectionData as DatosGenerales;
+    const hydrated = hydrateFormFromGeneralData(json);
+    const hasContent = Boolean(
+      hydrated.nombreAsignatura.trim() ||
+        hydrated.departamentoAcademico.trim() ||
+        hydrated.codigoAsignatura.trim(),
+    );
 
-    const horasTeoria = Number(json.horasTeoria ?? 0);
-    const horasPractica = Number(json.horasPractica ?? 0);
-    const horasTotales = horasTeoria + horasPractica;
+    if (!hasContent) return;
 
-    setTotalHours(horasTotales);
+    const horasTeoria = Number(hydrated.horasTeoria || 0);
+    const horasPractica = Number(hydrated.horasPractica || 0);
 
-    if (json.nombreAsignatura) {
-      setCourseName(json.nombreAsignatura);
+    setTotalHours(horasTeoria + horasPractica);
+    setForm(hydrated);
+
+    if (hydrated.nombreAsignatura) {
+      setCourseName(hydrated.nombreAsignatura);
     }
 
-    setForm((s) => ({
-      ...s,
-      nombreAsignatura: json.nombreAsignatura ?? s.nombreAsignatura,
-      departamentoAcademico:
-        json.departamentoAcademico ?? s.departamentoAcademico,
-      escuelaProfesional: json.escuelaProfesional ?? s.escuelaProfesional,
-      programaAcademico: json.programaAcademico ?? s.programaAcademico,
-      semestreAcademico: json.semestreAcademico ?? s.semestreAcademico,
-      tipoAsignatura: json.tipoAsignatura ?? s.tipoAsignatura,
-      tipoEstudios: json.tipoEstudios ?? s.tipoEstudios,
-      modalidad: json.modalidad ?? s.modalidad,
-      codigoAsignatura: json.codigoAsignatura ?? s.codigoAsignatura,
-      ciclo: json.ciclo ?? s.ciclo,
-      requisitos: json.requisitos ?? s.requisitos,
-      creditosTeoria:
-        json.creditosTeoria != null
-          ? String(json.creditosTeoria)
-          : s.creditosTeoria,
-      creditosPractica:
-        json.creditosPractica != null
-          ? String(json.creditosPractica)
-          : s.creditosPractica,
-      creditosTotal: String(
-        Number(json.creditosTeoria ?? 0) + Number(json.creditosPractica ?? 0),
-      ),
-      docentes: json.docentes ?? s.docentes,
-      horasTeoria:
-        json.horasTeoria != null ? String(json.horasTeoria) : s.horasTeoria,
-      horasPractica:
-        json.horasPractica != null
-          ? String(json.horasPractica)
-          : s.horasPractica,
-    }));
+    setHasHydrated(true);
   }, [isReviewMode, sectionData, setCourseName]);
 
   useEffect(() => {
@@ -284,7 +331,7 @@ export default function FirstStep() {
       ["Modalidad de la asignatura", "modalidad"],
       ["Código de la asignatura", "codigoAsignatura"],
       ["Ciclo", "ciclo"],
-      ["Requisitos", "requisitos"],
+      ["Requisitos curriculares", "requisitos"],
       ["Cantidad de horas", "horas"],
       ["Cantidad de Créditos", "creditos"],
       ["Docente(s)", "docentes"],
@@ -292,31 +339,9 @@ export default function FirstStep() {
     [],
   );
 
-  const filteredDocentes = docentesOptions.filter((docente) => {
-    const nombre = docente.nombre_docente || docente.nombreDocente || "";
-    const correo = docente.correo || "";
-    const search = docenteSearch.toLowerCase().trim();
-
-    return (
-      nombre.toLowerCase().includes(search) ||
-      correo.toLowerCase().includes(search)
-    );
-  });
-
-  const getDocenteLabel = (docenteId: string) => {
-    const docente = docentesOptions.find(
-      (item) => String(item.id) === String(docenteId),
-    );
-
-    if (!docente) return docenteId || "Sin docente";
-
-    return (
-      docente.nombre_docente ||
-      docente.nombreDocente ||
-      docente.correo ||
-      `Docente ${docente.id}`
-    );
-  };
+  const assignedTeacherDisplay = form.docentes.trim()
+    ? `Docente asignado: ${form.docentes.trim()}`
+    : "Pendiente de asignación por director.";
 
   const updateField = (name: string, value: string) => {
     setForm((prev) => ({
@@ -336,11 +361,6 @@ export default function FirstStep() {
 
   const clearField = (name: string) => {
     updateField(name, "");
-
-    if (name === "docentes") {
-      setDocenteSearch("");
-      setSelectedDocenteId("");
-    }
   };
 
   const ClearButton = ({
@@ -382,7 +402,6 @@ export default function FirstStep() {
       "creditosPractica",
       "horasTeoria",
       "horasPractica",
-      "docentes",
     ];
 
     for (const k of required) {
@@ -394,7 +413,6 @@ export default function FirstStep() {
     const numericFields: Array<keyof FormState> = [
       "creditosTeoria",
       "creditosPractica",
-      "creditosTotal",
       "horasTeoria",
       "horasPractica",
     ];
@@ -402,8 +420,15 @@ export default function FirstStep() {
     for (const k of numericFields) {
       const v = String(form[k] ?? "").trim();
 
-      if (v && Number.isNaN(Number(v))) {
+      if (!v) continue;
+
+      if (Number.isNaN(Number(v))) {
         e[String(k)] = "Debe ser un número";
+        continue;
+      }
+
+      if (Number(v) < 0) {
+        e[String(k)] = "Debe ser un número mayor o igual a 0";
       }
     }
 
@@ -411,7 +436,7 @@ export default function FirstStep() {
     return e;
   };
 
-  const validateAndNext = async () => {
+  const persistStep1 = async () => {
     const e = validate();
 
     if (Object.keys(e).length > 0) {
@@ -424,110 +449,109 @@ export default function FirstStep() {
         el.focus();
       }
 
+      throw new Error(
+        e[firstKey] || "Corrija los errores del formulario antes de guardar.",
+      );
+    }
+
+    const horasTeoria = Number(form.horasTeoria || 0);
+    const horasPractica = Number(form.horasPractica || 0);
+    const creditosTeoria = Number(form.creditosTeoria || 0);
+    const creditosPractica = Number(form.creditosPractica || 0);
+    const draftPayload = {
+      ...form,
+      totalHours: horasTeoria + horasPractica,
+    };
+
+    localStorage.setItem(draftKey, JSON.stringify(draftPayload));
+
+    setCourseName(form.nombreAsignatura);
+
+    setGeneralData(
+      draftGeneralDataToContextGeneralData(mapFormToDraftGeneralData(form)),
+    );
+
+    if (isDraftCreateMode) {
+      return;
+    }
+
+    if (resolvedSyllabusId && !isReadOnly) {
+      await saveDatosGenerales.mutateAsync({
+        syllabusId: resolvedSyllabusId,
+        data: buildDatosGeneralesPutPayload(
+          form,
+          horasTeoria,
+          horasPractica,
+          creditosTeoria,
+          creditosPractica,
+        ) as DatosGeneralesData,
+        isCreating: false,
+      });
+
+      setHasHydrated(false);
+    }
+  };
+
+  const validateAndNext = async () => {
+    if (isReviewMode) {
+      nextStep();
+      return;
+    }
+
+    if (!canEdit) {
+      nextStep();
+      return;
+    }
+
+    if (isDraftCreateMode) {
+      debugDraftCreateMode(true, "first-step validateAndNext");
+
+      const e = validate();
+      if (Object.keys(e).length > 0) {
+        const firstKey = Object.keys(e)[0];
+        const el = document.querySelector(
+          `[name="${firstKey}"]`,
+        ) as HTMLElement | null;
+
+        if (el && typeof el.focus === "function") {
+          el.focus();
+        }
+
+        toast.error(
+          e[firstKey] ||
+            "Corrija los errores del formulario antes de continuar.",
+        );
+        return;
+      }
+
+      if (import.meta.env.DEV) {
+        console.debug("[CREATE DRAFT] step1 next - saving draft only");
+      }
+
+      try {
+        setIsCreating(true);
+        const generalData = mapFormToDraftGeneralData(form);
+        setDraftGeneralData(generalData);
+        setCourseName(form.nombreAsignatura);
+        setGeneralData(draftGeneralDataToContextGeneralData(generalData));
+        nextStep();
+      } finally {
+        setIsCreating(false);
+      }
+
       return;
     }
 
     try {
       setIsCreating(true);
-
-      const horasTeoria = Number(form.horasTeoria || 0);
-      const horasPractica = Number(form.horasPractica || 0);
-      const creditosTeoria = Number(form.creditosTeoria || 0);
-      const creditosPractica = Number(form.creditosPractica || 0);
-      const docenteId = Number(selectedDocenteId || form.docentes);
-
-      console.log("DOCENTE SELECCIONADO FRONT:", docenteId);
-
-      const draft = {
-        ...form,
-        totalHours: horasTeoria + horasPractica,
-      };
-
-      localStorage.setItem(draftKey, JSON.stringify(draft));
-
-      setCourseName(form.nombreAsignatura);
-
-      setGeneralData({
-        nombreAsignatura: form.nombreAsignatura,
-        codigoAsignatura: form.codigoAsignatura,
-        departamentoAcademico: form.departamentoAcademico,
-        escuelaProfesional: form.escuelaProfesional,
-        programaAcademico: form.programaAcademico,
-        semestreAcademico: form.semestreAcademico,
-        ciclo: form.ciclo,
-      });
-
-      if (mode === "create" && !syllabusId) {
-        const res = await fetch(`${API_BASE}/syllabus`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nombreAsignatura: form.nombreAsignatura,
-            codigoAsignatura: form.codigoAsignatura,
-            departamentoAcademico: form.departamentoAcademico,
-            escuelaProfesional: form.escuelaProfesional,
-            programaAcademico: form.programaAcademico,
-            areaCurricular: "Formación Especializada",
-            semestreAcademico: form.semestreAcademico,
-            tipoAsignatura: form.tipoAsignatura,
-            tipoEstudios: form.tipoEstudios,
-            modalidad: form.modalidad,
-            modalidadAsignatura: form.modalidad,
-            formatoCurso: "Teórico-práctico",
-            ciclo: form.ciclo,
-            requisitos: form.requisitos,
-            horasTeoria,
-            horasPractica,
-            horasLaboratorio: 0,
-            horasTotales: horasTeoria + horasPractica,
-            creditosTeoria,
-            creditosPractica,
-            creditosTotales: creditosTeoria + creditosPractica,
-            estadoRevision: "BORRADOR",
-            docenteId,
-            asignadoADocenteId: docenteId,
-            creadoPorDocenteId: docenteId,
-            actualizadoPorDocenteId: docenteId,
-            curso_nombre: form.nombreAsignatura,
-            curso_codigo: form.codigoAsignatura,
-            departamento_academico: form.departamentoAcademico,
-            escuela_profesional: form.escuelaProfesional,
-            programa_academico: form.programaAcademico,
-            area_curricular: "Formación Especializada",
-            semestre_academico: form.semestreAcademico,
-            tipo_asignatura: form.tipoAsignatura,
-            tipo_de_estudios: form.tipoEstudios,
-            modalidad_de_asignatura: form.modalidad,
-            formato_de_curso: "Teórico-práctico",
-            horas_teoria: horasTeoria,
-            horas_practica: horasPractica,
-            horas_laboratorio: 0,
-            creditos_teoria: creditosTeoria,
-            creditos_practica: creditosPractica,
-            creditos_totales: creditosTeoria + creditosPractica,
-            estado_revision: "BORRADOR",
-            docente_id: docenteId,
-            asignado_a_docente_id: docenteId,
-            creado_por_docente_id: docenteId,
-          }),
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("ERROR BACKEND CREATE SYLLABUS:", text);
-          throw new Error(text || "Error creando sílabo");
-        }
-
-        const responseData = await res.json();
-        setSyllabusId(Number(responseData.id));
-      }
-
+      await persistStep1();
       nextStep();
     } catch (error) {
-      console.error(error);
-      alert("Error al crear el sílabo");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al guardar los datos generales";
+      toast.error(message);
     } finally {
       setIsCreating(false);
     }
@@ -559,7 +583,8 @@ export default function FirstStep() {
 
   const renderInput = (name: string) => {
     const value = String(form[name] ?? "");
-    const disabled = isReadOnly || isCreating;
+    const disabled =
+      inputsDisabled || (isCreateMode && fixedGeneralFields.has(name));
     const canClear = !disabled && value.trim() !== "";
 
     return (
@@ -608,7 +633,7 @@ export default function FirstStep() {
         </div>
 
         <div className="p-8 pb-24">
-          {isLoading && !isCreateMode && (
+          {(isLoading || isFetching) && !isCreateMode && (
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
               Cargando datos generales...
             </div>
@@ -620,12 +645,40 @@ export default function FirstStep() {
             </div>
           )}
 
+          <CoordinatorCommentsBanner
+            stepNumber={1}
+            comments={coordinatorComments}
+          />
+          {!canEdit && (
+            <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-50 px-6 py-5 text-yellow-800">
+              <div className="flex items-start gap-4">
+                <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500 text-white">
+                  <AlertTriangle size={22} />
+                </div>
+
+                <div>
+                  <p className="font-bold">
+                    {isReviewMode ? "Modo revisión" : "Modo solo lectura"}
+                  </p>
+
+                  <p className="mt-1 text-sm">
+                    {isReviewMode
+                      ? "Estás revisando esta sección en modo coordinador. Puedes consultar los datos generales, pero no modificarlos."
+                      : isDisapprovedCorrection
+                        ? "Esta sección no tiene observaciones del coordinador, por eso permanece bloqueada."
+                        : "No tienes permiso para editar esta sección. Puedes revisar los datos generales, pero no modificarlos."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mb-8">
             <label className="block text-sm font-bold text-gray-900 mb-2">
               Nombre de la asignatura
             </label>
 
-            {isCreateMode ? (
+            {canEdit ? (
               <div className="relative">
                 <input
                   name="nombreAsignatura"
@@ -634,7 +687,7 @@ export default function FirstStep() {
                     updateField("nombreAsignatura", e.target.value)
                   }
                   placeholder="Nombre de la asignatura"
-                  disabled={isCreating}
+                  disabled={inputsDisabled}
                   className={`w-full h-12 rounded-xl px-4 pr-10 border text-base font-semibold transition-all outline-none ${
                     errors.nombreAsignatura
                       ? "border-red-500 focus:ring-red-500"
@@ -644,7 +697,9 @@ export default function FirstStep() {
 
                 <ClearButton
                   fieldName="nombreAsignatura"
-                  visible={!isCreating && form.nombreAsignatura.trim() !== ""}
+                  visible={
+                    !inputsDisabled && form.nombreAsignatura.trim() !== ""
+                  }
                 />
               </div>
             ) : (
@@ -654,6 +709,11 @@ export default function FirstStep() {
             )}
 
             {errorText("nombreAsignatura")}
+          </div>
+
+          <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-800">
+            Los datos institucionales se generan automáticamente. El director
+            asignará el docente responsable después de crear el sílabo.
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-6">
@@ -666,53 +726,73 @@ export default function FirstStep() {
                     : ""
                 }
               >
-                <label className="block text-sm font-bold text-gray-900 mb-2">
-                  {label}
-                </label>
+                {name !== "requisitos" && (
+                  <label className="block text-sm font-bold text-gray-900 mb-2">
+                    {label}
+                  </label>
+                )}
 
                 {name === "requisitos" ? (
-                  isCreateMode ? (
-                    <>
-                      <div className="relative">
-                        <textarea
-                          name="requisitos"
-                          value={form.requisitos}
-                          onChange={(e) => updateField("requisitos", e.target.value)}
-                          placeholder="Requisitos"
-                          disabled={isCreating}
-                          className={`${textareaClass(
-                            Boolean(errors.requisitos),
-                            isCreating,
-                          )} ${form.requisitos.trim() && !isCreating ? "pr-12" : ""}`}
-                        />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-900 mb-2">
+                        Requisitos curriculares
+                      </label>
 
-                        {form.requisitos.trim() && !isCreating && (
-                          <button
-                            type="button"
-                            onClick={() => clearField("requisitos")}
-                            className="absolute right-3 top-3 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
-                            title="Limpiar requisitos"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
+                      <CurriculumContextInline
+                        syllabusId={resolvedSyllabusId}
+                        courseName={form.nombreAsignatura}
+                        disabled={inputsDisabled}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-900 mb-2">
+                        Requisitos adicionales
+                      </label>
+
+                      {canEdit ? (
+                        <div className="relative">
+                          <textarea
+                            name="requisitos"
+                            value={form.requisitos}
+                            onChange={(e) =>
+                              updateField("requisitos", e.target.value)
+                            }
+                            placeholder="Ingrese requisitos adicionales si corresponde..."
+                            disabled={inputsDisabled}
+                            className={`${textareaClass(
+                              Boolean(errors.requisitos),
+                              inputsDisabled,
+                            )} ${form.requisitos.trim() && !inputsDisabled ? "pr-12" : ""}`}
+                          />
+
+                          {form.requisitos.trim() && !inputsDisabled && (
+                            <button
+                              type="button"
+                              onClick={() => clearField("requisitos")}
+                              className="absolute right-3 top-3 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                              title="Limpiar requisitos adicionales"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={readonlyBoxClass}>
+                          {form.requisitos.trim()
+                            ? form.requisitos
+                            : "Sin requisitos adicionales"}
+                        </div>
+                      )}
 
                       {errorText("requisitos")}
-                    </>
-                  ) : (
-                    <div className="w-full min-h-[88px] rounded-xl px-4 py-3 bg-gray-100 text-left whitespace-pre-line border border-gray-200 text-sm text-gray-700">
-                      {String(form.requisitos ?? "")
-                        .split(",")
-                        .map((req) => req.trim())
-                        .filter(Boolean)
-                        .join("\n")}
                     </div>
-                  )
+                  </div>
                 ) : name === "creditos" ? (
                   <div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {isCreateMode ? (
+                      {canEdit ? (
                         <>
                           <input
                             type="number"
@@ -724,10 +804,10 @@ export default function FirstStep() {
                               updateField("creditosTeoria", e.target.value)
                             }
                             placeholder="Teoría"
-                            disabled={isCreating}
+                            disabled={inputsDisabled}
                             className={inputClass(
                               Boolean(errors.creditosTeoria),
-                              isCreating,
+                              inputsDisabled,
                             )}
                           />
 
@@ -741,10 +821,10 @@ export default function FirstStep() {
                               updateField("creditosPractica", e.target.value)
                             }
                             placeholder="Práctica"
-                            disabled={isCreating}
+                            disabled={inputsDisabled}
                             className={inputClass(
                               Boolean(errors.creditosPractica),
-                              isCreating,
+                              inputsDisabled,
                             )}
                           />
 
@@ -778,10 +858,7 @@ export default function FirstStep() {
 
                           <div className={readonlyBoxClass}>
                             Total créditos (
-                            {String(form.creditosTotal || "0").padStart(
-                              2,
-                              "0",
-                            )}
+                            {String(form.creditosTotal || "0").padStart(2, "0")}
                             )
                           </div>
                         </>
@@ -801,7 +878,7 @@ export default function FirstStep() {
                 ) : name === "horas" ? (
                   <div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {isCreateMode ? (
+                      {canEdit ? (
                         <>
                           <input
                             type="number"
@@ -813,10 +890,10 @@ export default function FirstStep() {
                               updateField("horasTeoria", e.target.value)
                             }
                             placeholder="Teoría"
-                            disabled={isCreating}
+                            disabled={inputsDisabled}
                             className={inputClass(
                               Boolean(errors.horasTeoria),
-                              isCreating,
+                              inputsDisabled,
                             )}
                           />
 
@@ -830,10 +907,10 @@ export default function FirstStep() {
                               updateField("horasPractica", e.target.value)
                             }
                             placeholder="Práctica"
-                            disabled={isCreating}
+                            disabled={inputsDisabled}
                             className={inputClass(
                               Boolean(errors.horasPractica),
-                              isCreating,
+                              inputsDisabled,
                             )}
                           />
 
@@ -854,10 +931,7 @@ export default function FirstStep() {
 
                           <div className={readonlyBoxClass}>
                             Práctica (
-                            {String(form.horasPractica || "0").padStart(
-                              2,
-                              "0",
-                            )}
+                            {String(form.horasPractica || "0").padStart(2, "0")}
                             )
                           </div>
 
@@ -877,93 +951,16 @@ export default function FirstStep() {
                   </div>
                 ) : name === "docentes" ? (
                   isCreateMode ? (
-                    <div className="relative z-50">
-                      <div className="relative">
-                        <input
-                          name="docentes"
-                          value={docenteSearch}
-                          onChange={(e) => {
-                            setDocenteSearch(e.target.value);
-                            setSelectedDocenteId("");
-                            updateField("docentes", "");
-                          }}
-                          placeholder="Buscar docente por nombre o correo..."
-                          disabled={isCreating}
-                          className={`${inputClass(
-                            Boolean(errors.docentes),
-                            isCreating,
-                          )} ${docenteSearch.trim() ? "pr-10" : ""}`}
-                        />
-
-                        {docenteSearch.trim() && !isCreating && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDocenteSearch("");
-                              setSelectedDocenteId("");
-                              updateField("docentes", "");
-                            }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
-                            title="Limpiar docente"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-
-                      {docenteSearch.trim() && !form.docentes && (
-                        <div className="absolute left-0 right-0 top-full z-[9999] mt-2 max-h-72 overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-2xl">
-                          {filteredDocentes.length > 0 ? (
-                            filteredDocentes.map((docente) => {
-                              const nombre =
-                                docente.nombre_docente ||
-                                docente.nombreDocente ||
-                                docente.correo ||
-                                "";
-                              const correo = docente.correo || "";
-
-                              return (
-                                <button
-                                  key={docente.id}
-                                  type="button"
-                                  onClick={() => {
-                                    const id = String(docente.id);
-
-                                    setSelectedDocenteId(id);
-                                    updateField("docentes", id);
-                                    setDocenteSearch(correo || nombre);
-                                  }}
-                                  className="w-full px-4 py-3 text-left hover:bg-red-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                                >
-                                  <div className="font-semibold text-gray-900">
-                                    {nombre}
-                                  </div>
-
-                                  {correo && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {correo}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="px-4 py-4 text-sm text-gray-500 text-center">
-                              No se encontraron docentes.
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {errorText("docentes")}
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                      El docente será asignado posteriormente por el director.
                     </div>
                   ) : (
                     <div className={readonlyBoxClass}>
-                      {getDocenteLabel(form.docentes)}
+                      {assignedTeacherDisplay}
                     </div>
                   )
                 ) : name === "tipoEstudios" ? (
-                  isCreateMode ? (
+                  canEdit ? (
                     <>
                       <select
                         name="tipoEstudios"
@@ -971,10 +968,10 @@ export default function FirstStep() {
                         onChange={(e) =>
                           updateField("tipoEstudios", e.target.value)
                         }
-                        disabled={isCreating}
+                        disabled={inputsDisabled}
                         className={inputClass(
                           Boolean(errors.tipoEstudios),
-                          isCreating,
+                          inputsDisabled,
                         )}
                       >
                         <option value="">Seleccione tipo de estudios</option>
@@ -1015,7 +1012,7 @@ export default function FirstStep() {
                     </div>
                   )
                 ) : name === "modalidad" ? (
-                  isCreateMode ? (
+                  canEdit ? (
                     <>
                       <select
                         name="modalidad"
@@ -1023,10 +1020,10 @@ export default function FirstStep() {
                         onChange={(e) =>
                           updateField("modalidad", e.target.value)
                         }
-                        disabled={isCreating}
+                        disabled={inputsDisabled}
                         className={inputClass(
                           Boolean(errors.modalidad),
-                          isCreating,
+                          inputsDisabled,
                         )}
                       >
                         <option value="">Seleccione modalidad</option>
@@ -1082,7 +1079,7 @@ export default function FirstStep() {
                     {errorText("semestreAcademico")}
                   </>
                 ) : name === "tipoAsignatura" ? (
-                  isCreateMode ? (
+                  canEdit ? (
                     <>
                       <select
                         name="tipoAsignatura"
@@ -1090,10 +1087,10 @@ export default function FirstStep() {
                         onChange={(e) =>
                           updateField("tipoAsignatura", e.target.value)
                         }
-                        disabled={isCreating}
+                        disabled={inputsDisabled}
                         className={inputClass(
                           Boolean(errors.tipoAsignatura),
-                          isCreating,
+                          inputsDisabled,
                         )}
                       >
                         <option value="">Seleccione tipo de asignatura</option>
@@ -1109,14 +1106,17 @@ export default function FirstStep() {
                     </div>
                   )
                 ) : name === "ciclo" ? (
-                  isCreateMode ? (
+                  canEdit ? (
                     <>
                       <select
                         name="ciclo"
                         value={form.ciclo}
                         onChange={(e) => updateField("ciclo", e.target.value)}
-                        disabled={isCreating}
-                        className={inputClass(Boolean(errors.ciclo), isCreating)}
+                        disabled={inputsDisabled}
+                        className={inputClass(
+                          Boolean(errors.ciclo),
+                          inputsDisabled,
+                        )}
                       >
                         <option value="">Seleccione ciclo</option>
                         <option value="I">I</option>
