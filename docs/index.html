@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SGA Frontend — Dashboard de Calidad</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #7d8590;
+      --blue:     #388bfd;
+      --blue-dim: #1f3460;
+      --green:    #3fb950;
+      --green-dim:#1a3a24;
+      --amber:    #d29922;
+      --amber-dim:#3d2d00;
+      --red:      #f85149;
+      --red-dim:  #3d1a1a;
+      --purple:   #bc8cff;
+      --purple-dim:#2d1f4d;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      height: 56px;
+      background: var(--surface);
+    }
+    .topbar-logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .topbar-logo .badge {
+      background: var(--blue-dim);
+      color: var(--blue);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid var(--blue);
+      letter-spacing: 0.06em;
+    }
+    .topbar-meta {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 6px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; } 50% { opacity:0.4; }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 3rem 2rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 span { color: var(--blue); font-weight: 600; }
+    .hero-sub {
+      color: var(--muted);
+      font-size: 14px;
+      font-family: var(--mono);
+    }
+
+    /* ── STATS ROW ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat {
+      background: var(--surface);
+      padding: 1.25rem 1.5rem;
+    }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.6rem;
+      font-weight: 500;
+      line-height: 1;
+    }
+    .stat-value.blue   { color: var(--blue); }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.amber  { color: var(--amber); }
+    .stat-value.red    { color: var(--red); }
+    .stat-value.purple { color: var(--purple); }
+
+    /* ── GRID DE CARDS ── */
+    .cards-section {
+      padding: 2rem;
+    }
+    .section-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .card.blue::before   { background: var(--blue); }
+    .card.green::before  { background: var(--green); }
+    .card.amber::before  { background: var(--amber); }
+    .card.purple::before { background: var(--purple); }
+    .card.red::before    { background: var(--red); }
+
+    .card:hover {
+      border-color: #484f58;
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .card-icon.blue   { background: var(--blue-dim);   color: var(--blue); }
+    .card-icon.green  { background: var(--green-dim);  color: var(--green); }
+    .card-icon.amber  { background: var(--amber-dim);  color: var(--amber); }
+    .card-icon.purple { background: var(--purple-dim); color: var(--purple); }
+    .card-icon.red    { background: var(--red-dim);    color: var(--red); }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+    .pill.blue   { background: var(--blue-dim);   color: var(--blue);   border-color: var(--blue); }
+    .pill.green  { background: var(--green-dim);  color: var(--green);  border-color: var(--green); }
+    .pill.amber  { background: var(--amber-dim);  color: var(--amber);  border-color: var(--amber); }
+    .pill.purple { background: var(--purple-dim); color: var(--purple); border-color: var(--purple); }
+    .pill.red    { background: var(--red-dim);    color: var(--red);    border-color: var(--red); }
+    .pill.gray   { background: #1c2128;           color: var(--muted);  border-color: var(--border); }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .card-link {
+      color: var(--blue);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .card-link svg {
+      width: 12px; height: 12px;
+    }
+
+    /* ── PRONTO / PENDING ── */
+    .card.pending {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    .pending-badge {
+      position: absolute;
+      top: 12px; right: 12px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      background: #1c2128;
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .footer a { color: var(--blue); text-decoration: none; }
+
+    /* ── RUN INFO ── */
+    .run-info {
+      padding: 0.75rem 2rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .run-info span { display: flex; align-items: center; gap: 6px; }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-logo">
+      🎓 SGA_FRONTEND
+      <span class="badge">CALIDAD</span>
+    </div>
+    <div class="topbar-meta">
+      <span class="status-dot"></span>
+      CI/CD · GitHub Actions
+    </div>
+  </header>
+
+  <!-- RUN INFO -->
+  <div class="run-info">
+    <span>📅 Generado: <strong id="gen-date">—</strong></span>
+    <span>🌿 Branch: <strong>feature/swagger-docs</strong></span>
+    <span>🏛️ Org: <strong>TALLER-PROYECTOS-2026-I</strong></span>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-label">Dashboard de Calidad</div>
+    <h1>Sistema de Gestión <span>Académica</span></h1>
+    <div class="hero-sub">Reportes de seguridad, validación y cobertura · DevSecOps Pipeline</div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-label">Workflows activos</div>
+      <div class="stat-value blue">5</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Swagger endpoints</div>
+      <div class="stat-value green">12</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">OWASP ZAP</div>
+      <div class="stat-value amber">activo</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Roles escaneados</div>
+      <div class="stat-value purple">2</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Cobertura</div>
+      <div class="stat-value green">—</div>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <main class="cards-section">
+    <div class="section-title">Reportes disponibles</div>
+    <div class="cards-grid">
+
+      <!-- SWAGGER -->
+      <a class="card blue" href="./swagger/index.html">
+        <div class="card-header">
+          <div class="card-icon blue">📄</div>
+          <div>
+            <div class="card-title">Swagger / OpenAPI</div>
+            <div class="card-desc">Documentación y validación de endpoints del SGA Frontend. Spectral lint integrado en CI.</div>
+          </div>
+        </div>
+        <div class="card-badges">
+          <span class="pill blue">OpenAPI 3.0.3</span>
+          <span class="pill green">Spectral lint ✓</span>
+          <span class="pill blue">Prism mock</span>
+        </div>
+        <div class="card-footer">
+          <span>swagger-validation.yml</span>
+          <span class="card-link">Ver reporte →</span>
+        </div>
+      </a>
+
+      <!-- OWASP ZAP -->
+      <a class="card red" href="./security/index.html">
+        <div class="card-header">
+          <div class="card-icon red">🛡️</div>
+          <div>
+            <div class="card-title">OWASP ZAP Security</div>
+            <div class="card-desc">Escaneo DAST por rol — Admin, Alumno. Hallazgos clasificados por severidad con CWE.</div>
+          </div>
+        </div>
+        <div class="card-badges">
+          <span class="pill red">DAST</span>
+          <span class="pill amber">OWASP A01</span>
+          <span class="pill gray">por rol</span>
+        </div>
+        <div class="card-footer">
+          <span>owasp-zap-validation.yml</span>
+          <span class="card-link">Ver reporte →</span>
+        </div>
+      </a>
+
+      <!-- COBERTURA (pendiente) -->
+      <div class="card green pending">
+        <span class="pending-badge">PRÓXIMO</span>
+        <div class="card-header">
+          <div class="card-icon green">📈</div>
+          <div>
+            <div class="card-title">Cobertura de código</div>
+            <div class="card-desc">Cobertura de pruebas por componente y módulo. Jest + Vitest integrado en pipeline.</div>
+          </div>
+        </div>
+        <div class="card-badges">
+          <span class="pill green">Jest</span>
+          <span class="pill green">Vitest</span>
+          <span class="pill gray">por módulo</span>
+        </div>
+        <div class="card-footer">
+          <span>coverage-report.yml</span>
+          <span class="card-link">Próximamente →</span>
+        </div>
+      </div>
+
+      <!-- CHECKOV (pendiente) -->
+      <div class="card amber pending">
+        <span class="pending-badge">PRÓXIMO</span>
+        <div class="card-header">
+          <div class="card-icon amber">🏗️</div>
+          <div>
+            <div class="card-title">Checkov IaC</div>
+            <div class="card-desc">Seguridad de infraestructura como código. Azure Static Web Apps / Bicep.</div>
+          </div>
+        </div>
+        <div class="card-badges">
+          <span class="pill amber">Checkov</span>
+          <span class="pill amber">Azure SWA</span>
+          <span class="pill gray">IaC</span>
+        </div>
+        <div class="card-footer">
+          <span>checkov.yml</span>
+          <span class="card-link">Próximamente →</span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span>SGA Frontend · Dashboard de Calidad · DevSecOps Sprint 2026</span>
+    <span>Generado por <a href="https://github.com/TALLER-PROYECTOS-2026-I/SGA_FRONTEND/actions" target="_blank">GitHub Actions</a></span>
+  </footer>
+
+  <script>
+    document.getElementById('gen-date').textContent =
+      new Date().toLocaleString('es-PE', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima'
+      }) + ' (Lima)';
+  </script>
+</body>
+</html>
