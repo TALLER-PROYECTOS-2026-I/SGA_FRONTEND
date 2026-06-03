@@ -1,4 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { authFetch } from "../../../common/utils/auth-fetch";
 
 // Paso 3: Competencias, Componentes y Actitudes
 
@@ -90,7 +96,7 @@ class ThirdStepManager {
       baseUrl ??
       import.meta.env.VITE_API_BASE_URL ??
       "http://localhost:7071/api";
-    return apiBase;
+    return apiBase.replace(/\/+$/, "");
   }
 
   // ========== DATOS COMBINADOS (Competencias principales + Componentes + Actitudinales) ==========
@@ -106,7 +112,7 @@ class ThirdStepManager {
 
     // Primero obtener las competencias principales
     const competenciasUrl = `${apiBase}/syllabus/${syllabusId}/competencies`;
-    const competenciasRes = await fetch(competenciasUrl);
+    const competenciasRes = await authFetch(competenciasUrl);
 
     let competenciasPrincipales: CompetenciaItem[] = [];
     if (competenciasRes.ok) {
@@ -120,7 +126,7 @@ class ThirdStepManager {
 
     // Luego obtener componentes y actitudinales
     const componentesUrl = `${apiBase}/syllabus/${syllabusId}/components`;
-    const componentesRes = await fetch(componentesUrl);
+    const componentesRes = await authFetch(componentesUrl);
 
     let componentes: ComponenteItem[] = [];
     let actitudinales: ActitudItem[] = [];
@@ -156,7 +162,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/competencies`;
 
-    const res = await fetch(url);
+    const res = await authFetch(url);
     if (res.status === 404) {
       return { items: [] };
     }
@@ -188,7 +194,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/competencies`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -223,7 +229,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/competencies`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -256,7 +262,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/competencies/${competenciaId}`;
 
-    const res = await fetch(url, { method: "DELETE" });
+    const res = await authFetch(url, { method: "DELETE" });
 
     if (!res.ok) {
       const text = await res.text();
@@ -274,7 +280,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/components`;
 
-    const res = await fetch(url);
+    const res = await authFetch(url);
     if (res.status === 404) {
       return { items: [] };
     }
@@ -306,7 +312,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/components`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -341,7 +347,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/components`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -374,7 +380,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/components/${componenteId}`;
 
-    const res = await fetch(url, { method: "DELETE" });
+    const res = await authFetch(url, { method: "DELETE" });
 
     if (!res.ok) {
       const text = await res.text();
@@ -392,7 +398,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/attitudes`;
 
-    const res = await fetch(url);
+    const res = await authFetch(url);
     if (res.status === 404) {
       return { items: [] };
     }
@@ -424,7 +430,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/attitudes`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -459,7 +465,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/attitudes`;
 
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -492,7 +498,7 @@ class ThirdStepManager {
     const apiBase = this.getApiBase(baseUrl);
     const url = `${apiBase}/syllabus/${syllabusId}/attitudes/${actitudId}`;
 
-    const res = await fetch(url, { method: "DELETE" });
+    const res = await authFetch(url, { method: "DELETE" });
 
     if (!res.ok) {
       const text = await res.text();
@@ -503,7 +509,38 @@ class ThirdStepManager {
   }
 }
 
-const thirdStepManager = new ThirdStepManager();
+export const thirdStepManager = new ThirdStepManager();
+
+async function refetchThirdStepQueries(
+  queryClient: QueryClient,
+  syllabusId: number,
+) {
+  await queryClient.invalidateQueries({
+    queryKey: ["syllabus", syllabusId, "third-step-all"],
+  });
+  await queryClient.invalidateQueries({
+    queryKey: ["syllabus", syllabusId, "competencies"],
+  });
+  await queryClient.invalidateQueries({
+    queryKey: ["syllabus", syllabusId, "components"],
+  });
+  await queryClient.invalidateQueries({
+    queryKey: ["syllabus", syllabusId, "attitudes"],
+  });
+
+  await queryClient.refetchQueries({
+    queryKey: ["syllabus", syllabusId, "third-step-all"],
+    type: "all",
+  });
+}
+
+const thirdStepQueryDefaults = {
+  staleTime: 0,
+  gcTime: 0,
+  refetchOnMount: "always" as const,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+};
 
 // ========== HOOKS ==========
 
@@ -524,11 +561,7 @@ export const useThirdStepData = (syllabusId: number | null) => {
     enabled: isValidId,
     retry: false,
     throwOnError: false,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    ...thirdStepQueryDefaults,
   });
 };
 
@@ -540,11 +573,7 @@ export const useCompetencias = (syllabusId: number | null) => {
     enabled: isValidId,
     retry: false,
     throwOnError: false,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    ...thirdStepQueryDefaults,
   });
 };
 
@@ -556,6 +585,7 @@ export const useComponentes = (syllabusId: number | null) => {
     enabled: isValidId,
     retry: false,
     throwOnError: false,
+    ...thirdStepQueryDefaults,
   });
 };
 
@@ -567,6 +597,7 @@ export const useActitudes = (syllabusId: number | null) => {
     enabled: isValidId,
     retry: false,
     throwOnError: false,
+    ...thirdStepQueryDefaults,
   });
 };
 
@@ -582,13 +613,8 @@ export const useSaveCompetencias = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.createCompetencias(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "competencies"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -609,13 +635,8 @@ export const useUpdateCompetencias = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.updateCompetencias(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "competencies"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -630,13 +651,8 @@ export const useDeleteCompetencia = () => {
   >({
     mutationFn: ({ syllabusId, competenciaId }) =>
       thirdStepManager.deleteCompetencia(syllabusId, competenciaId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "competencies"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -651,13 +667,8 @@ export const useSaveComponentes = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.createComponentes(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "components"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -678,13 +689,8 @@ export const useUpdateComponentes = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.updateComponentes(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "components"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -699,13 +705,8 @@ export const useDeleteComponente = () => {
   >({
     mutationFn: ({ syllabusId, componenteId }) =>
       thirdStepManager.deleteComponente(syllabusId, componenteId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "components"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -720,13 +721,8 @@ export const useSaveActitudes = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.createActitudes(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "attitudes"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -747,13 +743,8 @@ export const useUpdateActitudes = () => {
   >({
     mutationFn: ({ syllabusId, data }) =>
       thirdStepManager.updateActitudes(syllabusId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "attitudes"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };
@@ -768,13 +759,8 @@ export const useDeleteActitud = () => {
   >({
     mutationFn: ({ syllabusId, actitudId }) =>
       thirdStepManager.deleteActitud(syllabusId, actitudId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "attitudes"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["syllabus", variables.syllabusId, "third-step-all"],
-      });
+    onSuccess: async (_, variables) => {
+      await refetchThirdStepQueries(queryClient, variables.syllabusId);
     },
   });
 };

@@ -31,7 +31,9 @@ export default function SearchableSelect<T>({
 }: SearchableSelectProps<T>) {
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-4 py-3 bg-white">
+      <div className="flex items-center gap-3 h-12 border border-gray-200 rounded-xl px-4 bg-gray-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent transition-all">
+        <Search className="text-gray-400" size={20} />
+
         <input
           type="text"
           value={value}
@@ -41,34 +43,37 @@ export default function SearchableSelect<T>({
           }}
           onFocus={() => setShowDropdown(true)}
           placeholder={placeholder}
-          className="flex-1 outline-none text-gray-700"
+          className="flex-1 outline-none bg-transparent text-sm text-gray-700 placeholder:text-gray-400"
         />
-        <Search className="text-gray-400" size={20} />
+
         {selectedItem && (
           <button
+            type="button"
             onClick={onClear}
-            className="text-gray-400 hover:text-gray-600"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         )}
       </div>
 
-      {/* Dropdown */}
       {showDropdown && value && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
           {items.length > 0 ? (
             items.map((item) => (
               <button
+                type="button"
                 key={getItemKey(item)}
                 onClick={() => onSelect(item)}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                className="w-full text-left px-4 py-4 hover:bg-red-50 transition-colors border-b border-gray-100 last:border-b-0"
               >
                 {renderItem(item)}
               </button>
             ))
           ) : (
-            <div className="px-4 py-3 text-gray-500">{noResultsText}</div>
+            <div className="px-4 py-5 text-center text-sm text-gray-500">
+              {noResultsText}
+            </div>
           )}
         </div>
       )}

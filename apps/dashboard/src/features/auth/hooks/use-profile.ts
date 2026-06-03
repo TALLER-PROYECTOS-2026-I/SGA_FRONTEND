@@ -157,8 +157,6 @@ export function useProfile() {
         throw new Error("No hay cambios para guardar");
       }
 
-      console.log("📤 Enviando al backend:", updatePayload);
-
       const response = await fetch(`${API_BASE}/teacher/${user.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

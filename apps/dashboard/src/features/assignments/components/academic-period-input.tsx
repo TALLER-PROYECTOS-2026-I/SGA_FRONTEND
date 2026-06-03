@@ -8,17 +8,19 @@ export default function AcademicPeriodInput({
   academicPeriod,
 }: AcademicPeriodInputProps) {
   return (
-    <div className="mb-6">
-      <label className="block text-lg font-semibold text-gray-800 mb-2">
+    <div>
+      <label className="block text-sm font-bold text-gray-900 mb-2">
         4. Periodo Académico
       </label>
+
       <input
         type="text"
         value={academicPeriod}
         readOnly
-        className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-gray-50 text-gray-700 font-medium"
+        className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-gray-50 text-sm text-gray-700 font-semibold outline-none"
       />
-      <p className="text-sm text-gray-500 mt-1">
+
+      <p className="text-xs text-gray-500 mt-2 leading-relaxed">
         {academicPeriod && getSemesterName(academicPeriod)} - Periodo generado
         automáticamente según el ciclo académico actual de la USMP
       </p>

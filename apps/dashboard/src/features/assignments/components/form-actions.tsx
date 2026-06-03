@@ -1,3 +1,5 @@
+import { ArrowLeft, Send } from "lucide-react";
+
 interface FormActionsProps {
   onGoBack: () => void;
   onSubmit: () => void;
@@ -5,17 +7,22 @@ interface FormActionsProps {
 
 export default function FormActions({ onGoBack, onSubmit }: FormActionsProps) {
   return (
-    <div className="flex justify-between items-center pt-4">
+    <div className="flex justify-between items-center">
       <button
+        type="button"
         onClick={onGoBack}
-        className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+        className="h-11 px-6 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors flex items-center gap-2 font-semibold shadow-sm"
       >
-        &lt; Atrás
+        <ArrowLeft size={18} />
+        Atrás
       </button>
+
       <button
+        type="button"
         onClick={onSubmit}
-        className="px-8 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+        className="h-11 px-8 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center gap-2 font-semibold shadow-sm"
       >
+        <Send size={18} />
         Enviar
       </button>
     </div>

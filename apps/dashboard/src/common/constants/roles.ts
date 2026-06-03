@@ -1,6 +1,6 @@
 export const roleNames: Record<number, string> = {
   1: "docente",
-  2: "indeterminado",
+  2: "director_escuela",
   3: "coordinadora_academica",
   4: "director_escuela",
 } as const;

@@ -3,31 +3,10 @@ import { SyllabusPDFDocument } from "../components/SyllabusPDFDocument";
 import { syllabusPDFService } from "../services/syllabus-pdf-service";
 
 function sanitizeFileToken(value: string): string {
-  const normalized = value.toLowerCase();
-  let result = "";
-  let previousWasDash = false;
-
-  for (const char of normalized) {
-    const isLetter = char >= "a" && char <= "z";
-    const isNumber = char >= "0" && char <= "9";
-
-    if (isLetter || isNumber) {
-      result += char;
-      previousWasDash = false;
-      continue;
-    }
-
-    if (!previousWasDash && result.length > 0) {
-      result += "-";
-      previousWasDash = true;
-    }
-  }
-
-  while (result.endsWith("-")) {
-    result = result.slice(0, -1);
-  }
-
-  return result;
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function buildSyllabusPdfFilename(

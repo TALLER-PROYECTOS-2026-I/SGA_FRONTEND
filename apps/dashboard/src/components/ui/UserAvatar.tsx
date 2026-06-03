@@ -1,23 +1,38 @@
+import { useState } from "react";
 import { useUserPhoto } from "@/common/hooks/useUserPhoto";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function UserAvatar(props: React.HTMLAttributes<HTMLDivElement>) {
   const { data: photoUrl, isLoading } = useUserPhoto();
+  const [imageError, setImageError] = useState(false);
 
-  // Si está cargando, mostramos un placeholder
+  const shouldShowImage =
+    !!photoUrl &&
+    !imageError &&
+    !String(photoUrl).startsWith("blob:");
+
   if (isLoading) {
     return (
       <Avatar {...props}>
-        <AvatarFallback>...</AvatarFallback>
+        <AvatarFallback className="bg-slate-100 text-slate-600 font-semibold">
+          ...
+        </AvatarFallback>
       </Avatar>
     );
   }
 
   return (
     <Avatar {...props}>
-      <AvatarImage src={photoUrl || undefined} alt="User photo" />
-      <AvatarFallback>
-        {/* Mostrar iniciales o icono por defecto cuando no hay foto */}U
+      {shouldShowImage && (
+        <AvatarImage
+          src={photoUrl}
+          alt="User photo"
+          onError={() => setImageError(true)}
+        />
+      )}
+
+      <AvatarFallback className="bg-slate-100 text-slate-700 font-semibold">
+        U
       </AvatarFallback>
     </Avatar>
   );

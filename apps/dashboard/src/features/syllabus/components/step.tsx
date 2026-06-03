@@ -2,15 +2,16 @@ import { useSteps } from "../contexts/steps-context-provider";
 import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import { ReviewButtons } from "../../coordinator/components/review-buttons";
 import StepControls from "./step-controls";
+import { ClipboardCheck } from "lucide-react";
 
 type StepProps = {
   step: number;
   onNextStep: () => void;
   children: React.ReactNode;
   hideControls?: boolean;
+  disableNext?: boolean;
 };
 
-// Mapeo de nombres de pasos para los IDs de revisión
 const stepNames: Record<number, string> = {
   1: "Datos generales",
   2: "Sumilla",
@@ -27,6 +28,7 @@ export const Step = ({
   children,
   onNextStep,
   hideControls = false,
+  disableNext = false,
 }: StepProps) => {
   const { currentStep } = useSteps();
   const { isReviewMode, onFieldReview, onFieldComment, reviewData } =
@@ -34,26 +36,33 @@ export const Step = ({
 
   if (currentStep !== step) return null;
 
-  // ID único para la revisión de este paso completo
   const stepFieldId = `step-${step}`;
   const fieldReviewData = reviewData?.[stepFieldId];
 
   return (
-    <div className="h-full flex flex-col justify-center">
-      <div className="h-full w-full">{children}</div>
+    <div className="w-full">
+      <div className="w-full">{children}</div>
 
-      {/* Botones de revisión general del paso */}
       {isReviewMode && (
-        <div className="mt-6 pt-6 border-t-2 border-gray-300">
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+        <div className="mt-8 rounded-2xl border border-gray-100 bg-white shadow-md overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-700">
-                Revisión del paso completo:
-              </span>
-              <span className="text-sm text-gray-600">
-                {stepNames[step] || `Paso ${step}`}
-              </span>
+              <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                <ClipboardCheck size={20} />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Revisión del paso completo
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {stepNames[step] || `Paso ${step}`}
+                </p>
+              </div>
             </div>
+          </div>
+
+          <div className="p-6">
             <ReviewButtons
               fieldId={stepFieldId}
               onStatusChange={onFieldReview}
@@ -65,7 +74,11 @@ export const Step = ({
         </div>
       )}
 
-      <StepControls onNextStep={onNextStep} hideControls={hideControls} />
+      <StepControls
+        onNextStep={onNextStep}
+        hideControls={hideControls || isReviewMode}
+        disableNext={disableNext}
+      />
     </div>
   );
 };

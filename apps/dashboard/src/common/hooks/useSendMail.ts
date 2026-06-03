@@ -35,34 +35,7 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   "jpeg",
 ]);
 
-const FORBIDDEN_FILENAME_CHARS = new Set([
-  "\\",
-  "/",
-  ":",
-  "*",
-  "?",
-  '"',
-  "<",
-  ">",
-  "|",
-]);
-
-const isValidEmailAddress = (value: string): boolean => {
-  const trimmed = value.trim();
-
-  if (!trimmed) return false;
-  if (trimmed.includes(" ")) return false;
-
-  const atIndex = trimmed.indexOf("@");
-  const lastAtIndex = trimmed.lastIndexOf("@");
-
-  if (atIndex <= 0 || atIndex !== lastAtIndex) return false;
-
-  const domain = trimmed.slice(atIndex + 1);
-  const dotIndex = domain.lastIndexOf(".");
-
-  return dotIndex > 0 && dotIndex < domain.length - 1;
-};
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const humanSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -84,39 +57,8 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-const collapseSpaces = (value: string): string => {
-  const parts: string[] = [];
-  let current = "";
-
-  for (const char of value) {
-    if (char.trim() === "") {
-      if (current) {
-        parts.push(current);
-        current = "";
-      }
-    } else {
-      current += char;
-    }
-  }
-
-  if (current) {
-    parts.push(current);
-  }
-
-  return parts.join(" ");
-};
-
-const getSafeFileName = (name: string): string => {
-  let safeName = "";
-
-  for (const char of name) {
-    safeName += FORBIDDEN_FILENAME_CHARS.has(char) ? "_" : char;
-  }
-
-  const cleaned = collapseSpaces(safeName).trim();
-
-  return cleaned || "adjunto";
-};
+const getSafeFileName = (name: string) =>
+  name.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").trim() || "adjunto";
 
 const getFileExtension = (name: string) =>
   name.split(".").pop()?.toLowerCase().trim() ?? "";
@@ -132,14 +74,12 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
     throw new Error("Completa destinatario, asunto y mensaje");
   }
 
-  if (!isValidEmailAddress(normalizedTo)) {
+  if (!EMAIL_PATTERN.test(normalizedTo)) {
     throw new Error("El destinatario no tiene un formato de correo válido");
   }
 
   if (normalizedSubject.length > MAX_SUBJECT_LENGTH) {
-    throw new Error(
-      `El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`,
-    );
+    throw new Error(`El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`);
   }
 
   if (normalizedBody.length > MAX_BODY_LENGTH) {

@@ -5,7 +5,7 @@ export interface Assignment {
   cursoCodigo: string;
   cursoNombre: string;
   estadoRevision: string;
-  docenteId: number;
+  docenteId: number | null;
   syllabusId?: number;
   nombreDocente: string;
   docenteEmail?: string;
@@ -52,11 +52,16 @@ export const useAssignments = (
   docenteId: number | string | null | undefined,
   options?: UseQueryOptions<Assignment[], Error>,
 ) => {
+  const shouldFetchAll = docenteId === null || docenteId === undefined;
+
   return useQuery<Assignment[], Error>({
-    queryKey: ["assignments", docenteId],
+    queryKey: shouldFetchAll
+      ? ["assignments", "all"]
+      : ["assignments", docenteId],
     queryFn: () =>
-      assignmentsManager.fetchByDocente(docenteId as number | string),
-    enabled: docenteId !== null && docenteId !== undefined,
+      shouldFetchAll
+        ? assignmentsManager.fetchAll()
+        : assignmentsManager.fetchByDocente(docenteId),
     retry: false,
     staleTime: 60_000,
     ...options,

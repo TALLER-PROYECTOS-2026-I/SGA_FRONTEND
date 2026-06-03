@@ -227,7 +227,8 @@ export default function SendEmail() {
   useEffect(() => {
     if (teacherEmailParam && teachers.length > 0) {
       const teacher = teachers.find(
-        (item) => item.email.toLowerCase() === teacherEmailParam.toLowerCase(),
+        (item) =>
+          item.email.toLowerCase() === teacherEmailParam.toLowerCase(),
       );
 
       if (teacher) {
@@ -434,27 +435,11 @@ Comité Curricular EPICS`;
     enabledSections,
   ]);
 
-  const getEmailSubject = () => {
-    if (fromPermissions) {
-      return `Habilitación de edición de sílabo - ${courseCode || "N/A"}`;
-    }
-
-    if (notificationType === "APPROVED") {
-      return `Sílabo aprobado - ${courseCode || "N/A"}`;
-    }
-
-    return `Observaciones del sílabo - ${courseCode || "N/A"}`;
-  };
-
-  const subject = getEmailSubject();
-
-  const getSendButtonLabel = () => {
-    if (fromPermissions) {
-      return "Enviar correo de habilitación";
-    }
-
-    return "Enviar notificación";
-  };
+  const subject = fromPermissions
+    ? `Habilitación de edición de sílabo - ${courseCode || "N/A"}`
+    : notificationType === "APPROVED"
+      ? `Sílabo aprobado - ${courseCode || "N/A"}`
+      : `Observaciones del sílabo - ${courseCode || "N/A"}`;
 
   const handleNotificationTypeChange = (type: ReviewNotificationType) => {
     setNotificationType(type);
@@ -960,7 +945,9 @@ Comité Curricular EPICS`;
                 </h3>
 
                 <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-800">
-                  <p className="font-semibold">Tipo de acceso: {accessLabel}</p>
+                  <p className="font-semibold">
+                    Tipo de acceso: {accessLabel}
+                  </p>
 
                   {enabledSections.length > 0 ? (
                     <div className="mt-2">
@@ -1149,7 +1136,9 @@ Comité Curricular EPICS`;
                 ) : (
                   <>
                     <Send size={18} />
-                    {getSendButtonLabel()}
+                    {fromPermissions
+                      ? "Enviar correo de habilitación"
+                      : "Enviar notificación"}
                   </>
                 )}
               </button>

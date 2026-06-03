@@ -7,9 +7,59 @@ import { pdf } from "@react-pdf/renderer";
 import { syllabusPDFService } from "../../syllabus/services/syllabus-pdf-service";
 import { SyllabusPDFDocument } from "../../syllabus/components/SyllabusPDFDocument";
 
+type AssignmentStatus =
+  | "APROBADO"
+  | "EN_PROCESO"
+  | "PENDIENTE"
+  | "ASIGNADO"
+  | "NUEVO";
+
+type FilterStatus = "ALL" | AssignmentStatus;
+
+function normalizeStatus(status?: string | null): AssignmentStatus {
+  const value = String(status || "").trim().toUpperCase();
+
+  if (value === "APROBADO") {
+    return "APROBADO";
+  }
+
+  if (
+    value === "ANALIZANDO" ||
+    value === "EN_REVISION" ||
+    value === "EN REVISIÓN" ||
+    value === "PENDIENTE_REVISION" ||
+    value === "PENDIENTE" ||
+    value === "EN_PROCESO" ||
+    value === "EN PROCESO"
+  ) {
+    return "EN_PROCESO";
+  }
+
+  if (value === "DESAPROBADO" || value === "RECHAZADO") {
+    return "PENDIENTE";
+  }
+
+  if (value === "ASIGNADO") {
+    return "ASIGNADO";
+  }
+
+  if (value === "NUEVO") {
+    return "NUEVO";
+  }
+
+  return "ASIGNADO";
+}
+
 export default function MyAssignments() {
   const { user, isLoading: sessionLoading } = useSession();
-  const docenteId = user?.id as number | string | undefined;
+
+  const roleId = Number(user?.role);
+  const isCoordinator = roleId === 3;
+
+  const docenteId = isCoordinator
+    ? undefined
+    : (user?.id as number | string | undefined);
+
   const {
     data: assignments = [],
     isLoading,
@@ -23,18 +73,10 @@ export default function MyAssignments() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-
-  type AssignmentStatus =
-    | "APROBADO"
-    | "ANALIZANDO"
-    | "DESAPROBADO"
-    | "ASIGNADO"
-    | "NUEVO";
-  type FilterStatus = "ALL" | AssignmentStatus;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("ALL");
+
   const navigate = useNavigate();
 
-  // Config visual por estado
   const statusConfig: Record<
     AssignmentStatus,
     { label: string; color: string; textColor: string; bgColor: string }
@@ -45,14 +87,14 @@ export default function MyAssignments() {
       textColor: "text-green-700",
       bgColor: "bg-green-50",
     },
-    ANALIZANDO: {
-      label: "Analizando",
+    EN_PROCESO: {
+      label: "En proceso",
       color: "bg-yellow-500",
       textColor: "text-yellow-700",
       bgColor: "bg-yellow-50",
     },
-    DESAPROBADO: {
-      label: "Desaprobado",
+    PENDIENTE: {
+      label: "Pendiente",
       color: "bg-red-500",
       textColor: "text-red-700",
       bgColor: "bg-red-50",
@@ -72,11 +114,15 @@ export default function MyAssignments() {
   };
 
   const filteredAssignments = assignments.filter((assignment: Assignment) => {
-    const matchesSearch = assignment.cursoNombre
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "ALL" || assignment.estadoRevision === selectedStatus;
+    const search = searchTerm.toLowerCase();
+    const status = normalizeStatus(assignment.estadoRevision);
+
+    const matchesSearch =
+      assignment.cursoNombre.toLowerCase().includes(search) ||
+      assignment.cursoCodigo.toLowerCase().includes(search);
+
+    const matchesStatus = selectedStatus === "ALL" || status === selectedStatus;
+
     return matchesSearch && matchesStatus;
   });
 
@@ -85,7 +131,6 @@ export default function MyAssignments() {
     setPdfUrl(null);
     setPdfError(null);
 
-    // Solo generar preview si tiene syllabusId
     if (!assignment.syllabusId) {
       setPdfError("No hay sílabo disponible para previsualizar");
       return;
@@ -94,19 +139,15 @@ export default function MyAssignments() {
     setIsLoadingPdf(true);
 
     try {
-      console.log(`📥 Cargando sílabo ID: ${assignment.syllabusId}...`);
       const data = await syllabusPDFService.fetchCompleteSyllabus(
         assignment.syllabusId,
       );
 
-      console.log(`📄 Generando PDF blob...`);
       const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
       const url = URL.createObjectURL(blob);
 
       setPdfUrl(url);
-      console.log("✅ PDF generado exitosamente");
     } catch (err) {
-      console.error("❌ Error al generar PDF:", err);
       setPdfError(
         err instanceof Error ? err.message : "Error al cargar el sílabo",
       );
@@ -120,28 +161,26 @@ export default function MyAssignments() {
     estado: string,
     syllabusId?: number,
   ) => {
-    // Si es NUEVO, usar mode=create
-    // Si es DESAPROBADO o ASIGNADO, usar mode=edit
-    const mode = estado === "NUEVO" ? "create" : "edit";
+    const normalizedStatus = normalizeStatus(estado);
+    const mode = normalizedStatus === "NUEVO" ? "create" : "edit";
 
     const url = syllabusId
-      ? `/syllabus?codigo=${codigo}&id=${syllabusId}&mode=${mode}`
-      : `/syllabus?codigo=${codigo}&mode=${mode}`;
+      ? `/syllabus?codigo=${encodeURIComponent(codigo)}&id=${syllabusId}&mode=${mode}`
+      : `/syllabus?codigo=${encodeURIComponent(codigo)}&mode=${mode}`;
 
     navigate(url);
   };
 
   const closeModal = () => {
-    // Limpiar URL del PDF para liberar memoria
     if (pdfUrl) {
       URL.revokeObjectURL(pdfUrl);
     }
+
     setSelectedAssignment(null);
     setPdfUrl(null);
     setPdfError(null);
   };
 
-  // Limpiar URL del PDF cuando el componente se desmonte
   useEffect(() => {
     return () => {
       if (pdfUrl) {
@@ -152,7 +191,8 @@ export default function MyAssignments() {
 
   if (sessionLoading || isLoading) {
     return (
-      <div className="p-6 text-center text-gray-600">
+      <div className="p-8 flex items-center justify-center gap-2 text-gray-600">
+        <Loader2 className="animate-spin" size={20} />
         Cargando asignaciones...
       </div>
     );
@@ -167,246 +207,379 @@ export default function MyAssignments() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
-          Mis Asignaciones
-        </h1>
+    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Mis Asignaciones
+          </h1>
 
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md mb-6">
+          <p className="text-sm text-gray-500 mt-1">
+            Gestiona y revisa tus sílabos asignados
+          </p>
+        </div>
+
+        <div className="relative mb-4">
           <Search
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
             size={20}
           />
+
           <input
             type="text"
-            placeholder="Buscar curso..."
+            placeholder="Buscar por código o asignatura..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="w-full h-12 pl-12 pr-4 bg-white border border-gray-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
           />
         </div>
 
-        {/* Filtros por estado */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {/* Todos */}
-          <button
-            onClick={() => setSelectedStatus("ALL")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-              selectedStatus === "ALL"
-                ? "bg-blue-500 text-white shadow-md"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            <span className="text-sm">Todos</span>
-            <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full text-black">
-              {assignments.length}
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm px-4 py-4 mb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700 mr-1">
+              Filtrar por estado:
             </span>
-          </button>
 
-          {(Object.keys(statusConfig) as AssignmentStatus[]).map((key) => {
-            const cfg = statusConfig[key];
-            const count = assignments.filter(
-              (a) => a.estadoRevision === key,
-            ).length;
-            const isSelected = selectedStatus === key;
-            return (
-              <button
-                key={key}
-                onClick={() => setSelectedStatus(key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isSelected
-                    ? `${cfg.color} text-white shadow-md`
-                    : `${cfg.bgColor} ${cfg.textColor} hover:shadow-sm`
-                }`}
-              >
-                <div
-                  className={`w-3 h-3 rounded-full ${isSelected ? "bg-white bg-opacity-30" : cfg.color}`}
-                ></div>
-                <span className="text-sm">{cfg.label}</span>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${isSelected ? "bg-white bg-opacity-20" : "bg-white bg-opacity-60"}`}
-                >
-                  <span className="text-black">{count}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Assignments List */}
-      <div className="space-y-4">
-        {filteredAssignments.map((assignment: Assignment) => (
-          <div
-            key={assignment.cursoCodigo}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                <h3 className="text-lg font-medium text-gray-800">
-                  {assignment.cursoNombre}
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {/* Estado con badge coloreado */}
-                {(() => {
-                  const cfg = statusConfig[
-                    assignment.estadoRevision as AssignmentStatus
-                  ] ?? {
-                    label: assignment.estadoRevision,
-                    color: "bg-gray-400",
-                    textColor: "text-gray-700",
-                    bgColor: "bg-gray-100",
-                  };
-                  return (
-                    <div
-                      className={`flex items-center gap-2 px-2 py-1 rounded ${cfg.bgColor} ${cfg.textColor}`}
-                    >
-                      <div
-                        className={`w-3 h-3 rounded-full ${cfg.color}`}
-                      ></div>
-                      <span className="text-xs font-semibold">{cfg.label}</span>
-                    </div>
-                  );
-                })()}
-
-                {/* Editar solo si está desaprobado, asignado o nuevo */}
-                {(assignment.estadoRevision === "DESAPROBADO" ||
-                  assignment.estadoRevision === "ASIGNADO" ||
-                  assignment.estadoRevision === "NUEVO") && (
-                  <button
-                    onClick={() =>
-                      handleEditAssignment(
-                        assignment.cursoCodigo,
-                        assignment.estadoRevision,
-                        assignment.syllabusId,
-                      )
-                    }
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <Edit size={18} />
-                  </button>
-                )}
-
-                {/* Ver */}
-                <button
-                  onClick={() => handleViewAssignment(assignment)}
-                  className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <Eye size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filteredAssignments.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No se encontraron asignaciones que coincidan con tu búsqueda.
-        </div>
-      )}
-
-      {/* Modal */}
-      {selectedAssignment && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[90vh] flex flex-col relative">
             <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 transition-colors bg-white rounded-full p-2 shadow-md"
+              type="button"
+              onClick={() => setSelectedStatus("ALL")}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                selectedStatus === "ALL"
+                  ? "bg-red-600 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
-              <X size={24} />
+              Todos
             </button>
 
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
-                {selectedAssignment.cursoNombre}
-              </h2>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span>Código: {selectedAssignment.cursoCodigo}</span>
-                <span>•</span>
-                <span>
-                  Estado:{" "}
-                  <span
-                    className={`font-medium ${statusConfig[selectedAssignment.estadoRevision as AssignmentStatus]?.textColor || "text-gray-700"}`}
-                  >
-                    {
-                      statusConfig[
-                        selectedAssignment.estadoRevision as AssignmentStatus
-                      ]?.label
-                    }
-                  </span>
-                </span>
-                {selectedAssignment.syllabusId && (
-                  <>
-                    <span>•</span>
-                    <span>Sílabo ID: {selectedAssignment.syllabusId}</span>
-                  </>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("APROBADO")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                selectedStatus === "APROBADO"
+                  ? "bg-green-600 text-white border-green-600 shadow-sm"
+                  : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  selectedStatus === "APROBADO" ? "bg-white" : "bg-green-500"
+                }`}
+              />
+              Aprobado
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("EN_PROCESO")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                selectedStatus === "EN_PROCESO"
+                  ? "bg-yellow-500 text-white border-yellow-500 shadow-sm"
+                  : "bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  selectedStatus === "EN_PROCESO" ? "bg-white" : "bg-yellow-500"
+                }`}
+              />
+              En proceso
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("PENDIENTE")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                selectedStatus === "PENDIENTE"
+                  ? "bg-red-600 text-white border-red-600 shadow-sm"
+                  : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  selectedStatus === "PENDIENTE" ? "bg-white" : "bg-red-500"
+                }`}
+              />
+              Pendiente
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
+                  <th className="px-6 py-4 text-left font-bold w-[18%]">
+                    Código
+                  </th>
+
+                  <th className="px-6 py-4 text-left font-bold w-[46%]">
+                    Asignatura
+                  </th>
+
+                  <th className="px-6 py-4 text-left font-bold w-[20%]">
+                    Estado
+                  </th>
+
+                  <th className="px-6 py-4 text-center font-bold w-[16%]">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredAssignments.map(
+                  (assignment: Assignment, index: number) => {
+                    const status = normalizeStatus(assignment.estadoRevision);
+                    const cfg = statusConfig[status];
+
+                    const canEdit =
+                      status === "PENDIENTE" ||
+                      status === "ASIGNADO" ||
+                      status === "NUEVO";
+
+                    return (
+                      <tr
+                        key={`${assignment.cursoCodigo}-${
+                          assignment.syllabusId ?? "sin-id"
+                        }-${assignment.docenteId ?? "sin-docente"}-${index}`}
+                        className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-5 font-semibold text-gray-800">
+                          {assignment.cursoCodigo || "N/A"}
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="font-semibold text-gray-900">
+                            {assignment.cursoNombre}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="inline-flex items-center gap-2">
+                            <span
+                              className={`w-3 h-3 rounded-full ${cfg.color}`}
+                            />
+
+                            <span
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold border ${cfg.bgColor} ${cfg.textColor}`}
+                            >
+                              {cfg.label}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="flex items-center justify-center gap-3">
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditAssignment(
+                                    assignment.cursoCodigo,
+                                    assignment.estadoRevision,
+                                    assignment.syllabusId,
+                                  )
+                                }
+                                title={
+                                  status === "PENDIENTE"
+                                    ? "Editar sílabo pendiente"
+                                    : "Editar sílabo"
+                                }
+                                className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors ${
+                                  status === "PENDIENTE"
+                                    ? "text-red-600 bg-red-50 hover:bg-red-100"
+                                    : "text-blue-600 bg-blue-50 hover:bg-blue-100"
+                                }`}
+                              >
+                                <Edit size={18} />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleViewAssignment(assignment)}
+                              title="Ver"
+                              className="w-9 h-9 flex items-center justify-center text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                            >
+                              <Eye size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  },
                 )}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredAssignments.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              No se encontraron asignaciones que coincidan con tu búsqueda.
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xl mt-6 p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-5">
+            Leyenda de Estados
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-start gap-3">
+              <span className="w-4 h-4 rounded-full bg-green-500 mt-1" />
+
+              <div>
+                <p className="text-sm font-bold text-gray-900">
+                  Verde - Aprobado
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  El sílabo está aprobado.
+                </p>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-hidden">
-              {isLoadingPdf ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                    <p className="text-lg font-medium text-gray-700">
-                      Generando vista previa del PDF...
-                    </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Esto puede tomar unos segundos
-                    </p>
-                  </div>
-                </div>
-              ) : pdfError ? (
-                <div className="h-full flex items-center justify-center p-6">
-                  <div className="text-center max-w-md">
-                    <div className="w-16 h-16 bg-red-100 rounded-lg mx-auto flex items-center justify-center mb-4">
-                      <X size={32} className="text-red-600" />
-                    </div>
-                    <p className="text-lg font-medium text-red-700 mb-2">
-                      Error al cargar el sílabo
-                    </p>
-                    <p className="text-sm text-gray-600">{pdfError}</p>
-                  </div>
-                </div>
-              ) : pdfUrl ? (
-                <iframe
-                  src={pdfUrl}
-                  className="w-full h-full"
-                  title="Vista previa del PDF"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center text-gray-500">
-                    <div className="mb-4">
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto flex items-center justify-center">
-                        <Eye size={32} className="text-gray-400" />
-                      </div>
-                    </div>
-                    <p className="text-lg font-medium">
-                      Vista previa del sílabo
-                    </p>
-                    <p className="text-sm mt-2">
-                      {selectedAssignment.syllabusId
-                        ? "Cargando..."
-                        : "No hay sílabo disponible para este curso"}
-                    </p>
-                  </div>
-                </div>
-              )}
+            <div className="flex items-start gap-3">
+              <span className="w-4 h-4 rounded-full bg-yellow-500 mt-1" />
+
+              <div>
+                <p className="text-sm font-bold text-gray-900">
+                  Amarillo - En proceso
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  El sílabo está en proceso de revisión o evaluación.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="w-4 h-4 rounded-full bg-red-500 mt-1" />
+
+              <div>
+                <p className="text-sm font-bold text-gray-900">
+                  Rojo - Pendiente
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  El sílabo tiene observaciones pendientes por corregir.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      )}
+
+        {selectedAssignment && (
+          <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[90vh] flex flex-col relative">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 transition-colors bg-white rounded-full p-2 shadow-md"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-800 mb-2">
+                  {selectedAssignment.cursoNombre}
+                </h2>
+
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <span>Código: {selectedAssignment.cursoCodigo}</span>
+
+                  <span>•</span>
+
+                  <span>
+                    Estado:{" "}
+                    <span
+                      className={`font-medium ${
+                        statusConfig[
+                          normalizeStatus(selectedAssignment.estadoRevision)
+                        ].textColor
+                      }`}
+                    >
+                      {
+                        statusConfig[
+                          normalizeStatus(selectedAssignment.estadoRevision)
+                        ].label
+                      }
+                    </span>
+                  </span>
+
+                  {selectedAssignment.syllabusId && (
+                    <>
+                      <span>•</span>
+                      <span>Sílabo ID: {selectedAssignment.syllabusId}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-hidden">
+                {isLoadingPdf ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+
+                      <p className="text-lg font-medium text-gray-700">
+                        Generando vista previa del PDF...
+                      </p>
+
+                      <p className="text-sm text-gray-500 mt-2">
+                        Esto puede tomar unos segundos
+                      </p>
+                    </div>
+                  </div>
+                ) : pdfError ? (
+                  <div className="h-full flex items-center justify-center p-6">
+                    <div className="text-center max-w-md">
+                      <div className="w-16 h-16 bg-red-100 rounded-lg mx-auto flex items-center justify-center mb-4">
+                        <X size={32} className="text-red-600" />
+                      </div>
+
+                      <p className="text-lg font-medium text-red-700 mb-2">
+                        Error al cargar el sílabo
+                      </p>
+
+                      <p className="text-sm text-gray-600">{pdfError}</p>
+                    </div>
+                  </div>
+                ) : pdfUrl ? (
+                  <iframe
+                    src={pdfUrl}
+                    className="w-full h-full"
+                    title="Vista previa del PDF"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <div className="mb-4">
+                        <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto flex items-center justify-center">
+                          <Eye size={32} className="text-gray-400" />
+                        </div>
+                      </div>
+
+                      <p className="text-lg font-medium">
+                        Vista previa del sílabo
+                      </p>
+
+                      <p className="text-sm mt-2">
+                        {selectedAssignment.syllabusId
+                          ? "Cargando..."
+                          : "No hay sílabo disponible para este curso"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
