@@ -389,12 +389,12 @@ class SixthStepFormulaManager {
   }
 
   async updateFormula(
-    silaboId: number,
+    formulaId: number,
     formula: FormulaEvaluacionUpdate,
     baseUrl?: string,
   ): Promise<FormulaEvaluacion> {
     const apiBase = this.getApiBase(baseUrl);
-    const url = `${apiBase}/syllabus/${silaboId}/formula_evaluacion`;
+    const url = `${apiBase}/syllabus/${formulaId}/formula_evaluacion`;
 
     const res = await authFetch(url, {
       method: "PUT",
@@ -457,10 +457,10 @@ export const useUpdateFormula = () => {
   return useMutation<
     FormulaEvaluacion,
     Error,
-    { silaboId: number; formula: FormulaEvaluacionUpdate }
+    { formulaId: number; formula: FormulaEvaluacionUpdate }
   >({
-    mutationFn: ({ silaboId, formula }) =>
-      sixthStepFormulaManager.updateFormula(silaboId, formula),
+    mutationFn: ({ formulaId, formula }) =>
+      sixthStepFormulaManager.updateFormula(formulaId, formula),
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: ["syllabus", data.silaboId, "formula_evaluacion"],

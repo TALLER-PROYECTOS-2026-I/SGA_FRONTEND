@@ -34,16 +34,10 @@ export function ReviewConfirmationModal({
           <div className="flex items-center gap-4">
             <div
               className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-md ${
-                isApproved
-                  ? "bg-green-600 text-white"
-                  : "bg-red-600 text-white"
+                isApproved ? "bg-green-600 text-white" : "bg-red-600 text-white"
               }`}
             >
-              {isApproved ? (
-                <CheckCircle size={34} />
-              ) : (
-                <XCircle size={34} />
-              )}
+              {isApproved ? <CheckCircle size={34} /> : <XCircle size={34} />}
             </div>
 
             <div>

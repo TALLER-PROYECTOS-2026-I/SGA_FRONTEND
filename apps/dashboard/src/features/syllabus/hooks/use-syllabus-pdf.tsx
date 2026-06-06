@@ -55,6 +55,11 @@ export function useSyllabusPDF(options: UseSyllabusPDFOptions = {}) {
       const blob = await pdf(<SyllabusPDFDocument data={data} />).toBlob();
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 2000);
+
       onSuccess?.();
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error(String(err));

@@ -35,9 +35,7 @@ export default function DirectorHome() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-blue-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
             <div>
-              <p className="text-sm font-medium opacity-90">
-                Gestión Docente
-              </p>
+              <p className="text-sm font-medium opacity-90">Gestión Docente</p>
               <h2 className="text-3xl font-bold mt-1">Asignar</h2>
             </div>
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -61,7 +59,7 @@ export default function DirectorHome() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <button
             type="button"
-            onClick={() => navigate("/management")}
+            onClick={() => navigate("/syllabus-versions")}
             className="group bg-white rounded-2xl shadow-md border border-gray-100 p-7 text-left hover:shadow-xl transition-all duration-200 min-h-[180px]"
           >
             <div className="flex items-start justify-between">
@@ -80,7 +78,7 @@ export default function DirectorHome() {
 
             <div className="mt-8">
               <h3 className="text-xl font-bold text-gray-900">
-                Asignar Docente
+                Versiones de Sílabos
               </h3>
               <p className="text-sm text-gray-500 mt-2 max-w-sm">
                 Gestiona la asignación de docentes a cursos y sílabos.

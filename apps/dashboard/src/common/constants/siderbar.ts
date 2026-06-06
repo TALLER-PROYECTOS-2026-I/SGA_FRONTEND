@@ -5,6 +5,9 @@ import {
   Mail,
   BookOpenCheck,
   UserPlus,
+  Calculator,
+  Network,
+  History,
 } from "lucide-react";
 
 export const sidebarMenusByRole = {
@@ -40,6 +43,34 @@ export const sidebarMenusByRole = {
   ],
 
   director_escuela: [
+    {
+      to: "/",
+      label: "Inicio",
+      icon: Home,
+    },
+    {
+      to: "/silabus",
+      label: "Sílabos",
+      icon: BookOpenCheck,
+    },
+    {
+      to: "/syllabus-versions",
+      label: "Versiones de Sílabos",
+      icon: History,
+    },
+    {
+      to: "/curriculum",
+      label: "Malla Curricular",
+      icon: Network,
+    },
+    {
+      to: "/formulas",
+      label: "Fórmulas",
+      icon: Calculator,
+    },
+  ],
+
+  comite_curricular_operativo: [
     {
       to: "/",
       label: "Inicio",

@@ -1,4 +1,7 @@
-import type { SemanaProgramacion, UnidadProgramacion } from "../hooks/fourth-step-query";
+import type {
+  SemanaProgramacion,
+  UnidadProgramacion,
+} from "../hooks/fourth-step-query";
 
 export type ProgramacionStatus = "PENDIENTE" | "EN_PROCESO" | "COMPLETADO";
 

@@ -156,9 +156,7 @@ export default function CoordinatorAssignments() {
               <div className="bg-green-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
                 <div>
                   <p className="text-sm font-medium opacity-90">Aprobados</p>
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalAprobados}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalAprobados}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -169,9 +167,7 @@ export default function CoordinatorAssignments() {
               <div className="bg-yellow-500 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
                 <div>
                   <p className="text-sm font-medium opacity-90">Pendientes</p>
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalPendientes}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalPendientes}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -181,9 +177,7 @@ export default function CoordinatorAssignments() {
 
               <div className="bg-red-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-medium opacity-90">
-                    Desaprobados
-                  </p>
+                  <p className="text-sm font-medium opacity-90">Desaprobados</p>
                   <h2 className="text-3xl font-bold mt-1">
                     {totalDesaprobados}
                   </h2>
@@ -234,9 +228,9 @@ export default function CoordinatorAssignments() {
                   </thead>
 
                   <tbody>
-                    {filteredAssignments.map((assignment: Assignment) => {
-                      const cfg =
-                        statusConfig[
+                    {filteredAssignments.map(
+                      (assignment: Assignment, index: number) => {
+                        const cfg = statusConfig[
                           assignment.estadoRevision as AssignmentStatus
                         ] ?? {
                           label: assignment.estadoRevision,
@@ -245,52 +239,53 @@ export default function CoordinatorAssignments() {
                           bgColor: "bg-gray-100",
                         };
 
-                      return (
-                        <tr
-                          key={`${assignment.cursoCodigo}-${assignment.docenteId}`}
-                          className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="px-6 py-5 font-semibold text-gray-800">
-                            {assignment.cursoCodigo || "N/A"}
-                          </td>
+                        return (
+                          <tr
+                            key={`${assignment.cursoCodigo}-${assignment.docenteId}-${index}`}
+                            className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-6 py-5 font-semibold text-gray-800">
+                              {assignment.cursoCodigo || "N/A"}
+                            </td>
 
-                          <td className="px-6 py-5">
-                            <div className="font-bold text-gray-900">
-                              {assignment.cursoNombre}
-                            </div>
-                          </td>
+                            <td className="px-6 py-5">
+                              <div className="font-bold text-gray-900">
+                                {assignment.cursoNombre}
+                              </div>
+                            </td>
 
-                          <td className="px-6 py-5 text-gray-700">
-                            {assignment.nombreDocente || "No asignado"}
-                          </td>
+                            <td className="px-6 py-5 text-gray-700">
+                              {assignment.nombreDocente || "No asignado"}
+                            </td>
 
-                          <td className="px-6 py-5">
-                            <div className="inline-flex items-center gap-2">
-                              <span
-                                className={`w-3 h-3 rounded-full ${cfg.color}`}
-                              />
-                              <span
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold border ${cfg.bgColor} ${cfg.textColor}`}
-                              >
-                                {cfg.label}
-                              </span>
-                            </div>
-                          </td>
+                            <td className="px-6 py-5">
+                              <div className="inline-flex items-center gap-2">
+                                <span
+                                  className={`w-3 h-3 rounded-full ${cfg.color}`}
+                                />
+                                <span
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold border ${cfg.bgColor} ${cfg.textColor}`}
+                                >
+                                  {cfg.label}
+                                </span>
+                              </div>
+                            </td>
 
-                          <td className="px-6 py-5">
-                            <div className="flex items-center justify-center">
-                              <button
-                                type="button"
-                                className="w-9 h-9 flex items-center justify-center text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
-                                title="Ver asignación"
-                              >
-                                <Eye size={18} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <td className="px-6 py-5">
+                              <div className="flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  className="w-9 h-9 flex items-center justify-center text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+                                  title="Ver asignación"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      },
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -301,7 +296,8 @@ export default function CoordinatorAssignments() {
                     <Search className="text-gray-400" size={30} />
                   </div>
                   <p className="text-gray-500">
-                    No se encontraron asignaciones que coincidan con tu búsqueda.
+                    No se encontraron asignaciones que coincidan con tu
+                    búsqueda.
                   </p>
                 </div>
               )}

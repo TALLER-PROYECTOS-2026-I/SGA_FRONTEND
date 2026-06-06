@@ -345,11 +345,19 @@ export default function ReviewSyllabusSummary() {
         reviewData,
       });
 
-      await approveMutation.mutateAsync({
-        syllabusId: parsedSyllabusId,
-        estado,
-        reviewData,
-      });
+      try {
+        await approveMutation.mutateAsync({
+          syllabusId: parsedSyllabusId,
+          estado,
+          reviewData,
+        });
+      } catch (approveError) {
+        toast.error(
+          "La revisión fue guardada pero el cambio de estado falló. Por favor, intente aprobar nuevamente.",
+        );
+        console.error("Approve mutation failed after save:", approveError);
+        throw approveError;
+      }
 
       setModalType(hasRejectedSections ? "rejected" : "approved");
       setShowModal(true);

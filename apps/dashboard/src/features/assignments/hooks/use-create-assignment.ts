@@ -1,4 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  authFetch,
+  getApiBaseUrl,
+  readApiErrorMessage,
+} from "../../../common/utils/auth-fetch";
 
 export interface CreateAssignmentData {
   teacherId: number;
@@ -29,16 +34,10 @@ interface ValidationError {
 async function createAssignment(
   data: CreateAssignmentData,
 ): Promise<CreateAssignmentResponse> {
-  const apiBase =
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:7071/api";
-  const url = `${apiBase}/assignments/`;
+  const url = `${getApiBaseUrl()}/assignments/`;
 
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: "POST",
-    credentials: "include", // Para enviar cookie sessionSGA
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(data),
   });
 
@@ -81,6 +80,22 @@ async function createAssignment(
   return response;
 }
 
+async function unassignTeacher(
+  syllabusId: number,
+): Promise<CreateAssignmentResponse> {
+  const res = await authFetch(`${getApiBaseUrl()}/assignments/${syllabusId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      await readApiErrorMessage(res, "No se pudo desasignar el docente."),
+    );
+  }
+
+  return res.json();
+}
+
 export function useCreateAssignment() {
   const queryClient = useQueryClient();
 
@@ -88,6 +103,17 @@ export function useCreateAssignment() {
     mutationFn: createAssignment,
     onSuccess: () => {
       // Invalidar cache de asignaciones si existe
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+    },
+  });
+}
+
+export function useUnassignTeacher() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CreateAssignmentResponse, Error, number>({
+    mutationFn: unassignTeacher,
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments"] });
     },
   });

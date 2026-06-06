@@ -3,6 +3,7 @@ export const roleNames: Record<number, string> = {
   2: "director_escuela",
   3: "coordinadora_academica",
   4: "director_escuela",
+  5: "comite_curricular_operativo",
 } as const;
 
 export type RoleKey = keyof typeof roleNames;

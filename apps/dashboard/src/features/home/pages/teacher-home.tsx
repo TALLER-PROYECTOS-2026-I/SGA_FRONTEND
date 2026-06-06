@@ -7,17 +7,42 @@ import {
   ArrowRight,
   Loader2,
   XCircle,
+  LifeBuoy,
+  Mail,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "../../auth/hooks/use-session";
 import { useAssignments } from "../../assignments/hooks/assignments-query";
 import { TeacherAssignedCoursesContext } from "../components/teacher-assigned-courses-context";
 
-function normalizeStatus(status?: string | null) {
-  const value = String(status || "").trim().toUpperCase();
+type NormalizedStatus = "APROBADO" | "DESAPROBADO" | "RECHAZADO" | "EN_PROCESO";
+
+function getAssignmentEstadoRevision(assignment: unknown): string | null {
+  if (!assignment || typeof assignment !== "object") {
+    return null;
+  }
+
+  const record = assignment as Record<string, unknown>;
+  const value = record.estadoRevision;
+
+  return typeof value === "string" ? value : null;
+}
+
+function normalizeStatus(status?: string | null): NormalizedStatus {
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
 
   if (value === "APROBADO") {
     return "APROBADO";
+  }
+
+  if (value === "DESAPROBADO") {
+    return "DESAPROBADO";
+  }
+
+  if (value === "RECHAZADO") {
+    return "RECHAZADO";
   }
 
   if (
@@ -29,13 +54,10 @@ function normalizeStatus(status?: string | null) {
     value === "EN_PROCESO" ||
     value === "EN PROCESO" ||
     value === "ASIGNADO" ||
-    value === "NUEVO"
+    value === "NUEVO" ||
+    value === "BORRADOR"
   ) {
     return "EN_PROCESO";
-  }
-
-  if (value === "DESAPROBADO" || value === "RECHAZADO") {
-    return "PENDIENTE";
   }
 
   return "EN_PROCESO";
@@ -51,19 +73,20 @@ export default function TeacherHome() {
 
   const totalActivos = assignments.length;
 
-  const totalAprobados = assignments.filter(
-    (assignment: any) => normalizeStatus(assignment.estadoRevision) === "APROBADO",
-  ).length;
+  const totalAprobados = assignments.filter((assignment) => {
+    const status = normalizeStatus(getAssignmentEstadoRevision(assignment));
+    return status === "APROBADO";
+  }).length;
 
-  const totalEnProceso = assignments.filter(
-    (assignment: any) =>
-      normalizeStatus(assignment.estadoRevision) === "EN_PROCESO",
-  ).length;
+  const totalEnProceso = assignments.filter((assignment) => {
+    const status = normalizeStatus(getAssignmentEstadoRevision(assignment));
+    return status === "EN_PROCESO";
+  }).length;
 
-  const totalPendientes = assignments.filter(
-    (assignment: any) =>
-      normalizeStatus(assignment.estadoRevision) === "PENDIENTE",
-  ).length;
+  const totalPendientes = assignments.filter((assignment) => {
+    const status = normalizeStatus(getAssignmentEstadoRevision(assignment));
+    return status === "DESAPROBADO" || status === "RECHAZADO";
+  }).length;
 
   if (sessionLoading || isLoading) {
     return (
@@ -76,24 +99,53 @@ export default function TeacherHome() {
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex items-center gap-5">
-          <div className="w-14 h-14 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-            <Hand size={30} />
+      <div className="max-w-7xl mx-auto space-y-6">
+        <section className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
+          <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex items-center gap-5">
+            <div className="w-14 h-14 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+              <Hand size={30} />
+            </div>
+
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Bienvenido, {user?.name || "Docente"}! 👋
+              </h1>
+
+              <p className="text-gray-500 text-sm mt-1">
+                Sistema de Gestión Académica - USMP
+              </p>
+
+              <p className="text-gray-400 text-xs mt-2">
+                Gestiona tus sílabos asignados de forma rápida y eficiente.
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Bienvenido, {user?.name || "Docente"}! 👋
-            </h1>
+          <div className="bg-white rounded-2xl shadow-md border border-red-100 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <LifeBuoy size={22} />
+              </div>
 
-            <p className="text-gray-500 text-sm mt-1">
-              Sistema de Gestión Académica - USMP
-            </p>
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-gray-900">
+                  ¿Necesitas ayuda?
+                </h2>
 
-            <p className="text-gray-400 text-xs mt-2">
-              Gestiona tus sílabos asignados de forma rápida y eficiente.
-            </p>
+                <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                  Si tienes problemas con el sistema, comunícate con soporte
+                  técnico.
+                </p>
+
+                <a
+                  href="mailto:servicedesk@usmp.pe"
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700 border border-red-100 hover:bg-red-100 transition-colors"
+                >
+                  <Mail size={16} />
+                  servicedesk@usmp.pe
+                </a>
+              </div>
+            </div>
           </div>
         </section>
 

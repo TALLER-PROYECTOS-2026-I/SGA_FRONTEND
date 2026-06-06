@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "../../../common/utils/auth-fetch";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "/api";
+const API_BASE_URL = "/api";
 
 // Sección 1: Datos Generales
 export interface DatosGenerales {

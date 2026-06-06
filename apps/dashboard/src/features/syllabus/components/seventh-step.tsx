@@ -64,7 +64,9 @@ function parseValidYear(value: string | undefined, required = false) {
 }
 
 function normalizeFuenteTipo(tipo: unknown) {
-  const value = String(tipo ?? "").trim().toUpperCase();
+  const value = String(tipo ?? "")
+    .trim()
+    .toUpperCase();
 
   if (value === "LIBRO") return "LIBRO";
   if (value === "ART") return "ART";
@@ -122,8 +124,7 @@ export default function SeventhStep() {
       syllabusId != null && Number(syllabusId) > 0 ? Number(syllabusId) : null;
     if (fromContext) return fromContext;
 
-    const queryRaw =
-      searchParams.get("syllabusId") ?? searchParams.get("id");
+    const queryRaw = searchParams.get("syllabusId") ?? searchParams.get("id");
     const queryId = queryRaw ? Number(queryRaw) : NaN;
     if (Number.isFinite(queryId) && queryId > 0) return queryId;
 
@@ -189,39 +190,39 @@ export default function SeventhStep() {
   useEffect(() => {
     if (isDraftCreateMode) return;
 
-  const rows = Array.isArray(fuentesFromApi) ? fuentesFromApi : [];
+    const rows = Array.isArray(fuentesFromApi) ? fuentesFromApi : [];
 
-  const biblio: Bibliography[] = [];
-  const electronic: ElectronicResource[] = [];
+    const biblio: Bibliography[] = [];
+    const electronic: ElectronicResource[] = [];
 
-  rows.forEach((fuente) => {
-    const tipo = normalizeFuenteTipo(fuente.tipo);
-    const year =
-      fuente.anio != null && !Number.isNaN(fuente.anio)
-        ? String(fuente.anio)
-        : "";
+    rows.forEach((fuente) => {
+      const tipo = normalizeFuenteTipo(fuente.tipo);
+      const year =
+        fuente.anio != null && !Number.isNaN(fuente.anio)
+          ? String(fuente.anio)
+          : "";
 
-    if (tipo === "LIBRO" || tipo === "ART") {
-      biblio.push({
-        id: fuente.id,
-        tipo: tipo as "LIBRO" | "ART",
-        authors: fuente.autores,
-        year,
-        title: fuente.titulo,
-      });
-    } else if (tipo === "WEB") {
-      electronic.push({
-        id: fuente.id,
-        source: fuente.autores,
-        year,
-        url: fuente.doiUrl || fuente.titulo,
-      });
-    }
-  });
+      if (tipo === "LIBRO" || tipo === "ART") {
+        biblio.push({
+          id: fuente.id,
+          tipo: tipo as "LIBRO" | "ART",
+          authors: fuente.autores,
+          year,
+          title: fuente.titulo,
+        });
+      } else if (tipo === "WEB") {
+        electronic.push({
+          id: fuente.id,
+          source: fuente.autores,
+          year,
+          url: fuente.doiUrl || fuente.titulo,
+        });
+      }
+    });
 
-  setBibliographies(biblio);
-  setElectronicResources(electronic);
-}, [fuentesFromApi, isDraftCreateMode]);
+    setBibliographies(biblio);
+    setElectronicResources(electronic);
+  }, [fuentesFromApi, isDraftCreateMode]);
 
   const handleNextStep = () => {
     if (isDraftCreateMode && canEdit) {
@@ -327,7 +328,9 @@ export default function SeventhStep() {
         toast.success("Fuente actualizada");
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Error al actualizar la fuente",
+          error instanceof Error
+            ? error.message
+            : "Error al actualizar la fuente",
         );
       }
       return;
@@ -392,7 +395,9 @@ export default function SeventhStep() {
       toast.success("Fuente actualizada");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Error al actualizar la fuente",
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar la fuente",
       );
     }
   };
@@ -405,9 +410,7 @@ export default function SeventhStep() {
       !newBiblio.year?.trim() ||
       !newBiblio.title?.trim()
     ) {
-      toast.error(
-        "Complete autor, año y título de la fuente bibliográfica.",
-      );
+      toast.error("Complete autor, año y título de la fuente bibliográfica.");
       return;
     }
 
@@ -449,7 +452,9 @@ export default function SeventhStep() {
       toast.success("Bibliografía agregada");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Error al agregar bibliografía",
+        error instanceof Error
+          ? error.message
+          : "Error al agregar bibliografía",
       );
     }
   };
@@ -811,54 +816,56 @@ export default function SeventhStep() {
                             </div>
                           </div>
                         ) : (
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold text-sm shrink-0">
-                              {index + 1}
-                            </div>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold text-sm shrink-0">
+                                {index + 1}
+                              </div>
 
-                            <div className="space-y-2">
-                              <p className="font-bold text-gray-900">
-                                {biblio.title}
-                              </p>
+                              <div className="space-y-2">
+                                <p className="font-bold text-gray-900">
+                                  {biblio.title}
+                                </p>
 
-                              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                                <span className="inline-flex px-2 py-1 rounded-lg bg-white border border-gray-100">
-                                  {biblio.authors}
-                                </span>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                  <span className="inline-flex px-2 py-1 rounded-lg bg-white border border-gray-100">
+                                    {biblio.authors}
+                                  </span>
 
-                                <span className="inline-flex px-2 py-1 rounded-lg bg-white border border-gray-100">
-                                  {biblio.year}
-                                </span>
+                                  <span className="inline-flex px-2 py-1 rounded-lg bg-white border border-gray-100">
+                                    {biblio.year}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex gap-2 shrink-0">
-                            {canEdit && (
+                            <div className="flex gap-2 shrink-0">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditBibliography(biblio)}
+                                  className="w-9 h-9 flex items-center justify-center text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={
+                                    inputsDisabled || editingFuenteId !== null
+                                  }
+                                  title="Editar bibliografía"
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => startEditBibliography(biblio)}
-                                className="w-9 h-9 flex items-center justify-center text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                disabled={
-                                  inputsDisabled || editingFuenteId !== null
+                                onClick={() =>
+                                  handleRemoveBibliography(biblio.id)
                                 }
-                                title="Editar bibliografía"
+                                className="w-9 h-9 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                disabled={inputsDisabled}
+                                title="Eliminar bibliografía"
                               >
-                                <Pencil size={16} />
+                                <X size={18} />
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveBibliography(biblio.id)}
-                              className="w-9 h-9 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              disabled={inputsDisabled}
-                              title="Eliminar bibliografía"
-                            >
-                              <X size={18} />
-                            </button>
+                            </div>
                           </div>
-                        </div>
                         )}
                       </div>
                     ))}
@@ -1039,49 +1046,51 @@ export default function SeventhStep() {
                             </div>
                           </div>
                         ) : (
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold text-sm shrink-0">
-                              {index + 1}
-                            </div>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold text-sm shrink-0">
+                                {index + 1}
+                              </div>
 
-                            <div className="min-w-0">
-                              <p className="font-bold text-gray-900">
-                                {resource.source}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-900">
+                                  {resource.source}
+                                </p>
 
-                              <div className="mt-2 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 break-all">
-                                <Link size={15} className="shrink-0" />
-                                <span>{resource.url}</span>
+                                <div className="mt-2 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 break-all">
+                                  <Link size={15} className="shrink-0" />
+                                  <span>{resource.url}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex gap-2 shrink-0">
-                            {canEdit && (
+                            <div className="flex gap-2 shrink-0">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditElectronic(resource)}
+                                  className="w-9 h-9 flex items-center justify-center text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={
+                                    inputsDisabled || editingFuenteId !== null
+                                  }
+                                  title="Editar recurso"
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => startEditElectronic(resource)}
-                                className="w-9 h-9 flex items-center justify-center text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                disabled={
-                                  inputsDisabled || editingFuenteId !== null
+                                onClick={() =>
+                                  handleRemoveElectronic(resource.id)
                                 }
-                                title="Editar recurso"
+                                className="w-9 h-9 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                disabled={inputsDisabled}
+                                title="Eliminar recurso"
                               >
-                                <Pencil size={16} />
+                                <X size={18} />
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveElectronic(resource.id)}
-                              className="w-9 h-9 flex items-center justify-center text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              disabled={inputsDisabled}
-                              title="Eliminar recurso"
-                            >
-                              <X size={18} />
-                            </button>
+                            </div>
                           </div>
-                        </div>
                         )}
                       </div>
                     ))}

@@ -10,7 +10,22 @@ export interface SendAssignmentEmailOptions {
   additionalMessage?: string;
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isValidEmailAddress = (value: string): boolean => {
+  const trimmed = value.trim();
+
+  if (!trimmed) return false;
+  if (trimmed.includes(" ")) return false;
+
+  const atIndex = trimmed.indexOf("@");
+  const lastAtIndex = trimmed.lastIndexOf("@");
+
+  if (atIndex <= 0 || atIndex !== lastAtIndex) return false;
+
+  const domain = trimmed.slice(atIndex + 1);
+  const dotIndex = domain.lastIndexOf(".");
+
+  return dotIndex > 0 && dotIndex < domain.length - 1;
+};
 
 function escapeHtml(value: string) {
   return value
@@ -46,7 +61,7 @@ export function useSendAssignmentEmail() {
       }
 
       // 2. Validar email
-      if (!teacherEmail || !EMAIL_PATTERN.test(teacherEmail.trim())) {
+      if (!teacherEmail || !isValidEmailAddress(teacherEmail.trim())) {
         throw new Error("Email inválido");
       }
 

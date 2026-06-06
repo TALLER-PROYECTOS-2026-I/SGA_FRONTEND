@@ -144,7 +144,10 @@ export async function finalizeCreateSyllabus(
         }
 
         if (recursos.length > 0) {
-          await updateDidacticResourcesForSyllabus(String(syllabusId), recursos);
+          await updateDidacticResourcesForSyllabus(
+            String(syllabusId),
+            recursos,
+          );
         }
       });
     }

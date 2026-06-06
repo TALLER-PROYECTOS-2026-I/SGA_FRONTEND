@@ -2,6 +2,7 @@ import { getRoleName } from "../../../common/constants/roles";
 import { useSession } from "../../auth/hooks/use-session";
 import CoordinatorHome from "./coordinator-home";
 import DirectorHome from "./director-home";
+import OperationalCommitteeHome from "./operational-committee-home";
 import TeacherHome from "./teacher-home";
 
 export default function HomePage() {
@@ -12,6 +13,7 @@ export default function HomePage() {
     docente: <TeacherHome />,
     coordinadora_academica: <CoordinatorHome />,
     director_escuela: <DirectorHome />,
+    comite_curricular_operativo: <OperationalCommitteeHome />,
   } as const;
 
   return (

@@ -154,18 +154,14 @@ export default function PermissionsManage() {
 
   const { user, isLoading: sessionLoading } = useSession();
 
-  const {
-    selectedDocenteId,
-    selectedSilaboId,
-  } = useCoordinator();
+  const { selectedDocenteId, selectedSilaboId } = useCoordinator();
 
   const { data: permissions = [], isLoading: permissionsLoading } =
     usePermissions(selectedDocenteId, selectedSilaboId);
 
   const savePermissionsMutation = useSavePermissions();
 
-  const [sections, setSections] =
-    useState<SyllabusSection[]>(INITIAL_SECTIONS);
+  const [sections, setSections] = useState<SyllabusSection[]>(INITIAL_SECTIONS);
 
   const [accessType, setAccessType] = useState<AccessType>("READ_ONLY");
 
@@ -295,9 +291,7 @@ export default function PermissionsManage() {
   const finalEnabledSections = getFinalEnabledSections();
 
   const enabledCount =
-    accessType === "FULL_EDIT"
-      ? sections.length
-      : finalEnabledSections.length;
+    accessType === "FULL_EDIT" ? sections.length : finalEnabledSections.length;
 
   const lockedCount =
     accessType === "READ_ONLY"
@@ -340,7 +334,6 @@ export default function PermissionsManage() {
       const queryParams = new URLSearchParams({
         fromPermissions: "1",
         teacherName,
-        teacherEmail,
         courseName,
         courseCode,
         accessType,
@@ -353,7 +346,9 @@ export default function PermissionsManage() {
             : finalEnabledSections.map((section) => section.title).join("|"),
       });
 
-      navigate(`/coordinator/send-email?${queryParams.toString()}`);
+      navigate(`/coordinator/send-email?${queryParams.toString()}`, {
+        state: { teacherEmail },
+      });
     } catch {
       alert("Error al guardar los permisos. Por favor, intente de nuevo.");
     }
@@ -373,7 +368,6 @@ export default function PermissionsManage() {
   return (
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-6 py-6">
       <div className="mx-auto max-w-7xl">
-
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -435,9 +429,7 @@ export default function PermissionsManage() {
               <div className="grid grid-cols-3 gap-3 xl:min-w-[520px]">
                 <div className="rounded-2xl bg-blue-600 p-4 text-white shadow-md">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-white/80">
-                      Total
-                    </p>
+                    <p className="text-xs font-semibold text-white/80">Total</p>
                     <BookOpen size={20} className="text-white/80" />
                   </div>
                   <p className="mt-2 text-3xl font-bold">{sections.length}</p>
@@ -482,9 +474,7 @@ export default function PermissionsManage() {
                 >
                   <option value="READ_ONLY">Solo lectura</option>
                   <option value="RESTRICTED_EDIT">Edición restringida</option>
-                  <option value="FULL_EDIT">
-                    Edición completa autorizada
-                  </option>
+                  <option value="FULL_EDIT">Edición completa autorizada</option>
                 </select>
 
                 <div
@@ -599,7 +589,9 @@ export default function PermissionsManage() {
                           >
                             <span
                               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                                visibleEnabled ? "translate-x-8" : "translate-x-1"
+                                visibleEnabled
+                                  ? "translate-x-8"
+                                  : "translate-x-1"
                               }`}
                             />
                           </button>

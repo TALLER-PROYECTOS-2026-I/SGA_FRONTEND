@@ -22,8 +22,7 @@ const StepControls: React.FC<{
 
   const isLastAllowedStep = currentStep === lastAllowedStep;
 
-  const isNextDisabled =
-    disableNext || (!isLastAllowedStep && isLast);
+  const isNextDisabled = disableNext || (!isLastAllowedStep && isLast);
 
   return (
     <div className="mt-8 border-t border-gray-100 pt-6">

@@ -188,9 +188,7 @@ export default function Profile() {
           </div>
 
           <div>
-            <p className="text-base font-bold text-gray-900">
-              Cargando perfil
-            </p>
+            <p className="text-base font-bold text-gray-900">Cargando perfil</p>
             <p className="text-sm text-gray-500 mt-1">
               Obteniendo información de tu cuenta...
             </p>

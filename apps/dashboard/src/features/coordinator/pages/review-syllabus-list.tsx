@@ -26,7 +26,9 @@ type SyllabusStatus = "ASIGNADO" | "EN_PROCESO" | "VALIDADO" | "PENDIENTE";
 type FilterStatus = "ALL" | SyllabusStatus;
 
 function normalizeStatus(status?: string | null): SyllabusStatus {
-  const value = String(status || "").trim().toUpperCase();
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
 
   if (value === "VALIDADO" || value === "APROBADO") {
     return "VALIDADO";
@@ -226,18 +228,13 @@ export default function ReviewSyllabusList() {
     (syllabus) => normalizeStatus(syllabus?.status) === "PENDIENTE",
   ).length;
 
-  const toggleSyllabusSelection = (
-    syllabus: SyllabusReview,
-    index: number,
-  ) => {
+  const toggleSyllabusSelection = (syllabus: SyllabusReview, index: number) => {
     const key = getSyllabusKey(syllabus, index);
 
     if (!key) return;
 
     setSelectedSyllabusKeys((prev) =>
-      prev.includes(key)
-        ? prev.filter((item) => item !== key)
-        : [...prev, key],
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
     );
   };
 
@@ -488,9 +485,7 @@ export default function ReviewSyllabusList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">En proceso</p>
 
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalEnProceso}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalEnProceso}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -502,9 +497,7 @@ export default function ReviewSyllabusList() {
                 <div>
                   <p className="text-sm font-medium opacity-90">Pendientes</p>
 
-                  <h2 className="text-3xl font-bold mt-1">
-                    {totalPendiente}
-                  </h2>
+                  <h2 className="text-3xl font-bold mt-1">{totalPendiente}</h2>
                 </div>
 
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -651,8 +644,7 @@ export default function ReviewSyllabusList() {
                       const normalizedStatus = normalizeStatus(syllabus.status);
                       const cfg = statusConfig[normalizedStatus];
                       const rowKey = getSyllabusKey(syllabus, index);
-                      const isSelected =
-                        selectedSyllabusKeys.includes(rowKey);
+                      const isSelected = selectedSyllabusKeys.includes(rowKey);
 
                       return (
                         <tr

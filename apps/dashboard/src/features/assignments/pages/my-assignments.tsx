@@ -17,7 +17,9 @@ type AssignmentStatus =
 type FilterStatus = "ALL" | AssignmentStatus;
 
 function normalizeStatus(status?: string | null): AssignmentStatus {
-  const value = String(status || "").trim().toUpperCase();
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
 
   if (value === "APROBADO") {
     return "APROBADO";
@@ -210,9 +212,7 @@ export default function MyAssignments() {
     <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
       <div className="max-w-5xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Mis Asignaciones
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Mis Asignaciones</h1>
 
           <p className="text-sm text-gray-500 mt-1">
             Gestiona y revisa tus sílabos asignados

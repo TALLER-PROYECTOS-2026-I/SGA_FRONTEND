@@ -80,13 +80,9 @@ export default function SecondStep() {
   const [apiError, setApiError] = useState("");
   const [hasHydrated, setHasHydrated] = useState(false);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-  } = useSumilla(isDraftCreateMode ? null : resolvedSyllabusId);
+  const { data, isLoading, isFetching, isError, error } = useSumilla(
+    isDraftCreateMode ? null : resolvedSyllabusId,
+  );
 
   const saveSumilla = useSaveSumilla();
 
@@ -539,9 +535,7 @@ export default function SecondStep() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-blue-900">
-                      Recomendación
-                    </h3>
+                    <h3 className="font-bold text-blue-900">Recomendación</h3>
 
                     <p className="text-sm text-blue-700 leading-relaxed mt-1">
                       La sumilla debe explicar brevemente la naturaleza de la

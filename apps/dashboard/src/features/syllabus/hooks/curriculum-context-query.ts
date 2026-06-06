@@ -73,7 +73,8 @@ export const useCurriculumContext = (
   courseName = "",
 ) => {
   const trimmedName = courseName.trim();
-  const enabled = (syllabusId !== null && syllabusId > 0) || trimmedName.length > 0;
+  const enabled =
+    (syllabusId !== null && syllabusId > 0) || trimmedName.length > 0;
 
   return useQuery<CurriculumContextData | null, Error>({
     queryKey: ["syllabus", syllabusId, "curriculum-context", trimmedName],

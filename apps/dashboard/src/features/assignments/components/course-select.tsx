@@ -73,8 +73,8 @@ export default function CourseSelect({
 
       {selectedCourse?.isPendingAssignment && (
         <p className="mt-2 text-xs text-amber-700 font-medium">
-          Este sílabo aún no tiene docente. Al guardar la asignación se vinculará
-          al docente seleccionado.
+          Este sílabo aún no tiene docente. Al guardar la asignación se
+          vinculará al docente seleccionado.
         </p>
       )}
     </div>

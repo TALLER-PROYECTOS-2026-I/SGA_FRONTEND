@@ -38,6 +38,7 @@ import FifthStep from "../../syllabus/components/fifth-step";
 import SixthStep from "../../syllabus/components/sixth-step";
 import SeventhStep from "../../syllabus/components/seventh-step";
 import EighthStep from "../../syllabus/components/eighth-step";
+import { error } from "console";
 
 type ReviewStatus = "approved" | "rejected" | null;
 
@@ -99,6 +100,7 @@ export default function ReviewSyllabusDetail() {
         const parsed = JSON.parse(savedData) as ReviewData;
         setReviewData(parsed);
       } catch {
+        console.error("Error:", error);
       }
     }
   }, [savedReviewData, id]);
@@ -343,9 +345,7 @@ export default function ReviewSyllabusDetail() {
                         <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle size={18} />
-                            <span className="text-xs font-bold">
-                              Aprobados
-                            </span>
+                            <span className="text-xs font-bold">Aprobados</span>
                           </div>
 
                           <p className="text-2xl font-bold text-gray-900 mt-1">

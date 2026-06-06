@@ -7,10 +7,7 @@ import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import { usePermissionsContext } from "../hooks/use-permissions-context";
 import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
 import { useSubmitToAnalysis } from "../hooks/use-submit-to-analysis";
-import {
-  useResultados,
-  useSaveResultados,
-} from "../hooks/eighth-step-query";
+import { useResultados, useSaveResultados } from "../hooks/eighth-step-query";
 import {
   ChevronDown,
   GraduationCap,
@@ -41,7 +38,9 @@ interface StudentOutcome {
 }
 
 function normalizeAporteValue(value: unknown): "K" | "R" | "" {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
 
   if (raw === "K") return "K";
   if (raw === "R") return "R";
@@ -232,15 +231,14 @@ export default function EighthStep() {
         return {
           ...mockOutcome,
           code,
-          description:
-            found
-              ? String(
-                  found.resultadoProgramaDescripcion ??
-                    found.descripcion ??
-                    found.description ??
-                    mockOutcome.description,
-                ).trim() || mockOutcome.description
-              : mockOutcome.description,
+          description: found
+            ? String(
+                found.resultadoProgramaDescripcion ??
+                  found.descripcion ??
+                  found.description ??
+                  mockOutcome.description,
+              ).trim() || mockOutcome.description
+            : mockOutcome.description,
           level: found
             ? normalizeAporteValue(
                 found.aporteValor ?? found.nivel ?? found.level,
@@ -571,9 +569,7 @@ export default function EighthStep() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
-                    <th className="px-6 py-4 text-left font-bold w-[8%]">
-                      #
-                    </th>
+                    <th className="px-6 py-4 text-left font-bold w-[8%]">#</th>
 
                     <th className="px-6 py-4 text-left font-bold w-[72%]">
                       Descripción

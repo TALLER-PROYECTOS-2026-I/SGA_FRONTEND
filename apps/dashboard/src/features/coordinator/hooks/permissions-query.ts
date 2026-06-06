@@ -118,13 +118,11 @@ export const usePermissions = (
   silaboId?: number | string | null,
   options?: UseQueryOptions<Permission[], Error>,
 ) => {
+  const normalizedSilaboId = silaboId ?? "all";
   return useQuery<Permission[], Error>({
-    queryKey: ["permissions", docenteId, silaboId ?? "all"],
+    queryKey: ["permissions", docenteId, normalizedSilaboId],
     queryFn: () =>
-      permissionsManager.fetchByDocente(
-        docenteId as number | string,
-        silaboId,
-      ),
+      permissionsManager.fetchByDocente(docenteId as number | string, silaboId),
     enabled: docenteId !== null && docenteId !== undefined,
     retry: false,
     staleTime: 0,

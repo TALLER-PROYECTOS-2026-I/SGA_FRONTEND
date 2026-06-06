@@ -601,8 +601,8 @@ export default function SyllabusCatalog() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-8 py-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-[calc(100vh-72px)] bg-gray-50 px-6 py-8 overflow-x-hidden">
+      <div className="w-full max-w-6xl mx-auto">
         <div className="mb-7">
           <h1 className="text-3xl font-bold text-gray-900">
             Catálogo de Sumilla
@@ -632,12 +632,12 @@ export default function SyllabusCatalog() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap lg:justify-end">
                 <button
                   type="button"
                   onClick={handleExportSelectedPDF}
                   disabled={isExportingPdf || !hasSelectedSyllabi}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 whitespace-nowrap"
                 >
                   {isExportingPdf ? (
                     <>
@@ -675,7 +675,7 @@ export default function SyllabusCatalog() {
           </div>
 
           <div className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
               <div className="bg-blue-600 text-white rounded-xl p-5 shadow-md flex justify-between items-center">
                 <div>
                   <p className="text-sm font-medium opacity-90">
@@ -756,7 +756,7 @@ export default function SyllabusCatalog() {
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1120px] table-fixed text-sm">
+                <table className="w-full min-w-[980px] table-fixed text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-700">
                       <th className="px-5 py-4 text-center font-bold w-[6%]">

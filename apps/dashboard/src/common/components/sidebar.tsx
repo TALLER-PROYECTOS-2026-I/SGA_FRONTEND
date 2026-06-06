@@ -6,18 +6,15 @@ import { sidebarMenusByRole, type RoleKey } from "../constants/siderbar";
 import type HeaderProps from "../types/headerProps";
 
 export default function Sidebar({ user }: HeaderProps) {
-  const role = getRoleName(user?.role) as RoleKey;
+  const roleName = getRoleName(user?.role);
+  const role = (roleName ?? "indeterminado") as RoleKey;
   const menuItems = sidebarMenusByRole[role] ?? [];
 
   return (
     <aside className="w-64 bg-[#111827] text-white h-screen flex flex-col border-r border-white/10">
       <div className="px-6 py-7 border-b border-white/10">
         <div className="flex items-center justify-center">
-          <img
-            src={usmpLogo}
-            alt="USMP Logo"
-            className="h-20 object-contain"
-          />
+          <img src={usmpLogo} alt="USMP Logo" className="h-20 object-contain" />
         </div>
       </div>
 
@@ -76,7 +73,9 @@ export default function Sidebar({ user }: HeaderProps) {
           </p>
 
           <p className="mt-0.5 text-xs text-gray-500 capitalize">
-            {role ? role.replace("_", " ") : "usuario"}
+            {role && role !== "indeterminado"
+              ? role.replaceAll("_", " ")
+              : "usuario"}
           </p>
         </div>
 

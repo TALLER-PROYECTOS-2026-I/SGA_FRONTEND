@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useCallback,
@@ -15,10 +16,7 @@ import {
   loadCreateDraft,
   saveCreateDraft,
 } from "./storage";
-import {
-  isDraftCreate,
-  resolveSyllabusIdFromSources,
-} from "./is-draft-create";
+import { isDraftCreate, resolveSyllabusIdFromSources } from "./is-draft-create";
 import type {
   CreateDraftGeneralData,
   DraftFuentesData,
@@ -96,7 +94,11 @@ export function CreateDraftProvider({ children }: { children: ReactNode }) {
   const { mode, syllabusId } = useSyllabusContext();
   const [searchParams] = useSearchParams();
 
-  const startFresh = shouldStartFreshCreateDraft(mode, syllabusId, searchParams);
+  const startFresh = shouldStartFreshCreateDraft(
+    mode,
+    syllabusId,
+    searchParams,
+  );
 
   const [draft, setDraft] = useState<SyllabusCreateDraft>(() =>
     readInitialDraft(startFresh),
@@ -109,17 +111,20 @@ export function CreateDraftProvider({ children }: { children: ReactNode }) {
     setDraft(createEmptyDraft());
   }, [startFresh]);
 
-  const updateCreateDraft = useCallback((patch: Partial<SyllabusCreateDraft>) => {
-    setDraft((prev) => {
-      const next: SyllabusCreateDraft = {
-        ...prev,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      saveCreateDraft(next);
-      return next;
-    });
-  }, []);
+  const updateCreateDraft = useCallback(
+    (patch: Partial<SyllabusCreateDraft>) => {
+      setDraft((prev) => {
+        const next: SyllabusCreateDraft = {
+          ...prev,
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        };
+        saveCreateDraft(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const setGeneralData = useCallback(
     (generalData: CreateDraftGeneralData) => {

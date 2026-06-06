@@ -18,9 +18,7 @@ export const useSyllabusSections = (
       }
 
       // Endpoint: /api/syllabus/revision/{silaboId}?docenteId={docenteId}
-      const baseURL =
-        import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "/api";
-      const base = `${baseURL}/syllabus/revision`;
+      const base = "/api/syllabus/revision";
       const url = docenteId
         ? `${base}/${encodeURIComponent(syllabusId)}?docenteId=${encodeURIComponent(
             String(docenteId),

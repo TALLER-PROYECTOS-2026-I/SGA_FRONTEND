@@ -1,4 +1,4 @@
-export function getStoredAuthToken() {
+export function getStoredAuthToken(): string | null {
   return (
     sessionStorage.getItem("token") ||
     localStorage.getItem("token") ||
@@ -7,12 +7,23 @@ export function getStoredAuthToken() {
   );
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+}
+
 export function getApiBaseUrl() {
-  return (
+  const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL ??
     import.meta.env.VITE_API_URL ??
-    "http://localhost:7071/api"
-  ).replace(/\/+$/, "");
+    "http://localhost:7071/api";
+
+  return trimTrailingSlashes(apiBaseUrl);
 }
 
 export function getHttpErrorFallback(status: number): string {
@@ -57,7 +68,17 @@ export async function authFetch(
   const headers = new Headers(init.headers ?? {});
 
   if (!headers.has("Content-Type") && init.body) {
-    headers.set("Content-Type", "application/json");
+    const isPlainObject =
+      typeof init.body === "object" &&
+      !(init.body instanceof FormData) &&
+      !(init.body instanceof Blob) &&
+      !(init.body instanceof ArrayBuffer) &&
+      !ArrayBuffer.isView(init.body) &&
+      !(init.body instanceof URLSearchParams);
+    const isJsonString = typeof init.body === "string";
+    if (isPlainObject || isJsonString) {
+      headers.set("Content-Type", "application/json");
+    }
   }
 
   if (token && !headers.has("Authorization")) {

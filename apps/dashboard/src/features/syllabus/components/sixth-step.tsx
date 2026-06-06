@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Step } from "./step";
 import { CoordinatorCommentsBanner } from "./coordinator-comments-banner";
 import { useSteps } from "../contexts/steps-context-provider";
@@ -15,6 +15,10 @@ import { useSyllabusEditLock } from "../hooks/use-syllabus-edit-lock";
 import { useReviewMode } from "../../coordinator/contexts/review-mode-context";
 import { useIsDraftCreateMode } from "../create-draft/is-draft-create";
 import { useCreateDraft } from "../create-draft/create-draft-context";
+import {
+  useCatalogFormulas,
+  type FormulaCatalogItem,
+} from "../../formulas/hooks/formulas-query";
 import {
   Select,
   SelectContent,
@@ -45,6 +49,10 @@ interface SubFormula {
   legend: Legend[];
 }
 
+interface SelectableSubFormula extends SubFormula {
+  id: string;
+}
+
 interface MainFormula {
   id: string;
   name: string;
@@ -52,6 +60,8 @@ interface MainFormula {
   legend: Legend[];
   subFormulas: SubFormula[];
 }
+
+const UI_STEP_NUMBER = 6;
 
 const availableFormulas: MainFormula[] = [
   {
@@ -150,7 +160,223 @@ const availableFormulas: MainFormula[] = [
   },
 ];
 
-export function buildFormulaPayload(
+const FORMULA_TOKEN_PATTERN = /\b[A-Z][A-Z0-9_]*\b/g;
+
+function ensureFormulaTarget(target: string, expression: string) {
+  const trimmed = expression.trim();
+  const targetPattern = new RegExp(`^\\s*${target}\\s*=`, "i");
+
+  return targetPattern.test(trimmed) ? trimmed : `${target} = ${trimmed}`;
+}
+
+function getStringValue(
+  source: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function legendFromJson(value: unknown): Legend[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+
+    const source = item as Record<string, unknown>;
+    const key = getStringValue(source, [
+      "key",
+      "codigo",
+      "variable",
+      "variableCodigo",
+    ]);
+
+    if (!key) return [];
+
+    const description =
+      getStringValue(source, [
+        "description",
+        "descripcion",
+        "nombre",
+        "name",
+      ]) ?? key;
+
+    return [{ key, description }];
+  });
+}
+
+function inferredLegend(
+  expression: string,
+  descriptions: Record<string, string> = {},
+): Legend[] {
+  const tokens = Array.from(
+    new Set(expression.match(FORMULA_TOKEN_PATTERN) ?? []),
+  );
+
+  return tokens.map((token) => ({
+    key: token,
+    description: descriptions[token] ?? token,
+  }));
+}
+
+function mergeLegend(...groups: Legend[][]): Legend[] {
+  const byKey = new Map<string, Legend>();
+
+  for (const group of groups) {
+    for (const item of group) {
+      if (!byKey.has(item.key)) {
+        byKey.set(item.key, item);
+      }
+    }
+  }
+
+  return Array.from(byKey.values());
+}
+
+function subFormulasFromJson(value: unknown): SubFormula[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+
+    const source = item as Record<string, unknown>;
+    const variable = getStringValue(source, [
+      "variable",
+      "variableCodigo",
+      "codigo",
+    ]);
+    const formula = getStringValue(source, ["formula", "expresion"]);
+
+    if (!variable || !formula) return [];
+
+    const name =
+      getStringValue(source, ["name", "nombre"]) ?? `Fórmula ${variable}`;
+
+    return [
+      {
+        variable,
+        name,
+        formula: ensureFormulaTarget(variable, formula),
+        legend: mergeLegend(
+          legendFromJson(source.legend),
+          inferredLegend(formula),
+        ),
+      },
+    ];
+  });
+}
+
+function expressionUsesVariable(expression: string, variable: string) {
+  return new RegExp(`\\b${variable}\\b`).test(expression);
+}
+
+function catalogFormulaToMainFormula(formula: FormulaCatalogItem): MainFormula {
+  const expression = ensureFormulaTarget(formula.tipo, formula.expresion);
+
+  const descriptions = {
+    PF: "Promedio Final",
+    PE: "Promedio de Evaluaciones",
+  };
+
+  const catalogSubFormulas = subFormulasFromJson(formula.subformulasJson);
+  const subFormulaText = catalogSubFormulas
+    .map((subFormula) => subFormula.formula)
+    .join(" ");
+
+  return {
+    id: `catalog-pf-${formula.id}`,
+    name: `${formula.tipo} - ${formula.nombre}`,
+    formula: expression,
+    legend: mergeLegend(
+      legendFromJson(formula.variablesJson),
+      inferredLegend(`${expression} ${subFormulaText}`, descriptions),
+    ),
+    subFormulas: catalogSubFormulas,
+  };
+}
+
+function catalogFormulaToSelectablePe(
+  formula: FormulaCatalogItem,
+): SelectableSubFormula {
+  const expression = ensureFormulaTarget("PE", formula.expresion);
+
+  const descriptions = {
+    PE: "Promedio de Evaluaciones",
+  };
+
+  return {
+    id: `catalog-pe-${formula.id}`,
+    variable: "PE",
+    name: formula.nombre,
+    formula: expression,
+    legend: mergeLegend(
+      legendFromJson(formula.variablesJson),
+      inferredLegend(expression, descriptions),
+    ),
+  };
+}
+
+function fallbackPeOptionsFromFormulas(
+  formulas: MainFormula[],
+): SelectableSubFormula[] {
+  const peOptions = new Map<string, SelectableSubFormula>();
+
+  for (const formula of formulas) {
+    for (const subFormula of formula.subFormulas) {
+      if (subFormula.variable.toUpperCase() !== "PE") continue;
+
+      const key = `${subFormula.name}-${subFormula.formula}`;
+
+      if (!peOptions.has(key)) {
+        peOptions.set(key, {
+          ...subFormula,
+          id: `fallback-pe-${peOptions.size + 1}`,
+        });
+      }
+    }
+  }
+
+  return Array.from(peOptions.values());
+}
+
+function combinePfWithSelectedPe(
+  pfFormula: MainFormula | undefined,
+  peFormula: SelectableSubFormula | undefined,
+): MainFormula | undefined {
+  if (!pfFormula) return undefined;
+
+  if (!peFormula) {
+    return pfFormula;
+  }
+
+  const subFormulasWithoutPe = pfFormula.subFormulas.filter(
+    (subFormula) => subFormula.variable.toUpperCase() !== "PE",
+  );
+
+  const subFormulas = [peFormula, ...subFormulasWithoutPe];
+  const subFormulaText = subFormulas
+    .map((subFormula) => subFormula.formula)
+    .join(" ");
+
+  return {
+    ...pfFormula,
+    legend: mergeLegend(
+      pfFormula.legend,
+      peFormula.legend,
+      inferredLegend(`${pfFormula.formula} ${subFormulaText}`),
+    ),
+    subFormulas,
+  };
+}
+
+function buildFormulaPayload(
   syllabusId: number,
   formula: MainFormula,
 ): FormulaEvaluacionCreate {
@@ -180,89 +406,187 @@ export default function SixthStep() {
   const { syllabusId } = useSyllabusContext();
   const { isDraftCreateMode } = useIsDraftCreateMode();
   const { draft, setSixthStepData } = useCreateDraft();
+
   const {
     hasEditPermissionForSection,
     getCommentsForSection,
     isDisapprovedCorrection,
   } = usePermissionsContext();
-  const coordinatorComments = getCommentsForSection(6);
-  const { isReviewMode } = useReviewMode();
 
+  const { isReviewMode } = useReviewMode();
   const { isLockedByState, isResolvingState } = useSyllabusEditLock(syllabusId);
 
-  const [selectedFormula, setSelectedFormula] = useState<string>("");
+  const [selectedPfFormula, setSelectedPfFormula] = useState<string>("");
+  const [selectedPeFormula, setSelectedPeFormula] = useState<string>("");
 
   const { data: formulaFromApi, isLoading } = useFormulaQuery(
     isDraftCreateMode ? null : syllabusId,
   );
+
+  const { data: catalogFormulas = [], isError: isCatalogError } =
+    useCatalogFormulas();
+
   const createFormulaMutation = useCreateFormula();
   const updateFormulaMutation = useUpdateFormula();
 
+  const pfFormulasForSelection = useMemo(() => {
+    const activePfCatalogFormulas = catalogFormulas.filter(
+      (formula) => formula.activo && formula.tipo === "PF",
+    );
+
+    if (isCatalogError || activePfCatalogFormulas.length === 0) {
+      return availableFormulas;
+    }
+
+    return activePfCatalogFormulas.map(catalogFormulaToMainFormula);
+  }, [catalogFormulas, isCatalogError]);
+
+  const peFormulasForSelection = useMemo(() => {
+    const activePeCatalogFormulas = catalogFormulas.filter(
+      (formula) => formula.activo && formula.tipo === "PE",
+    );
+
+    if (activePeCatalogFormulas.length > 0) {
+      return activePeCatalogFormulas.map(catalogFormulaToSelectablePe);
+    }
+
+    return fallbackPeOptionsFromFormulas(availableFormulas);
+  }, [catalogFormulas]);
+
+  const selectedPf = pfFormulasForSelection.find(
+    (formula) => formula.id === selectedPfFormula,
+  );
+
+  const selectedPe = peFormulasForSelection.find(
+    (formula) => formula.id === selectedPeFormula,
+  );
+
+  const requiresPe =
+    selectedPf !== undefined &&
+    expressionUsesVariable(selectedPf.formula, "PE");
+
+  const currentFormula = useMemo(() => {
+    return combinePfWithSelectedPe(selectedPf, selectedPe);
+  }, [selectedPf, selectedPe]);
+
+  const coordinatorComments = getCommentsForSection(UI_STEP_NUMBER);
+
   const canEdit =
-    !isReviewMode &&
-    hasEditPermissionForSection(6) &&
-    !isLockedByState &&
-    !isResolvingState;
+    isDraftCreateMode ||
+    (!isReviewMode &&
+      hasEditPermissionForSection(UI_STEP_NUMBER) &&
+      !isResolvingState &&
+      (!isLockedByState || isDisapprovedCorrection));
 
   useEffect(() => {
     if (!isDraftCreateMode || !draft.formulaEvaluacion) return;
 
-    const matchedFormula = availableFormulas.find((formula) => {
+    const matchedPf = pfFormulasForSelection.find((formula) => {
       return (
         formula.name === draft.formulaEvaluacion?.nombreRegla ||
         formula.formula === draft.formulaEvaluacion?.expresionFinal
       );
     });
 
-    if (matchedFormula) {
-      setSelectedFormula(matchedFormula.id);
+    if (matchedPf) {
+      setSelectedPfFormula(matchedPf.id);
     }
-  }, [isDraftCreateMode, draft.formulaEvaluacion]);
+
+    const draftPe = draft.formulaEvaluacion.subformulas?.find(
+      (subFormula) => subFormula.variableCodigo?.toUpperCase() === "PE",
+    );
+
+    if (draftPe) {
+      const matchedPe = peFormulasForSelection.find((formula) => {
+        return formula.formula === ensureFormulaTarget("PE", draftPe.expresion);
+      });
+
+      if (matchedPe) {
+        setSelectedPeFormula(matchedPe.id);
+      }
+    }
+  }, [
+    isDraftCreateMode,
+    draft.formulaEvaluacion,
+    pfFormulasForSelection,
+    peFormulasForSelection,
+  ]);
 
   useEffect(() => {
     if (isDraftCreateMode) return;
     if (!formulaFromApi) return;
 
-    const matchedFormula = availableFormulas.find((formula) => {
+    const matchedPf = pfFormulasForSelection.find((formula) => {
       return (
         formula.name === formulaFromApi.nombreRegla ||
         formula.formula === formulaFromApi.expresionFinal
       );
     });
 
-    if (matchedFormula) {
-      setSelectedFormula(matchedFormula.id);
+    if (matchedPf) {
+      setSelectedPfFormula(matchedPf.id);
     }
-  }, [formulaFromApi, isDraftCreateMode]);
 
-  const currentFormula = availableFormulas.find(
-    (formula) => formula.id === selectedFormula,
-  );
+    const apiPe = formulaFromApi.subformulas?.find(
+      (subFormula) => subFormula.variableCodigo?.toUpperCase() === "PE",
+    );
 
-  const handleFormulaChange = (value: string) => {
+    if (apiPe) {
+      const matchedPe = peFormulasForSelection.find((formula) => {
+        return formula.formula === ensureFormulaTarget("PE", apiPe.expresion);
+      });
+
+      if (matchedPe) {
+        setSelectedPeFormula(matchedPe.id);
+      }
+    }
+  }, [
+    formulaFromApi,
+    isDraftCreateMode,
+    pfFormulasForSelection,
+    peFormulasForSelection,
+  ]);
+
+  useEffect(() => {
+    if (!requiresPe) {
+      setSelectedPeFormula("");
+    }
+  }, [requiresPe]);
+
+  const handlePfFormulaChange = (value: string) => {
     if (!canEdit) return;
 
-    setSelectedFormula(value);
+    setSelectedPfFormula(value);
+  };
+
+  const handlePeFormulaChange = (value: string) => {
+    if (!canEdit) return;
+
+    setSelectedPeFormula(value);
   };
 
   const handleSaveFormula = async () => {
     if (!canEdit) {
-      throw new Error("No tienes permiso para guardar esta sección.");
+      return false;
     }
 
     if (!syllabusId) {
       throw new Error("No se pudo identificar el sílabo.");
     }
 
-    if (!currentFormula) {
-      throw new Error("Selecciona un esquema de evaluación antes de guardar.");
+    if (!selectedPf || !currentFormula) {
+      throw new Error("Selecciona una fórmula de promedio final.");
+    }
+
+    if (requiresPe && !selectedPe) {
+      throw new Error("Selecciona una fórmula de promedio de evaluaciones.");
     }
 
     const payload = buildFormulaPayload(Number(syllabusId), currentFormula);
 
     if (formulaFromApi?.id) {
       await updateFormulaMutation.mutateAsync({
-        silaboId: Number(syllabusId),
+        formulaId: formulaFromApi.id,
         formula: {
           nombreRegla: payload.nombreRegla,
           variableFinalCodigo: payload.variableFinalCodigo,
@@ -278,39 +602,54 @@ export default function SixthStep() {
     }
 
     toast.success("Esquema de evaluación guardado correctamente");
+    return true;
   };
 
   const handleNextStep = async () => {
-    if (canEdit) {
-      if (isDraftCreateMode) {
-        if (!currentFormula) {
-          toast.error("Selecciona un esquema de evaluación antes de continuar.");
-          return;
-        }
-
-        setSixthStepData(buildFormulaPayload(0, currentFormula));
-        nextStep();
-        return;
-      }
-
-      try {
-        await handleSaveFormula();
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "No se pudo guardar la evaluación",
-        );
-        return;
-      }
+    if (!canEdit) {
+      nextStep();
+      return;
     }
 
-    nextStep();
+    if (!selectedPf || !currentFormula) {
+      toast.error(
+        "Selecciona una fórmula de promedio final antes de continuar.",
+      );
+      return;
+    }
+
+    if (requiresPe && !selectedPe) {
+      toast.error(
+        "Selecciona una fórmula de promedio de evaluaciones antes de continuar.",
+      );
+      return;
+    }
+
+    if (isDraftCreateMode) {
+      setSixthStepData(buildFormulaPayload(0, currentFormula));
+      nextStep();
+      return;
+    }
+
+    try {
+      const saved = await handleSaveFormula();
+
+      if (saved) {
+        nextStep();
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la evaluación";
+
+      toast.error(message);
+    }
   };
 
   if (!isDraftCreateMode && isLoading) {
     return (
-      <Step step={6} onNextStep={handleNextStep}>
+      <Step step={UI_STEP_NUMBER} onNextStep={handleNextStep}>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-8">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
             <Loader2 size={18} className="animate-spin" />
@@ -322,7 +661,7 @@ export default function SixthStep() {
   }
 
   return (
-    <Step step={6} onNextStep={handleNextStep}>
+    <Step step={UI_STEP_NUMBER} onNextStep={handleNextStep}>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
         <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-red-50 via-white to-white">
           <div className="flex items-center gap-4">
@@ -336,8 +675,8 @@ export default function SixthStep() {
               </h2>
 
               <p className="text-sm text-gray-500 mt-1">
-                Selecciona el esquema de evaluación que se utilizará para calcular
-                el promedio final de la asignatura.
+                Selecciona el esquema de evaluación que se utilizará para
+                calcular el promedio final de la asignatura.
               </p>
             </div>
 
@@ -349,7 +688,7 @@ export default function SixthStep() {
 
         <div className="p-8">
           <CoordinatorCommentsBanner
-            stepNumber={6}
+            stepNumber={UI_STEP_NUMBER}
             comments={coordinatorComments}
           />
 
@@ -395,11 +734,21 @@ export default function SixthStep() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
                   <p className="text-xs font-semibold text-gray-400 uppercase">
-                    Esquemas
+                    Esquemas PF
                   </p>
 
                   <p className="text-xl font-bold text-gray-900">
-                    {availableFormulas.length}
+                    {pfFormulasForSelection.length}
+                  </p>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+                  <p className="text-xs font-semibold text-gray-400 uppercase">
+                    Fórmulas PE
+                  </p>
+
+                  <p className="text-xl font-bold text-gray-900">
+                    {peFormulasForSelection.length}
                   </p>
                 </div>
 
@@ -441,37 +790,70 @@ export default function SixthStep() {
                       </h3>
 
                       <p className="text-sm text-gray-500 mt-1">
-                        Selecciona un esquema de evaluación disponible.
+                        Selecciona la fórmula PF del sílabo.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-6">
-                  <label className="block text-sm font-bold text-gray-900 mb-2">
-                    Esquema de evaluación
-                  </label>
+                <div className="p-6 space-y-5">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900 mb-2">
+                      Fórmula PF
+                    </label>
 
-                  <Select
-                    value={selectedFormula || undefined}
-                    onValueChange={handleFormulaChange}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed disabled:opacity-70">
-                      <SelectValue placeholder="Selecciona un esquema de evaluación" />
-                    </SelectTrigger>
+                    <Select
+                      value={selectedPfFormula || undefined}
+                      onValueChange={handlePfFormulaChange}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <SelectValue placeholder="Selecciona una fórmula PF" />
+                      </SelectTrigger>
 
-                    <SelectContent>
-                      {availableFormulas.map((formula) => (
-                        <SelectItem key={formula.id} value={formula.id}>
-                          {formula.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectContent>
+                        {pfFormulasForSelection.map((formula) => (
+                          <SelectItem key={formula.id} value={formula.id}>
+                            {formula.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {requiresPe && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-900 mb-2">
+                        Fórmula PE
+                      </label>
+
+                      <Select
+                        value={selectedPeFormula || undefined}
+                        onValueChange={handlePeFormulaChange}
+                        disabled={!canEdit}
+                      >
+                        <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-sm focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed disabled:opacity-70">
+                          <SelectValue placeholder="Selecciona una fórmula PE" />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {peFormulasForSelection.map((formula) => (
+                            <SelectItem key={formula.id} value={formula.id}>
+                              {formula.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <p className="text-xs text-gray-500 mt-2">
+                        Esta fórmula se mostrará como desglose del promedio de
+                        evaluaciones.
+                      </p>
+                    </div>
+                  )}
 
                   {currentFormula && (
-                    <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
+                    <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
                       <p className="text-xs font-bold text-red-700 uppercase">
                         Esquema seleccionado
                       </p>
@@ -479,6 +861,12 @@ export default function SixthStep() {
                       <p className="text-sm font-semibold text-gray-900 mt-1">
                         {currentFormula.name}
                       </p>
+
+                      {selectedPe && (
+                        <p className="text-xs text-gray-700 mt-2">
+                          PE: {selectedPe.name}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -491,14 +879,12 @@ export default function SixthStep() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-blue-900">
-                      Recomendación
-                    </h3>
+                    <h3 className="font-bold text-blue-900">Recomendación</h3>
 
                     <p className="text-sm text-blue-700 leading-relaxed mt-1">
-                      Revisa la leyenda y las fórmulas desglosadas antes de
-                      continuar para asegurar que correspondan al sistema de
-                      evaluación del curso.
+                      Selecciona una fórmula PF y, si corresponde, una fórmula
+                      PE para que el sílabo muestre ambas fórmulas como en el
+                      formato oficial.
                     </p>
                   </div>
                 </div>
@@ -540,9 +926,9 @@ export default function SixthStep() {
                         </h4>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {currentFormula.legend.map((item, index) => (
+                          {currentFormula.legend.map((item) => (
                             <div
-                              key={index}
+                              key={`${currentFormula.id}-${item.key}`}
                               className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3"
                             >
                               <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-white border border-gray-100 text-xs font-bold text-red-700 mr-2">
@@ -583,7 +969,7 @@ export default function SixthStep() {
                       <div className="p-6 space-y-5">
                         {currentFormula.subFormulas.map((subFormula, index) => (
                           <div
-                            key={index}
+                            key={`${currentFormula.id}-${subFormula.variable}-${subFormula.formula}`}
                             className="rounded-2xl border border-gray-100 bg-gray-50 p-5"
                           >
                             <div className="flex items-start justify-between gap-4 mb-4">
@@ -614,22 +1000,20 @@ export default function SixthStep() {
                               </h5>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {subFormula.legend.map(
-                                  (item, legendIndex) => (
-                                    <div
-                                      key={legendIndex}
-                                      className="rounded-xl border border-gray-100 bg-white px-4 py-3"
-                                    >
-                                      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
-                                        {item.key}
-                                      </span>
+                                {subFormula.legend.map((item) => (
+                                  <div
+                                    key={`${subFormula.variable}-${item.key}`}
+                                    className="rounded-xl border border-gray-100 bg-white px-4 py-3"
+                                  >
+                                    <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-red-50 border border-red-100 text-xs font-bold text-red-700 mr-2">
+                                      {item.key}
+                                    </span>
 
-                                      <span className="text-sm text-gray-700">
-                                        {item.description}
-                                      </span>
-                                    </div>
-                                  ),
-                                )}
+                                    <span className="text-sm text-gray-700">
+                                      {item.description}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           </div>

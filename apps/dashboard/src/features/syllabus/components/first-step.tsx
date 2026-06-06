@@ -146,8 +146,7 @@ function hydrateFormFromGeneralData(
     creditosTotal: String(creditosTotales),
     docentes: json.docentes ?? "",
     horasTeoria: json.horasTeoria != null ? String(json.horasTeoria) : "",
-    horasPractica:
-      json.horasPractica != null ? String(json.horasPractica) : "",
+    horasPractica: json.horasPractica != null ? String(json.horasPractica) : "",
   };
 }
 
@@ -193,13 +192,9 @@ export default function FirstStep() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCreating, setIsCreating] = useState(false);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-  } = useSyllabusGeneral(isDraftCreateMode ? null : resolvedSyllabusId);
+  const { data, isLoading, isFetching, isError, error } = useSyllabusGeneral(
+    isDraftCreateMode ? null : resolvedSyllabusId,
+  );
 
   const inputsDisabled =
     isReadOnly ||
@@ -463,12 +458,12 @@ export default function FirstStep() {
     const horasPractica = Number(form.horasPractica || 0);
     const creditosTeoria = Number(form.creditosTeoria || 0);
     const creditosPractica = Number(form.creditosPractica || 0);
-    const draft = {
+    const draftPayload = {
       ...form,
       totalHours: horasTeoria + horasPractica,
     };
 
-    localStorage.setItem(draftKey, JSON.stringify(draft));
+    localStorage.setItem(draftKey, JSON.stringify(draftPayload));
 
     setCourseName(form.nombreAsignatura);
 
@@ -523,7 +518,8 @@ export default function FirstStep() {
         }
 
         toast.error(
-          e[firstKey] || "Corrija los errores del formulario antes de continuar.",
+          e[firstKey] ||
+            "Corrija los errores del formulario antes de continuar.",
         );
         return;
       }
@@ -701,7 +697,9 @@ export default function FirstStep() {
 
                 <ClearButton
                   fieldName="nombreAsignatura"
-                  visible={!inputsDisabled && form.nombreAsignatura.trim() !== ""}
+                  visible={
+                    !inputsDisabled && form.nombreAsignatura.trim() !== ""
+                  }
                 />
               </div>
             ) : (
@@ -860,10 +858,7 @@ export default function FirstStep() {
 
                           <div className={readonlyBoxClass}>
                             Total créditos (
-                            {String(form.creditosTotal || "0").padStart(
-                              2,
-                              "0",
-                            )}
+                            {String(form.creditosTotal || "0").padStart(2, "0")}
                             )
                           </div>
                         </>
@@ -936,10 +931,7 @@ export default function FirstStep() {
 
                           <div className={readonlyBoxClass}>
                             Práctica (
-                            {String(form.horasPractica || "0").padStart(
-                              2,
-                              "0",
-                            )}
+                            {String(form.horasPractica || "0").padStart(2, "0")}
                             )
                           </div>
 
@@ -1121,7 +1113,10 @@ export default function FirstStep() {
                         value={form.ciclo}
                         onChange={(e) => updateField("ciclo", e.target.value)}
                         disabled={inputsDisabled}
-                        className={inputClass(Boolean(errors.ciclo), inputsDisabled)}
+                        className={inputClass(
+                          Boolean(errors.ciclo),
+                          inputsDisabled,
+                        )}
                       >
                         <option value="">Seleccione ciclo</option>
                         <option value="I">I</option>

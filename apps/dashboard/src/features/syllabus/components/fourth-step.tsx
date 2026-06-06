@@ -83,7 +83,9 @@ function decodeEventoFromActividad(value: unknown) {
   };
 }
 
-function mapSemanaToApiPayload(semana: SemanaProgramacion): SemanaProgramacionApi {
+function mapSemanaToApiPayload(
+  semana: SemanaProgramacion,
+): SemanaProgramacionApi {
   return {
     semana: semana.semana,
     contenidosConceptuales: semana.esEvento
@@ -245,9 +247,7 @@ function normalizeUnitsFromApi(data: unknown[]): UnidadProgramacion[] {
           horasLectivasTeoria: Number(unidad.horasLectivasTeoria ?? 0),
           horasLectivasPractica: Number(unidad.horasLectivasPractica ?? 0),
           horasNoLectivasTeoria: Number(unidad.horasNoLectivasTeoria ?? 0),
-          horasNoLectivasPractica: Number(
-            unidad.horasNoLectivasPractica ?? 0,
-          ),
+          horasNoLectivasPractica: Number(unidad.horasNoLectivasPractica ?? 0),
         });
       }
 
@@ -261,7 +261,8 @@ function normalizeUnitsFromApi(data: unknown[]): UnidadProgramacion[] {
             unidad.capacidades ??
             "",
         ).trim(),
-        semanaInicio: semanas[0]?.semana ?? (unidad.semanaInicio as number) ?? null,
+        semanaInicio:
+          semanas[0]?.semana ?? (unidad.semanaInicio as number) ?? null,
         semanaFin:
           semanas[semanas.length - 1]?.semana ??
           (unidad.semanaFin as number) ??
@@ -272,6 +273,7 @@ function normalizeUnitsFromApi(data: unknown[]): UnidadProgramacion[] {
     .sort((a, b) => a.numero - b.numero);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function validateUnidadesBeforeSave(unidades: UnidadProgramacion[]) {
   if (!unidades.length) {
     throw new Error("Debe registrar al menos una unidad.");
@@ -361,6 +363,7 @@ export function validateUnidadesBeforeSave(unidades: UnidadProgramacion[]) {
   });
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function buildPayloadFromUnidad(
   silaboId: number,
   unidad: UnidadProgramacion,
@@ -476,9 +479,8 @@ export default function FourthStep() {
     return null;
   }, [syllabusId, searchParams]);
 
-  const { isLockedByState, isResolvingState } = useSyllabusEditLock(
-    resolvedSyllabusId,
-  );
+  const { isLockedByState, isResolvingState } =
+    useSyllabusEditLock(resolvedSyllabusId);
 
   const canEdit =
     !isReviewMode &&
@@ -513,9 +515,7 @@ export default function FourthStep() {
     deleteProgramacion.isPending;
 
   const inputsDisabled =
-    !canEdit ||
-    progBusy ||
-    (!isDraftCreateMode && (isLoading || isFetching));
+    !canEdit || progBusy || (!isDraftCreateMode && (isLoading || isFetching));
 
   const selectedUnidad = unidades[selectedUnidadIndex];
   const selectedSemana =
@@ -708,7 +708,9 @@ export default function FourthStep() {
         loadedUnitIdsRef.current.delete(Number(unidad.id));
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Error al eliminar la unidad",
+          error instanceof Error
+            ? error.message
+            : "Error al eliminar la unidad",
         );
         return;
       }
@@ -744,7 +746,9 @@ export default function FourthStep() {
     }
 
     if (!selectedUnidad.capacidadesText.trim()) {
-      toast.error("Ingrese la capacidad de la unidad antes de agregar semanas.");
+      toast.error(
+        "Ingrese la capacidad de la unidad antes de agregar semanas.",
+      );
       return;
     }
 
@@ -818,9 +822,7 @@ export default function FourthStep() {
     if (!canEdit || !selectedUnidad) return;
 
     if (!selectedUnidad.titulo.trim()) {
-      toast.error(
-        `Ingrese el nombre de la unidad ${selectedUnidad.numero}.`,
-      );
+      toast.error(`Ingrese el nombre de la unidad ${selectedUnidad.numero}.`);
       return;
     }
 
@@ -989,9 +991,7 @@ export default function FourthStep() {
       nextStep();
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Error guardando programación",
+        error instanceof Error ? error.message : "Error guardando programación",
       );
     }
   };
@@ -1083,9 +1083,7 @@ export default function FourthStep() {
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Código:{" "}
-                    {generalData?.codigoAsignatura ||
-                      cursoCodigo ||
-                      "—"}
+                    {generalData?.codigoAsignatura || cursoCodigo || "—"}
                     {generalData?.programaAcademico
                       ? ` · ${generalData.programaAcademico}`
                       : ""}
@@ -1198,7 +1196,9 @@ export default function FourthStep() {
                       {canEdit && unidades.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => void handleDeleteUnidad(selectedUnidadIndex)}
+                          onClick={() =>
+                            void handleDeleteUnidad(selectedUnidadIndex)
+                          }
                           disabled={inputsDisabled}
                           className={`mt-2 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 ${disabledInputClass}`}
                         >
@@ -1293,7 +1293,8 @@ export default function FourthStep() {
                       ) : (
                         <div className="space-y-2">
                           {selectedUnidad.semanas.map((semana, sIdx) => {
-                            const isSelectedSemana = selectedSemanaIndex === sIdx;
+                            const isSelectedSemana =
+                              selectedSemanaIndex === sIdx;
 
                             return (
                               <div
@@ -1334,14 +1335,19 @@ export default function FourthStep() {
                                 >
                                   <Star
                                     size={18}
-                                    className={semana.esEvento ? "fill-current" : ""}
+                                    className={
+                                      semana.esEvento ? "fill-current" : ""
+                                    }
                                   />
                                 </button>
                                 {canEdit && (
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      handleDeleteSemana(selectedUnidadIndex, sIdx)
+                                      handleDeleteSemana(
+                                        selectedUnidadIndex,
+                                        sIdx,
+                                      )
                                     }
                                     disabled={inputsDisabled}
                                     className={`h-10 w-10 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center shrink-0 ${disabledInputClass}`}
@@ -1364,7 +1370,6 @@ export default function FourthStep() {
             <div className="space-y-6">
               {selectedUnidad ? (
                 <>
-
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
@@ -1385,11 +1390,10 @@ export default function FourthStep() {
                       </span>
                     </div>
 
-
                     {selectedUnidad.semanas.length === 0 ? (
                       <p className="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-200 rounded-xl">
-                        No hay semanas registradas. Use &quot;Agregar semana&quot;
-                        para comenzar.
+                        No hay semanas registradas. Use &quot;Agregar
+                        semana&quot; para comenzar.
                       </p>
                     ) : (
                       <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -1474,7 +1478,9 @@ export default function FourthStep() {
                               >
                                 <Star
                                   size={18}
-                                  className={semana.esEvento ? "fill-current" : ""}
+                                  className={
+                                    semana.esEvento ? "fill-current" : ""
+                                  }
                                 />
                               </button>
                             </div>
@@ -1522,163 +1528,164 @@ export default function FourthStep() {
                       ) : null}
 
                       {!selectedSemana.esEvento ? (
-                      <>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-900 mb-2">
-                          Contenido conceptual
-                        </label>
-                        <textarea
-                          value={selectedSemana.contenidosConceptuales}
-                          onChange={(e) =>
-                            updateSelectedSemanaField(
-                              "contenidosConceptuales",
-                              e.target.value,
-                            )
-                          }
-                          disabled={inputsDisabled}
-                          rows={4}
-                          maxLength={800}
-                          placeholder="Describa los contenidos conceptuales de la semana..."
-                          className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                        />
-                        <p className="mt-1 text-xs text-gray-400 text-right">
-                          {selectedSemana.contenidosConceptuales.length}/800
-                        </p>
-                      </div>
+                        <>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-900 mb-2">
+                              Contenido conceptual
+                            </label>
+                            <textarea
+                              value={selectedSemana.contenidosConceptuales}
+                              onChange={(e) =>
+                                updateSelectedSemanaField(
+                                  "contenidosConceptuales",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={inputsDisabled}
+                              rows={4}
+                              maxLength={800}
+                              placeholder="Describa los contenidos conceptuales de la semana..."
+                              className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                            />
+                            <p className="mt-1 text-xs text-gray-400 text-right">
+                              {selectedSemana.contenidosConceptuales.length}/800
+                            </p>
+                          </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-gray-900 mb-2">
-                          Contenido procedimental
-                        </label>
-                        <textarea
-                          value={selectedSemana.contenidosProcedimentales}
-                          onChange={(e) =>
-                            updateSelectedSemanaField(
-                              "contenidosProcedimentales",
-                              e.target.value,
-                            )
-                          }
-                          disabled={inputsDisabled}
-                          rows={4}
-                          maxLength={800}
-                          placeholder="Describa los contenidos procedimentales de la semana..."
-                          className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                        />
-                        <p className="mt-1 text-xs text-gray-400 text-right">
-                          {selectedSemana.contenidosProcedimentales.length}/800
-                        </p>
-                      </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-900 mb-2">
+                              Contenido procedimental
+                            </label>
+                            <textarea
+                              value={selectedSemana.contenidosProcedimentales}
+                              onChange={(e) =>
+                                updateSelectedSemanaField(
+                                  "contenidosProcedimentales",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={inputsDisabled}
+                              rows={4}
+                              maxLength={800}
+                              placeholder="Describa los contenidos procedimentales de la semana..."
+                              className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                            />
+                            <p className="mt-1 text-xs text-gray-400 text-right">
+                              {selectedSemana.contenidosProcedimentales.length}
+                              /800
+                            </p>
+                          </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-gray-900 mb-2">
-                          Actividades de aprendizaje
-                        </label>
-                        <textarea
-                          value={selectedSemana.actividadesAprendizaje}
-                          onChange={(e) =>
-                            updateSelectedSemanaField(
-                              "actividadesAprendizaje",
-                              e.target.value,
-                            )
-                          }
-                          disabled={inputsDisabled}
-                          rows={4}
-                          maxLength={800}
-                          placeholder="Describa las actividades de aprendizaje de la semana..."
-                          className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                        />
-                        <p className="mt-1 text-xs text-gray-400 text-right">
-                          {selectedSemana.actividadesAprendizaje.length}/800
-                        </p>
-                      </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-900 mb-2">
+                              Actividades de aprendizaje
+                            </label>
+                            <textarea
+                              value={selectedSemana.actividadesAprendizaje}
+                              onChange={(e) =>
+                                updateSelectedSemanaField(
+                                  "actividadesAprendizaje",
+                                  e.target.value,
+                                )
+                              }
+                              disabled={inputsDisabled}
+                              rows={4}
+                              maxLength={800}
+                              placeholder="Describa las actividades de aprendizaje de la semana..."
+                              className={`w-full min-h-[110px] rounded-xl px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-700 placeholder:text-gray-400 resize-y outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                            />
+                            <p className="mt-1 text-xs text-gray-400 text-right">
+                              {selectedSemana.actividadesAprendizaje.length}/800
+                            </p>
+                          </div>
 
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Clock size={18} className="text-gray-500" />
-                          <h4 className="text-sm font-bold text-gray-900">
-                            Distribución horaria
-                          </h4>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">
-                              Horas lectivas — teoría
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={24}
-                              value={selectedSemana.horasLectivasTeoria}
-                              onChange={(e) =>
-                                updateSelectedSemanaField(
-                                  "horasLectivasTeoria",
-                                  Number(e.target.value),
-                                )
-                              }
-                              disabled={inputsDisabled}
-                              className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                            />
+                            <div className="flex items-center gap-2 mb-3">
+                              <Clock size={18} className="text-gray-500" />
+                              <h4 className="text-sm font-bold text-gray-900">
+                                Distribución horaria
+                              </h4>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                  Horas lectivas — teoría
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={24}
+                                  value={selectedSemana.horasLectivasTeoria}
+                                  onChange={(e) =>
+                                    updateSelectedSemanaField(
+                                      "horasLectivasTeoria",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={inputsDisabled}
+                                  className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                  Horas lectivas — práctica
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={24}
+                                  value={selectedSemana.horasLectivasPractica}
+                                  onChange={(e) =>
+                                    updateSelectedSemanaField(
+                                      "horasLectivasPractica",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={inputsDisabled}
+                                  className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                  Horas no lectivas — teoría
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={24}
+                                  value={selectedSemana.horasNoLectivasTeoria}
+                                  onChange={(e) =>
+                                    updateSelectedSemanaField(
+                                      "horasNoLectivasTeoria",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={inputsDisabled}
+                                  className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                                  Horas no lectivas — práctica
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={24}
+                                  value={selectedSemana.horasNoLectivasPractica}
+                                  onChange={(e) =>
+                                    updateSelectedSemanaField(
+                                      "horasNoLectivasPractica",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  disabled={inputsDisabled}
+                                  className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">
-                              Horas lectivas — práctica
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={24}
-                              value={selectedSemana.horasLectivasPractica}
-                              onChange={(e) =>
-                                updateSelectedSemanaField(
-                                  "horasLectivasPractica",
-                                  Number(e.target.value),
-                                )
-                              }
-                              disabled={inputsDisabled}
-                              className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">
-                              Horas no lectivas — teoría
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={24}
-                              value={selectedSemana.horasNoLectivasTeoria}
-                              onChange={(e) =>
-                                updateSelectedSemanaField(
-                                  "horasNoLectivasTeoria",
-                                  Number(e.target.value),
-                                )
-                              }
-                              disabled={inputsDisabled}
-                              className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">
-                              Horas no lectivas — práctica
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={24}
-                              value={selectedSemana.horasNoLectivasPractica}
-                              onChange={(e) =>
-                                updateSelectedSemanaField(
-                                  "horasNoLectivasPractica",
-                                  Number(e.target.value),
-                                )
-                              }
-                              disabled={inputsDisabled}
-                              className={`w-full h-11 rounded-xl px-4 bg-gray-50 border border-gray-200 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent ${disabledInputClass}`}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      </>
+                        </>
                       ) : null}
 
                       <button

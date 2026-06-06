@@ -3,10 +3,31 @@ import { SyllabusPDFDocument } from "../components/SyllabusPDFDocument";
 import { syllabusPDFService } from "../services/syllabus-pdf-service";
 
 function sanitizeFileToken(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = value.toLowerCase();
+  let result = "";
+  let previousWasDash = false;
+
+  for (const char of normalized) {
+    const isLetter = char >= "a" && char <= "z";
+    const isNumber = char >= "0" && char <= "9";
+
+    if (isLetter || isNumber) {
+      result += char;
+      previousWasDash = false;
+      continue;
+    }
+
+    if (!previousWasDash && result.length > 0) {
+      result += "-";
+      previousWasDash = true;
+    }
+  }
+
+  while (result.endsWith("-")) {
+    result = result.slice(0, -1);
+  }
+
+  return result;
 }
 
 export function buildSyllabusPdfFilename(
@@ -14,8 +35,13 @@ export function buildSyllabusPdfFilename(
   codigo?: string | null,
 ): string {
   if (codigo?.trim()) {
-    return `silabo-${sanitizeFileToken(codigo)}.pdf`;
+    const sanitizedCode = sanitizeFileToken(codigo);
+
+    if (sanitizedCode) {
+      return `silabo-${sanitizedCode}.pdf`;
+    }
   }
+
   return `silabo-${syllabusId}.pdf`;
 }
 
@@ -40,10 +66,13 @@ export async function downloadSyllabusPdf(
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+
   link.href = url;
   link.download = filename;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
+
   URL.revokeObjectURL(url);
 }
