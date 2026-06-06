@@ -38,7 +38,6 @@ import FifthStep from "../../syllabus/components/fifth-step";
 import SixthStep from "../../syllabus/components/sixth-step";
 import SeventhStep from "../../syllabus/components/seventh-step";
 import EighthStep from "../../syllabus/components/eighth-step";
-import { error } from "console";
 
 type ReviewStatus = "approved" | "rejected" | null;
 
@@ -99,8 +98,8 @@ export default function ReviewSyllabusDetail() {
       try {
         const parsed = JSON.parse(savedData) as ReviewData;
         setReviewData(parsed);
-      } catch {
-        console.error("Error:", error);
+      } catch (error) {
+        console.error("Error al obtener el detalle del syllabus:", error);
       }
     }
   }, [savedReviewData, id]);
