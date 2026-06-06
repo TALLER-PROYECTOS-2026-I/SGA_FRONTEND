@@ -24,6 +24,9 @@ import ReviewSyllabusList from "./features/coordinator/pages/review-syllabus-lis
 import ReviewSyllabusDetail from "./features/coordinator/pages/review-syllabus-detail";
 import ReviewSyllabusSummary from "./features/coordinator/pages/review-syllabus-summary";
 import SyllabusCatalog from "./features/coordinator/pages/syllabus-catalog";
+import FormulasManagement from "./features/formulas/pages/formulas-management";
+import SyllabusVersionsPage from "./features/syllabus/pages/syllabus-versions-page";
+import CurriculumMeshPage from "./features/curriculum/pages/curriculum-mesh-page";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +75,30 @@ export default function App() {
                 element={
                   <MainLayout title="Asignar Docente">
                     <ManagementPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/formulas"
+                element={
+                  <MainLayout title="Fórmulas">
+                    <FormulasManagement />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/syllabus-versions"
+                element={
+                  <MainLayout title="Versiones de Sílabos">
+                    <SyllabusVersionsPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/curriculum"
+                element={
+                  <MainLayout title="Malla Curricular">
+                    <CurriculumMeshPage />
                   </MainLayout>
                 }
               />
