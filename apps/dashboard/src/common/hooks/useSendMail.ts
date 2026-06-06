@@ -18,8 +18,10 @@ export interface SendMailOptions {
 export const MAX_FILE_BYTES = 3 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 export const MAX_FILES = 5;
+
 const MAX_SUBJECT_LENGTH = 150;
 const MAX_BODY_LENGTH = 10000;
+
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   "pdf",
   "doc",
@@ -32,6 +34,7 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   "jpg",
   "jpeg",
 ]);
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const humanSize = (bytes: number) => {
@@ -63,19 +66,23 @@ const getFileExtension = (name: string) =>
 const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   const { to, subject, body, files = [] } = opts;
 
-  if (!to.trim() || !subject.trim() || !body.trim()) {
+  const normalizedTo = to.trim();
+  const normalizedSubject = subject.trim();
+  const normalizedBody = body.trim();
+
+  if (!normalizedTo || !normalizedSubject || !normalizedBody) {
     throw new Error("Completa destinatario, asunto y mensaje");
   }
 
-  if (!EMAIL_PATTERN.test(to.trim())) {
+  if (!EMAIL_PATTERN.test(normalizedTo)) {
     throw new Error("El destinatario no tiene un formato de correo válido");
   }
 
-  if (subject.length > MAX_SUBJECT_LENGTH) {
+  if (normalizedSubject.length > MAX_SUBJECT_LENGTH) {
     throw new Error(`El asunto no debe superar ${MAX_SUBJECT_LENGTH} caracteres`);
   }
 
-  if (body.length > MAX_BODY_LENGTH) {
+  if (normalizedBody.length > MAX_BODY_LENGTH) {
     throw new Error(`El mensaje no debe superar ${MAX_BODY_LENGTH} caracteres`);
   }
 
@@ -140,15 +147,15 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
     },
     body: JSON.stringify({
       message: {
-        subject,
+        subject: normalizedSubject,
         body: {
           contentType: "HTML",
-          content: body,
+          content: normalizedBody,
         },
         toRecipients: [
           {
             emailAddress: {
-              address: to,
+              address: normalizedTo,
             },
           },
         ],
@@ -159,7 +166,8 @@ const sendMailRequest = async (opts: SendMailOptions): Promise<void> => {
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo enviar el correo con Microsoft Graph");
+    const text = await response.text().catch(() => "");
+    throw new Error(text || "No se pudo enviar el correo con Microsoft Graph");
   }
 };
 

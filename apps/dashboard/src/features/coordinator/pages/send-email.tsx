@@ -1002,7 +1002,9 @@ Comité Curricular EPICS`;
 
             <div className="mt-7">
               <label className="block text-sm font-bold text-gray-900 mb-2">
-                {fromPermissions ? "4. Archivos Adjuntos" : "5. Archivos Adjuntos"}{" "}
+                {fromPermissions
+                  ? "4. Archivos Adjuntos"
+                  : "5. Archivos Adjuntos"}{" "}
                 <span className="font-medium text-gray-400">(opcional)</span>
               </label>
 

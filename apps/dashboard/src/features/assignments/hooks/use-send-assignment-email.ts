@@ -37,15 +37,14 @@ export function useSendAssignmentEmail() {
         additionalMessage,
       } = options;
 
-      // 1. Verificar que existe el mailToken
       const mailToken = sessionStorage.getItem("mailToken");
+
       if (!mailToken) {
         throw new Error(
           "Token de correo no disponible. Por favor, cierra sesión y vuelve a iniciar sesión.",
         );
       }
 
-      // 2. Validar email
       if (!teacherEmail || !EMAIL_PATTERN.test(teacherEmail.trim())) {
         throw new Error("Email inválido");
       }
@@ -58,7 +57,6 @@ export function useSendAssignmentEmail() {
         ? escapeHtml(additionalMessage)
         : "";
 
-      // 3. Construir el cuerpo del correo HTML
       const emailBody = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <h2 style="color: #2563eb;">Asignación a nuevo curso</h2>
@@ -69,14 +67,17 @@ export function useSendAssignmentEmail() {
             <p><strong>Código:</strong> ${safeCourseCode}</p>
             <p><strong>Periodo Académico:</strong> ${safeAcademicPeriod}</p>
           </div>
-          ${safeAdditionalMessage ? `<p><strong>Mensaje adicional:</strong></p><p style="background-color: #fef3c7; padding: 10px; border-left: 4px solid #f59e0b;">${safeAdditionalMessage}</p>` : ""}
+          ${
+            safeAdditionalMessage
+              ? `<p><strong>Mensaje adicional:</strong></p><p style="background-color: #fef3c7; padding: 10px; border-left: 4px solid #f59e0b;">${safeAdditionalMessage}</p>`
+              : ""
+          }
           <p style="margin-top: 20px;">Por favor, acceda al sistema para revisar los detalles y comenzar con la elaboración del sílabo.</p>
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #6b7280;">Este es un correo automático, por favor no responder.</p>
         </div>
       `;
 
-      // 4. Enviar correo usando Microsoft Graph API
       const res = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
         method: "POST",
         headers: {
@@ -93,12 +94,12 @@ export function useSendAssignmentEmail() {
             toRecipients: [
               {
                 emailAddress: {
-                  address: teacherEmail,
+                  address: teacherEmail.trim(),
                 },
               },
             ],
           },
-          saveToSentItems: "true",
+          saveToSentItems: true,
         }),
       });
 
@@ -106,7 +107,6 @@ export function useSendAssignmentEmail() {
         const errorText = await res.text().catch(() => "");
         let errorCode = "";
 
-        // Parsear errores comunes de Microsoft Graph
         try {
           const errorData = JSON.parse(errorText);
           errorCode = String(errorData?.error?.code ?? "");

@@ -14,8 +14,13 @@ export function buildSyllabusPdfFilename(
   codigo?: string | null,
 ): string {
   if (codigo?.trim()) {
-    return `silabo-${sanitizeFileToken(codigo)}.pdf`;
+    const sanitizedCode = sanitizeFileToken(codigo);
+
+    if (sanitizedCode) {
+      return `silabo-${sanitizedCode}.pdf`;
+    }
   }
+
   return `silabo-${syllabusId}.pdf`;
 }
 
@@ -40,10 +45,13 @@ export async function downloadSyllabusPdf(
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+
   link.href = url;
   link.download = filename;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
+
   URL.revokeObjectURL(url);
 }
